@@ -11,5 +11,8 @@ export { LabelSelect } from "./properties/LabelSelect";
 export { DatePicker } from "./properties/DatePicker";
 export { EstimateInput } from "./properties/EstimateInput";
 export { CreateIssueDrawer } from "./CreateIssueDrawer";
+export { IssueDetailDrawer } from "./IssueDetailDrawer";
 export { ChatPanel } from "./ChatPanel";
+export { IssueChatPanel } from "./IssueChatPanel";
 export { IssueFormPanel } from "./IssueFormPanel";
+export { IssueDetailForm } from "./IssueDetailForm";

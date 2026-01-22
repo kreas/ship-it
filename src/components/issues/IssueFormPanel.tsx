@@ -42,7 +42,9 @@ export function IssueFormPanel({
   highlightedFields = new Set(),
 }: IssueFormPanelProps) {
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  const [localHighlights, setLocalHighlights] = useState<Set<keyof IssueFormState>>(new Set());
+  const [localHighlights, setLocalHighlights] = useState<
+    Set<keyof IssueFormState>
+  >(new Set());
 
   // Track highlighted fields for animation
   useEffect(() => {
@@ -69,7 +71,9 @@ export function IssueFormPanel({
   };
 
   const handleRemoveLabel = (labelId: string) => {
-    onFormChange({ labelIds: formState.labelIds.filter((id) => id !== labelId) });
+    onFormChange({
+      labelIds: formState.labelIds.filter((id) => id !== labelId),
+    });
   };
 
   const canSubmit = formState.title.trim().length > 0 && !isSubmitting;
@@ -87,7 +91,8 @@ export function IssueFormPanel({
         <div
           className={cn(
             "transition-all duration-500 rounded-md",
-            localHighlights.has("title") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+            localHighlights.has("title") &&
+              "ring-2 ring-primary ring-offset-2 ring-offset-background"
           )}
         >
           <label className="text-xs font-medium text-muted-foreground block mb-2">
@@ -111,7 +116,8 @@ export function IssueFormPanel({
         <div
           className={cn(
             "transition-all duration-500 rounded-md",
-            localHighlights.has("description") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+            localHighlights.has("description") &&
+              "ring-2 ring-primary ring-offset-2 ring-offset-background"
           )}
         >
           <label className="text-xs font-medium text-muted-foreground block mb-2">
@@ -136,7 +142,8 @@ export function IssueFormPanel({
           <div
             className={cn(
               "transition-all duration-500 rounded-md p-2 -m-2",
-              localHighlights.has("status") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+              localHighlights.has("status") &&
+                "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
           >
             <label className="text-xs font-medium text-muted-foreground block mb-1">
@@ -150,7 +157,8 @@ export function IssueFormPanel({
           <div
             className={cn(
               "transition-all duration-500 rounded-md p-2 -m-2",
-              localHighlights.has("priority") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+              localHighlights.has("priority") &&
+                "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
           >
             <label className="text-xs font-medium text-muted-foreground block mb-1">
@@ -164,7 +172,8 @@ export function IssueFormPanel({
           <div
             className={cn(
               "transition-all duration-500 rounded-md p-2 -m-2",
-              localHighlights.has("dueDate") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+              localHighlights.has("dueDate") &&
+                "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
           >
             <label className="text-xs font-medium text-muted-foreground block mb-1">
@@ -178,7 +187,8 @@ export function IssueFormPanel({
           <div
             className={cn(
               "transition-all duration-500 rounded-md p-2 -m-2",
-              localHighlights.has("estimate") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+              localHighlights.has("estimate") &&
+                "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
           >
             <label className="text-xs font-medium text-muted-foreground block mb-1">
@@ -195,7 +205,8 @@ export function IssueFormPanel({
         <div
           className={cn(
             "transition-all duration-500 rounded-md p-2 -m-2",
-            localHighlights.has("labelIds") && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+            localHighlights.has("labelIds") &&
+              "ring-2 ring-primary ring-offset-2 ring-offset-background"
           )}
         >
           <label className="text-xs font-medium text-muted-foreground block mb-2">

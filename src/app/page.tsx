@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BoardView } from "@/components/board/BoardView";
 import { ListView } from "@/components/list";
-import { IssueDetailPanel, CreateIssueDrawer } from "@/components/issues";
+import { IssueDetailDrawer, CreateIssueDrawer } from "@/components/issues";
 import { CommandPalette } from "@/components/command/CommandPalette";
 import { AppShell, useAppShell } from "@/components/layout";
 import { BoardProvider, useBoardContext } from "@/components/board/context";
@@ -44,7 +44,7 @@ function MainContent() {
     <>
       <div className="flex h-full">
         {/* Main content area */}
-        <div className={`flex-1 min-w-0 ${detailPanelOpen ? "border-r border-border" : ""}`}>
+        <div className="flex-1 min-w-0">
           {currentView === VIEW.BOARD ? (
             <div className="p-4 h-full overflow-auto">
               <BoardView onIssueSelect={selectIssue} />
@@ -55,22 +55,19 @@ function MainContent() {
             </div>
           )}
         </div>
-
-        {/* Detail panel */}
-        {detailPanelOpen && selectedIssue && (
-          <div className="w-[480px] flex-shrink-0">
-            <IssueDetailPanel
-              issue={selectedIssue}
-              allLabels={labels}
-              onUpdate={updateSelectedIssue}
-              onDelete={deleteSelectedIssue}
-              onAddLabel={addLabelToSelectedIssue}
-              onRemoveLabel={removeLabelFromSelectedIssue}
-              onClose={closeDetailPanel}
-            />
-          </div>
-        )}
       </div>
+
+      {/* Issue Detail Drawer (replaces inline panel) */}
+      <IssueDetailDrawer
+        open={detailPanelOpen && !!selectedIssue}
+        onOpenChange={(open) => !open && closeDetailPanel()}
+        issue={selectedIssue}
+        allLabels={labels}
+        onUpdate={updateSelectedIssue}
+        onDelete={deleteSelectedIssue}
+        onAddLabel={addLabelToSelectedIssue}
+        onRemoveLabel={removeLabelFromSelectedIssue}
+      />
 
       {/* Command Palette */}
       <CommandPalette

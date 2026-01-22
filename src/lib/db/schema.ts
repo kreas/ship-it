@@ -124,3 +124,14 @@ export const userStories = sqliteTable("user_stories", {
   acceptanceCriteria: text("acceptance_criteria"),
   position: integer("position").notNull(),
 });
+
+// Chat messages - AI chat history per issue
+export const chatMessages = sqliteTable("chat_messages", {
+  id: text("id").primaryKey(),
+  issueId: text("issue_id")
+    .notNull()
+    .references(() => issues.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // "user" | "assistant"
+  content: text("content").notNull(), // Message text or JSON for tool calls
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});

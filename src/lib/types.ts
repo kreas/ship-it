@@ -7,6 +7,7 @@ import type {
   cycles,
   comments,
   activities,
+  chatMessages,
 } from "./db/schema";
 import type { Status, Priority } from "./design-tokens";
 
@@ -19,6 +20,7 @@ export type Label = typeof labels.$inferSelect;
 export type Cycle = typeof cycles.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;
 
 // Extended types with relations
 export type IssueWithLabels = Issue & {
