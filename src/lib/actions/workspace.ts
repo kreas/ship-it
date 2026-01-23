@@ -1,0 +1,446 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { withAuth } from "@workos-inc/authkit-nextjs";
+import { db } from "../db";
+import {
+  workspaces,
+  workspaceMembers,
+  columns,
+  labels,
+  users,
+} from "../db/schema";
+import { eq, and, asc } from "drizzle-orm";
+import type {
+  Workspace,
+  WorkspaceMember,
+  WorkspaceMemberWithUser,
+  WorkspaceRole,
+  User,
+} from "../types";
+
+const DEFAULT_COLUMNS = ["Backlog", "Todo", "In Progress", "Done"];
+const DEFAULT_LABELS: Array<{ name: string; color: string }> = [
+  { name: "Bug", color: "#ef4444" },
+  { name: "Feature", color: "#3b82f6" },
+  { name: "Improvement", color: "#22c55e" },
+  { name: "Documentation", color: "#a855f7" },
+];
+
+/**
+ * Get the current authenticated user or throw
+ */
+export async function requireAuth(): Promise<User> {
+  const { user } = await withAuth();
+  if (!user) {
+    redirect("/auth/callback");
+  }
+
+  const dbUser = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, user.id))
+    .get();
+
+  if (!dbUser) {
+    redirect("/auth/callback");
+  }
+
+  return dbUser;
+}
+
+/**
+ * Check if user has access to workspace with optional minimum role
+ */
+export async function requireWorkspaceAccess(
+  workspaceId: string,
+  minimumRole?: WorkspaceRole
+): Promise<{ user: User; member: WorkspaceMember; workspace: Workspace }> {
+  const user = await requireAuth();
+
+  const member = await db
+    .select()
+    .from(workspaceMembers)
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, user.id)
+      )
+    )
+    .get();
+
+  if (!member) {
+    throw new Error("Access denied: You are not a member of this workspace");
+  }
+
+  const workspace = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .get();
+
+  if (!workspace) {
+    throw new Error("Workspace not found");
+  }
+
+  // Check role hierarchy if minimum role specified
+  if (minimumRole) {
+    const roleHierarchy: Record<WorkspaceRole, number> = {
+      viewer: 0,
+      member: 1,
+      admin: 2,
+    };
+
+    if (roleHierarchy[member.role as WorkspaceRole] < roleHierarchy[minimumRole]) {
+      throw new Error(
+        `Access denied: Requires ${minimumRole} role or higher`
+      );
+    }
+  }
+
+  return { user, member, workspace };
+}
+
+/**
+ * Generate a URL-friendly slug from a name
+ */
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50);
+}
+
+/**
+ * Create a new workspace
+ */
+export async function createWorkspace(name: string): Promise<Workspace> {
+  const user = await requireAuth();
+  const now = new Date();
+
+  // Generate unique slug
+  let slug = generateSlug(name);
+  let slugSuffix = 0;
+  let existingSlug = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.slug, slug))
+    .get();
+
+  while (existingSlug) {
+    slugSuffix++;
+    slug = `${generateSlug(name)}-${slugSuffix}`;
+    existingSlug = await db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.slug, slug))
+      .get();
+  }
+
+  const workspaceId = crypto.randomUUID();
+
+  const newWorkspace: Workspace = {
+    id: workspaceId,
+    name,
+    slug,
+    identifier: name.toUpperCase().slice(0, 4).replace(/[^A-Z]/g, "A"),
+    issueCounter: 0,
+    ownerId: user.id,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await db.insert(workspaces).values(newWorkspace);
+
+  // Add creator as admin member
+  await db.insert(workspaceMembers).values({
+    workspaceId,
+    userId: user.id,
+    role: "admin",
+    createdAt: now,
+  });
+
+  // Create default columns
+  for (let i = 0; i < DEFAULT_COLUMNS.length; i++) {
+    await db.insert(columns).values({
+      id: crypto.randomUUID(),
+      workspaceId,
+      name: DEFAULT_COLUMNS[i],
+      position: i,
+    });
+  }
+
+  // Create default labels
+  for (const label of DEFAULT_LABELS) {
+    await db.insert(labels).values({
+      id: crypto.randomUUID(),
+      workspaceId,
+      name: label.name,
+      color: label.color,
+      createdAt: now,
+    });
+  }
+
+  revalidatePath("/");
+
+  return newWorkspace;
+}
+
+/**
+ * Get all workspaces for the current user
+ */
+export async function getUserWorkspaces(): Promise<Workspace[]> {
+  const user = await requireAuth();
+
+  const userMemberships = await db
+    .select({ workspaceId: workspaceMembers.workspaceId })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, user.id));
+
+  if (userMemberships.length === 0) {
+    return [];
+  }
+
+  const workspaceIds = userMemberships.map((m) => m.workspaceId);
+
+  const userWorkspaces: Workspace[] = [];
+  for (const id of workspaceIds) {
+    const workspace = await db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.id, id))
+      .get();
+    if (workspace) {
+      userWorkspaces.push(workspace);
+    }
+  }
+
+  return userWorkspaces.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Get workspace by slug
+ */
+export async function getWorkspaceBySlug(slug: string): Promise<Workspace | null> {
+  const workspace = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.slug, slug))
+    .get();
+
+  return workspace ?? null;
+}
+
+/**
+ * Get workspace by ID
+ */
+export async function getWorkspaceById(
+  workspaceId: string
+): Promise<Workspace | null> {
+  const workspace = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .get();
+
+  return workspace ?? null;
+}
+
+/**
+ * Get user's default (first) workspace
+ */
+export async function getUserDefaultWorkspace(): Promise<Workspace | null> {
+  const workspaceList = await getUserWorkspaces();
+  return workspaceList[0] ?? null;
+}
+
+/**
+ * Get workspace members with user info
+ */
+export async function getWorkspaceMembers(
+  workspaceId: string
+): Promise<WorkspaceMemberWithUser[]> {
+  await requireWorkspaceAccess(workspaceId);
+
+  const members = await db
+    .select()
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, workspaceId))
+    .orderBy(asc(workspaceMembers.createdAt));
+
+  const membersWithUsers: WorkspaceMemberWithUser[] = [];
+
+  for (const member of members) {
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, member.userId))
+      .get();
+
+    if (user) {
+      membersWithUsers.push({
+        ...member,
+        user,
+      });
+    }
+  }
+
+  return membersWithUsers;
+}
+
+/**
+ * Invite a member to workspace by email
+ */
+export async function inviteMember(
+  workspaceId: string,
+  email: string,
+  role: WorkspaceRole = "member"
+): Promise<{ success: boolean; message: string }> {
+  await requireWorkspaceAccess(workspaceId, "admin");
+
+  // Find user by email
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .get();
+
+  if (!user) {
+    return {
+      success: false,
+      message: "User not found. They must sign up first.",
+    };
+  }
+
+  // Check if already a member
+  const existingMember = await db
+    .select()
+    .from(workspaceMembers)
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, user.id)
+      )
+    )
+    .get();
+
+  if (existingMember) {
+    return {
+      success: false,
+      message: "User is already a member of this workspace.",
+    };
+  }
+
+  // Add as member
+  await db.insert(workspaceMembers).values({
+    workspaceId,
+    userId: user.id,
+    role,
+    createdAt: new Date(),
+  });
+
+  revalidatePath(`/w/${workspaceId}`);
+
+  return {
+    success: true,
+    message: `${user.firstName || user.email} has been added to the workspace.`,
+  };
+}
+
+/**
+ * Remove a member from workspace
+ */
+export async function removeMember(
+  workspaceId: string,
+  userId: string
+): Promise<void> {
+  const { workspace } = await requireWorkspaceAccess(workspaceId, "admin");
+
+  // Cannot remove the owner
+  if (workspace.ownerId === userId) {
+    throw new Error("Cannot remove the workspace owner");
+  }
+
+  await db
+    .delete(workspaceMembers)
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId)
+      )
+    );
+
+  revalidatePath(`/w/${workspaceId}`);
+}
+
+/**
+ * Update a member's role
+ */
+export async function updateMemberRole(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole
+): Promise<void> {
+  const { workspace } = await requireWorkspaceAccess(workspaceId, "admin");
+
+  // Cannot change owner's role
+  if (workspace.ownerId === userId) {
+    throw new Error("Cannot change the workspace owner's role");
+  }
+
+  await db
+    .update(workspaceMembers)
+    .set({ role })
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId)
+      )
+    );
+
+  revalidatePath(`/w/${workspaceId}`);
+}
+
+/**
+ * Update workspace details
+ */
+export async function updateWorkspace(
+  workspaceId: string,
+  data: { name?: string; identifier?: string }
+): Promise<void> {
+  await requireWorkspaceAccess(workspaceId, "admin");
+
+  const updates: Partial<Workspace> = {
+    updatedAt: new Date(),
+  };
+
+  if (data.name !== undefined) {
+    updates.name = data.name;
+  }
+
+  if (data.identifier !== undefined) {
+    updates.identifier = data.identifier.toUpperCase();
+  }
+
+  await db.update(workspaces).set(updates).where(eq(workspaces.id, workspaceId));
+
+  revalidatePath(`/w/${workspaceId}`);
+}
+
+/**
+ * Delete a workspace (owner only)
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  const { user, workspace } = await requireWorkspaceAccess(workspaceId, "admin");
+
+  if (workspace.ownerId !== user.id) {
+    throw new Error("Only the workspace owner can delete the workspace");
+  }
+
+  // Cascade delete will handle columns, labels, issues, etc.
+  await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+
+  revalidatePath("/");
+}

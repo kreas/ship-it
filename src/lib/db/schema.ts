@@ -1,6 +1,49 @@
 import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
 
-// Boards - workspace containers
+// Users - synced from WorkOS
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  avatarUrl: text("avatar_url"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+// Workspaces - renamed from boards, adds owner
+export const workspaces = sqliteTable("workspaces", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  identifier: text("identifier").notNull().default("AUTO"), // For issue IDs like AUTO-123
+  issueCounter: integer("issue_counter").notNull().default(0),
+  ownerId: text("owner_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+// Workspace Members - team membership
+export const workspaceMembers = sqliteTable(
+  "workspace_members",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("member"), // admin, member, viewer
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
+  })
+);
+
+// Boards - workspace containers (legacy, kept for migration)
 export const boards = sqliteTable("boards", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -9,12 +52,12 @@ export const boards = sqliteTable("boards", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
-// Columns - status columns within boards
+// Columns - status columns within workspaces
 export const columns = sqliteTable("columns", {
   id: text("id").primaryKey(),
-  boardId: text("board_id")
+  workspaceId: text("workspace_id")
     .notNull()
-    .references(() => boards.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   position: integer("position").notNull(),
 });
@@ -23,9 +66,9 @@ export const columns = sqliteTable("columns", {
 // Defined before issues to avoid circular reference
 export const cycles = sqliteTable("cycles", {
   id: text("id").primaryKey(),
-  boardId: text("board_id")
+  workspaceId: text("workspace_id")
     .notNull()
-    .references(() => boards.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   startDate: integer("start_date", { mode: "timestamp" }),
@@ -56,9 +99,9 @@ export const issues = sqliteTable("issues", {
 // Labels - for categorizing issues
 export const labels = sqliteTable("labels", {
   id: text("id").primaryKey(),
-  boardId: text("board_id")
+  workspaceId: text("workspace_id")
     .notNull()
-    .references(() => boards.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   color: text("color").notNull(), // Hex color
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
@@ -86,6 +129,7 @@ export const comments = sqliteTable("comments", {
   issueId: text("issue_id")
     .notNull()
     .references(() => issues.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   body: text("body").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
@@ -97,6 +141,7 @@ export const activities = sqliteTable("activities", {
   issueId: text("issue_id")
     .notNull()
     .references(() => issues.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   type: text("type").notNull(), // created, updated, status_changed, priority_changed, etc.
   data: text("data"), // JSON string with details
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

@@ -1,87 +1,38 @@
 "use server";
 
 import { db } from "../db";
-import { boards, columns, cards, issues, labels, issueLabels, cycles } from "../db/schema";
+import { workspaces, columns, cards, issues, labels, issueLabels, cycles } from "../db/schema";
 import { eq, asc } from "drizzle-orm";
 import type {
   BoardWithColumnsAndCards,
-  BoardWithColumnsAndIssues,
+  WorkspaceWithColumnsAndIssues,
   Label,
+  Workspace,
 } from "../types";
-
-const DEFAULT_BOARD_ID = "default-board";
-const DEFAULT_COLUMNS = ["Backlog", "Todo", "In Progress", "Done"];
-
-// Default labels to seed
-const DEFAULT_LABELS: Array<{ name: string; color: string }> = [
-  { name: "Bug", color: "#ef4444" },
-  { name: "Feature", color: "#3b82f6" },
-  { name: "Improvement", color: "#22c55e" },
-  { name: "Documentation", color: "#a855f7" },
-];
-
-export async function getOrCreateDefaultBoard(): Promise<BoardWithColumnsAndCards> {
-  const existingBoard = await db
-    .select()
-    .from(boards)
-    .where(eq(boards.id, DEFAULT_BOARD_ID))
-    .get();
-
-  if (!existingBoard) {
-    await db.insert(boards).values({
-      id: DEFAULT_BOARD_ID,
-      name: "My Board",
-      identifier: "AUTO",
-      issueCounter: 0,
-      createdAt: new Date(),
-    });
-
-    for (let i = 0; i < DEFAULT_COLUMNS.length; i++) {
-      await db.insert(columns).values({
-        id: crypto.randomUUID(),
-        boardId: DEFAULT_BOARD_ID,
-        name: DEFAULT_COLUMNS[i],
-        position: i,
-      });
-    }
-
-    // Seed default labels
-    for (const label of DEFAULT_LABELS) {
-      await db.insert(labels).values({
-        id: crypto.randomUUID(),
-        boardId: DEFAULT_BOARD_ID,
-        name: label.name,
-        color: label.color,
-        createdAt: new Date(),
-      });
-    }
-  }
-
-  return getBoardWithColumnsAndCards(DEFAULT_BOARD_ID);
-}
+import { requireWorkspaceAccess } from "./workspace";
 
 // Legacy function for backward compatibility with existing Card-based components
 export async function getBoardWithColumnsAndCards(
-  boardId: string
+  workspaceId: string
 ): Promise<BoardWithColumnsAndCards> {
-  const board = await db
+  const workspace = await db
     .select()
-    .from(boards)
-    .where(eq(boards.id, boardId))
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
     .get();
 
-  if (!board) {
-    throw new Error(`Board not found: ${boardId}`);
+  if (!workspace) {
+    throw new Error(`Workspace not found: ${workspaceId}`);
   }
 
-  const boardColumns = await db
+  const workspaceColumns = await db
     .select()
     .from(columns)
-    .where(eq(columns.boardId, boardId))
+    .where(eq(columns.workspaceId, workspaceId))
     .orderBy(asc(columns.position));
 
   const columnsWithCards = await Promise.all(
-    boardColumns.map(async (column) => {
+    workspaceColumns.map(async (column) => {
       const columnCards = await db
         .select()
         .from(cards)
@@ -95,48 +46,56 @@ export async function getBoardWithColumnsAndCards(
     })
   );
 
+  // Map workspace to board-like structure for compatibility
   return {
-    ...board,
+    id: workspace.id,
+    name: workspace.name,
+    identifier: workspace.identifier,
+    issueCounter: workspace.issueCounter,
+    createdAt: workspace.createdAt,
     columns: columnsWithCards,
   };
 }
 
-// New function for Issue-based components
-export async function getBoardWithColumnsAndIssues(
-  boardId: string
-): Promise<BoardWithColumnsAndIssues> {
-  const board = await db
+// Get workspace with issues (requires authentication)
+export async function getWorkspaceWithIssues(
+  workspaceId: string
+): Promise<WorkspaceWithColumnsAndIssues> {
+  // Verify user has access
+  await requireWorkspaceAccess(workspaceId);
+
+  const workspace = await db
     .select()
-    .from(boards)
-    .where(eq(boards.id, boardId))
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
     .get();
 
-  if (!board) {
-    throw new Error(`Board not found: ${boardId}`);
+  if (!workspace) {
+    throw new Error(`Workspace not found: ${workspaceId}`);
   }
 
-  const boardColumns = await db
+  const workspaceColumns = await db
     .select()
     .from(columns)
-    .where(eq(columns.boardId, boardId))
+    .where(eq(columns.workspaceId, workspaceId))
     .orderBy(asc(columns.position));
 
-  // Get all labels for this board
-  const boardLabels = await db
+  // Get all labels for this workspace
+  const workspaceLabels = await db
     .select()
     .from(labels)
-    .where(eq(labels.boardId, boardId))
+    .where(eq(labels.workspaceId, workspaceId))
     .orderBy(asc(labels.name));
 
-  // Get all cycles for this board
-  const boardCycles = await db
+  // Get all cycles for this workspace
+  const workspaceCycles = await db
     .select()
     .from(cycles)
-    .where(eq(cycles.boardId, boardId))
+    .where(eq(cycles.workspaceId, workspaceId))
     .orderBy(asc(cycles.startDate));
 
   const columnsWithIssues = await Promise.all(
-    boardColumns.map(async (column) => {
+    workspaceColumns.map(async (column) => {
       const columnIssues = await db
         .select()
         .from(issues)
@@ -175,63 +134,42 @@ export async function getBoardWithColumnsAndIssues(
   );
 
   return {
-    ...board,
+    ...workspace,
     columns: columnsWithIssues,
-    labels: boardLabels,
-    cycles: boardCycles,
+    labels: workspaceLabels,
+    cycles: workspaceCycles,
   };
 }
 
-// Get or create default board with issues (new version)
-export async function getOrCreateDefaultBoardWithIssues(): Promise<BoardWithColumnsAndIssues> {
-  const existingBoard = await db
+// Get workspace by slug with issues (public helper - doesn't check auth, caller should)
+export async function getWorkspaceBySlugWithIssues(
+  slug: string
+): Promise<WorkspaceWithColumnsAndIssues | null> {
+  const workspace = await db
     .select()
-    .from(boards)
-    .where(eq(boards.id, DEFAULT_BOARD_ID))
+    .from(workspaces)
+    .where(eq(workspaces.slug, slug))
     .get();
 
-  if (!existingBoard) {
-    await db.insert(boards).values({
-      id: DEFAULT_BOARD_ID,
-      name: "My Workspace",
-      identifier: "AUTO",
-      issueCounter: 0,
-      createdAt: new Date(),
-    });
-
-    for (let i = 0; i < DEFAULT_COLUMNS.length; i++) {
-      await db.insert(columns).values({
-        id: crypto.randomUUID(),
-        boardId: DEFAULT_BOARD_ID,
-        name: DEFAULT_COLUMNS[i],
-        position: i,
-      });
-    }
-
-    // Seed default labels
-    for (const label of DEFAULT_LABELS) {
-      await db.insert(labels).values({
-        id: crypto.randomUUID(),
-        boardId: DEFAULT_BOARD_ID,
-        name: label.name,
-        color: label.color,
-        createdAt: new Date(),
-      });
-    }
+  if (!workspace) {
+    return null;
   }
 
-  return getBoardWithColumnsAndIssues(DEFAULT_BOARD_ID);
+  // Delegate to the main function which handles auth
+  return getWorkspaceWithIssues(workspace.id);
 }
 
 // Label management
 export async function createLabel(
-  boardId: string,
+  workspaceId: string,
   name: string,
   color: string
 ): Promise<Label> {
-  const label: Label = {
+  await requireWorkspaceAccess(workspaceId, "member");
+
+  const label = {
     id: crypto.randomUUID(),
-    boardId,
+    workspaceId,
     name,
     color,
     createdAt: new Date(),
@@ -245,17 +183,28 @@ export async function updateLabel(
   labelId: string,
   data: { name?: string; color?: string }
 ): Promise<void> {
+  // Get the label first to check workspace access
+  const label = await db.select().from(labels).where(eq(labels.id, labelId)).get();
+  if (!label) throw new Error("Label not found");
+
+  await requireWorkspaceAccess(label.workspaceId, "member");
   await db.update(labels).set(data).where(eq(labels.id, labelId));
 }
 
 export async function deleteLabel(labelId: string): Promise<void> {
+  const label = await db.select().from(labels).where(eq(labels.id, labelId)).get();
+  if (!label) throw new Error("Label not found");
+
+  await requireWorkspaceAccess(label.workspaceId, "admin");
   await db.delete(labels).where(eq(labels.id, labelId));
 }
 
-export async function getBoardLabels(boardId: string): Promise<Label[]> {
+export async function getWorkspaceLabels(workspaceId: string): Promise<Label[]> {
+  await requireWorkspaceAccess(workspaceId);
+
   return db
     .select()
     .from(labels)
-    .where(eq(labels.boardId, boardId))
+    .where(eq(labels.workspaceId, workspaceId))
     .orderBy(asc(labels.name));
 }

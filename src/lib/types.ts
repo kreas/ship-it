@@ -8,10 +8,16 @@ import type {
   comments,
   activities,
   chatMessages,
+  users,
+  workspaces,
+  workspaceMembers,
 } from "./db/schema";
 import type { Status, Priority } from "./design-tokens";
 
 // Base types inferred from schema
+export type User = typeof users.$inferSelect;
+export type Workspace = typeof workspaces.$inferSelect;
+export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type Board = typeof boards.$inferSelect;
 export type Column = typeof columns.$inferSelect;
 export type Card = typeof cards.$inferSelect;
@@ -21,6 +27,9 @@ export type Cycle = typeof cycles.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Workspace member role type
+export type WorkspaceRole = "admin" | "member" | "viewer";
 
 // Extended types with relations
 export type IssueWithLabels = Issue & {
@@ -50,6 +59,21 @@ export type BoardWithColumnsAndIssues = Board & {
   columns: ColumnWithIssues[];
   labels: Label[];
   cycles: Cycle[];
+};
+
+// Workspace types
+export type WorkspaceMemberWithUser = WorkspaceMember & {
+  user: User;
+};
+
+export type WorkspaceWithColumnsAndIssues = Workspace & {
+  columns: ColumnWithIssues[];
+  labels: Label[];
+  cycles: Cycle[];
+};
+
+export type WorkspaceWithMembers = Workspace & {
+  members: WorkspaceMemberWithUser[];
 };
 
 // Input types for creating/updating

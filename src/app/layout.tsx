@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Linear Clone",
+  title: "🛳️ Ship It",
   description: "A Linear-style issue tracker with keyboard-first navigation",
 };
 

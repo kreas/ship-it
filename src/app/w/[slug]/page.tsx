@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { BoardView } from "@/components/board/BoardView";
+import { ListView } from "@/components/list";
+import { IssueDetailDrawer, CreateIssueDrawer } from "@/components/issues";
+import { CommandPalette } from "@/components/command/CommandPalette";
+import { AppShell, useAppShell } from "@/components/layout";
+import { BoardProvider, useBoardContext } from "@/components/board/context";
+import { VIEW } from "@/lib/design-tokens";
+import { getWorkspaceBySlugWithIssues } from "@/lib/actions/board";
+import type { WorkspaceWithColumnsAndIssues } from "@/lib/types";
+
+/**
+ * Main content area that renders the board/list view and detail panel.
+ * Uses BoardContext for all issue operations.
+ */
+function MainContent() {
+  const {
+    currentView,
+    detailPanelOpen,
+    isCreateIssueOpen,
+    setCreateIssueOpen,
+  } = useAppShell();
+
+  const {
+    board,
+    labels,
+    selectedIssue,
+    selectIssue,
+    closeDetailPanel,
+    updateSelectedIssue,
+    deleteSelectedIssue,
+    addLabelToSelectedIssue,
+    removeLabelFromSelectedIssue,
+  } = useBoardContext();
+
+  return (
+    <>
+      <div className="flex h-full">
+        {/* Main content area */}
+        <div className="flex-1 min-w-0">
+          {currentView === VIEW.BOARD ? (
+            <div className="p-4 h-full overflow-auto">
+              <BoardView onIssueSelect={selectIssue} />
+            </div>
+          ) : (
+            <div className="relative h-full">
+              <ListView initialBoard={board} onIssueSelect={selectIssue} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Issue Detail Drawer */}
+      <IssueDetailDrawer
+        open={detailPanelOpen && !!selectedIssue}
+        onOpenChange={(open) => !open && closeDetailPanel()}
+        issue={selectedIssue}
+        allLabels={labels}
+        onUpdate={updateSelectedIssue}
+        onDelete={deleteSelectedIssue}
+        onAddLabel={addLabelToSelectedIssue}
+        onRemoveLabel={removeLabelFromSelectedIssue}
+      />
+
+      {/* Command Palette */}
+      <CommandPalette />
+
+      {/* Create Issue Drawer */}
+      <CreateIssueDrawer
+        open={isCreateIssueOpen}
+        onOpenChange={setCreateIssueOpen}
+      />
+    </>
+  );
+}
+
+/**
+ * Wrapper that provides BoardContext after workspace data is loaded.
+ */
+function WorkspaceContent({
+  workspace,
+}: {
+  workspace: WorkspaceWithColumnsAndIssues;
+}) {
+  const issueCount = workspace.columns.reduce(
+    (acc, col) => acc + col.issues.length,
+    0
+  );
+
+  return (
+    <AppShell title={workspace.name} issueCount={issueCount}>
+      <BoardProvider initialBoard={workspace} workspaceId={workspace.id}>
+        <MainContent />
+      </BoardProvider>
+    </AppShell>
+  );
+}
+
+/**
+ * Workspace page - loads workspace data then renders the app.
+ */
+export default function WorkspacePage() {
+  const params = useParams<{ slug: string }>();
+  const [workspace, setWorkspace] = useState<WorkspaceWithColumnsAndIssues | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (params.slug) {
+      getWorkspaceBySlugWithIssues(params.slug)
+        .then((data) => {
+          if (data) {
+            setWorkspace(data);
+          } else {
+            setError("Workspace not found");
+          }
+        })
+        .catch((err) => {
+          setError(err.message || "Failed to load workspace");
+        });
+    }
+  }, [params.slug]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold text-foreground mb-2">Error</h1>
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!workspace) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <WorkspaceContent workspace={workspace} />;
+}
