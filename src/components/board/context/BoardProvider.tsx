@@ -31,11 +31,12 @@ import type {
   Label,
   Cycle,
 } from "@/lib/types";
-import { STATUS } from "@/lib/design-tokens";
+import { STATUS, type WorkspacePurpose } from "@/lib/design-tokens";
 
 interface BoardContextValue {
   // Board data
   board: BoardWithColumnsAndIssues;
+  workspacePurpose: WorkspacePurpose;
   isLoading: boolean;
   refreshBoard: () => Promise<void>;
 
@@ -291,8 +292,15 @@ export function BoardProvider({ initialBoard, workspaceId, children }: BoardProv
     [selectedIssueId, removeLabelFromIssue]
   );
 
+  // Extract workspace purpose (defaults to "software" for legacy boards)
+  const workspacePurpose: WorkspacePurpose =
+    ("purpose" in board && (board.purpose === "software" || board.purpose === "marketing"))
+      ? board.purpose
+      : "software";
+
   const value: BoardContextValue = {
     board,
+    workspacePurpose,
     isLoading,
     refreshBoard,
     findColumn,

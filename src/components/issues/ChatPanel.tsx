@@ -11,6 +11,7 @@ import {
   PromptInputTextarea,
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
+import { useBoardContext } from "@/components/board/context/BoardProvider";
 import type { Priority } from "@/lib/design-tokens";
 
 interface SuggestedIssue {
@@ -24,12 +25,16 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ onSuggestion }: ChatPanelProps) {
+  const { workspacePurpose } = useBoardContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/chat" }),
-    []
+    () => new DefaultChatTransport({
+      api: "/api/chat",
+      body: { workspacePurpose },
+    }),
+    [workspacePurpose]
   );
 
   const { messages, sendMessage, status } = useChat({

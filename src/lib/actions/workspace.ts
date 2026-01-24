@@ -20,14 +20,7 @@ import type {
 } from "../types";
 import { getCurrentUser } from "../auth";
 import { syncUserFromWorkOS } from "./users";
-
-const DEFAULT_COLUMNS = ["Backlog", "Todo", "In Progress", "Done"];
-const DEFAULT_LABELS: Array<{ name: string; color: string }> = [
-  { name: "Bug", color: "#ef4444" },
-  { name: "Feature", color: "#3b82f6" },
-  { name: "Improvement", color: "#22c55e" },
-  { name: "Documentation", color: "#a855f7" },
-];
+import { PURPOSE_CONFIG, type WorkspacePurpose } from "../design-tokens";
 
 /**
  * Get the current authenticated user or redirect to auth
@@ -117,7 +110,10 @@ function generateSlug(name: string): string {
 /**
  * Create a new workspace
  */
-export async function createWorkspace(name: string): Promise<Workspace> {
+export async function createWorkspace(
+  name: string,
+  purpose: WorkspacePurpose = "software"
+): Promise<Workspace> {
   const user = await requireAuth();
   const now = new Date();
 
@@ -141,6 +137,7 @@ export async function createWorkspace(name: string): Promise<Workspace> {
   }
 
   const workspaceId = crypto.randomUUID();
+  const config = PURPOSE_CONFIG[purpose];
 
   const newWorkspace: Workspace = {
     id: workspaceId,
@@ -148,6 +145,7 @@ export async function createWorkspace(name: string): Promise<Workspace> {
     slug,
     identifier: name.toUpperCase().slice(0, 4).replace(/[^A-Z]/g, "A"),
     issueCounter: 0,
+    purpose,
     ownerId: user.id,
     createdAt: now,
     updatedAt: now,
@@ -163,18 +161,18 @@ export async function createWorkspace(name: string): Promise<Workspace> {
     createdAt: now,
   });
 
-  // Create default columns
-  for (let i = 0; i < DEFAULT_COLUMNS.length; i++) {
+  // Create default columns based on purpose
+  for (let i = 0; i < config.defaultColumns.length; i++) {
     await db.insert(columns).values({
       id: crypto.randomUUID(),
       workspaceId,
-      name: DEFAULT_COLUMNS[i],
+      name: config.defaultColumns[i],
       position: i,
     });
   }
 
-  // Create default labels
-  for (const label of DEFAULT_LABELS) {
+  // Create default labels based on purpose
+  for (const label of config.defaultLabels) {
     await db.insert(labels).values({
       id: crypto.randomUUID(),
       workspaceId,
@@ -431,11 +429,11 @@ export async function updateWorkspace(
 }
 
 /**
- * Update workspace settings (name and/or slug)
+ * Update workspace settings (name, slug, and/or purpose)
  */
 export async function updateWorkspaceSettings(
   workspaceId: string,
-  data: { name?: string; slug?: string }
+  data: { name?: string; slug?: string; purpose?: WorkspacePurpose }
 ): Promise<{ success: boolean; message: string; newSlug?: string }> {
   await requireWorkspaceAccess(workspaceId, "admin");
 
@@ -471,6 +469,10 @@ export async function updateWorkspaceSettings(
     }
 
     updates.slug = normalizedSlug;
+  }
+
+  if (data.purpose !== undefined) {
+    updates.purpose = data.purpose;
   }
 
   await db.update(workspaces).set(updates).where(eq(workspaces.id, workspaceId));

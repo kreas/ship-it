@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useSettingsContext } from "./context";
+import { PURPOSE_CONFIG, type WorkspacePurpose } from "@/lib/design-tokens";
 
 function SettingsRow({
   label,
@@ -42,6 +43,9 @@ export default function WorkspaceSettingsPage() {
   // Form state - initialized from workspace
   const [name, setName] = useState(workspace?.name ?? "");
   const [slug, setSlug] = useState(workspace?.slug ?? "");
+  const [purpose, setPurpose] = useState<WorkspacePurpose>(
+    (workspace?.purpose as WorkspacePurpose) ?? "software"
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -49,8 +53,8 @@ export default function WorkspaceSettingsPage() {
   // Check for changes
   const hasChanges = useMemo(() => {
     if (!workspace) return false;
-    return name !== workspace.name || slug !== workspace.slug;
-  }, [workspace, name, slug]);
+    return name !== workspace.name || slug !== workspace.slug || purpose !== workspace.purpose;
+  }, [workspace, name, slug, purpose]);
 
   // Get hostname for URL display
   const hostname = typeof window !== "undefined" ? window.location.host : "localhost:3000";
@@ -62,7 +66,7 @@ export default function WorkspaceSettingsPage() {
     setSaveMessage(null);
 
     try {
-      const result = await updateWorkspaceSettings(workspace.id, { name, slug });
+      const result = await updateWorkspaceSettings(workspace.id, { name, slug, purpose });
 
       if (result.success) {
         setSaveMessage({ type: "success", text: result.message });
@@ -77,6 +81,7 @@ export default function WorkspaceSettingsPage() {
           if (updatedWs) {
             setName(updatedWs.name);
             setSlug(updatedWs.slug);
+            setPurpose((updatedWs.purpose as WorkspacePurpose) ?? "software");
           }
         }
       } else {
@@ -167,6 +172,18 @@ export default function WorkspaceSettingsPage() {
               className="flex-1"
             />
           </div>
+        </SettingsRow>
+
+        <SettingsRow label="Type" description="Affects AI suggestions and default workflows">
+          <select
+            value={purpose}
+            onChange={(e) => setPurpose(e.target.value as WorkspacePurpose)}
+            disabled={!isAdmin}
+            className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="software">{PURPOSE_CONFIG.software.label}</option>
+            <option value="marketing">{PURPOSE_CONFIG.marketing.label}</option>
+          </select>
         </SettingsRow>
       </div>
 
