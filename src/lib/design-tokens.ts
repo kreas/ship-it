@@ -149,3 +149,42 @@ export const GROUP_BY = {
 } as const;
 
 export type GroupBy = (typeof GROUP_BY)[keyof typeof GROUP_BY];
+
+// Workspace purpose types
+export const WORKSPACE_PURPOSE = {
+  SOFTWARE: "software",
+  MARKETING: "marketing",
+} as const;
+
+export type WorkspacePurpose = (typeof WORKSPACE_PURPOSE)[keyof typeof WORKSPACE_PURPOSE];
+
+export const PURPOSE_CONFIG: Record<WorkspacePurpose, {
+  label: string;
+  description: string;
+  defaultColumns: string[];
+  defaultLabels: Array<{ name: string; color: string }>;
+}> = {
+  software: {
+    label: "Software Development",
+    description: "Track bugs, features, and technical tasks",
+    defaultColumns: ["Backlog", "Todo", "In Progress", "Done"],
+    defaultLabels: [
+      { name: "Bug", color: "#ef4444" },
+      { name: "Feature", color: "#3b82f6" },
+      { name: "Improvement", color: "#22c55e" },
+      { name: "Documentation", color: "#a855f7" },
+    ],
+  },
+  marketing: {
+    label: "Marketing",
+    description: "Manage campaigns, content, and creative projects",
+    defaultColumns: ["Ideas", "Planning", "In Progress", "Review", "Published"],
+    defaultLabels: [
+      { name: "Campaign", color: "#3b82f6" },
+      { name: "Content", color: "#a855f7" },
+      { name: "Design", color: "#ec4899" },
+      { name: "Analytics", color: "#22c55e" },
+      { name: "Social", color: "#f97316" },
+    ],
+  },
+};

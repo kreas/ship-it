@@ -16,6 +16,7 @@ import {
   saveChatMessage,
   clearIssueChatMessages,
 } from "@/lib/actions/chat";
+import { useBoardContext } from "@/components/board/context/BoardProvider";
 import type { IssueWithLabels, Comment, ChatMessage } from "@/lib/types";
 
 interface IssueContext {
@@ -46,6 +47,7 @@ export function IssueChatPanel({
   comments,
   onUpdateDescription,
 }: IssueChatPanelProps) {
+  const { workspacePurpose } = useBoardContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -64,14 +66,14 @@ export function IssueChatPanel({
     [issue.title, issue.description, issue.status, issue.priority, comments]
   );
 
-  // Custom transport that includes issue context
+  // Custom transport that includes issue context and workspace purpose
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat/issue",
-        body: { issueContext },
+        body: { issueContext, workspacePurpose },
       }),
-    [issueContext]
+    [issueContext, workspacePurpose]
   );
 
   const { messages, sendMessage, status, setMessages } = useChat({

@@ -19,10 +19,11 @@ import {
   addLabel as addLabelAction,
   removeLabel as removeLabelAction,
 } from "@/lib/actions/issues";
-import { getOrCreateDefaultBoardWithIssues } from "@/lib/actions/board";
+import { getWorkspaceWithIssues } from "@/lib/actions/board";
 import { issueReducer, type OptimisticAction } from "./IssueContext";
 import type {
   BoardWithColumnsAndIssues,
+  WorkspaceWithColumnsAndIssues,
   IssueWithLabels,
   ColumnWithIssues,
   CreateIssueInput,
@@ -30,11 +31,12 @@ import type {
   Label,
   Cycle,
 } from "@/lib/types";
-import { STATUS } from "@/lib/design-tokens";
+import { STATUS, type WorkspacePurpose } from "@/lib/design-tokens";
 
 interface BoardContextValue {
   // Board data
   board: BoardWithColumnsAndIssues;
+  workspacePurpose: WorkspacePurpose;
   isLoading: boolean;
   refreshBoard: () => Promise<void>;
 
@@ -80,11 +82,12 @@ export function useBoardContext() {
 }
 
 interface BoardProviderProps {
-  initialBoard: BoardWithColumnsAndIssues;
+  initialBoard: BoardWithColumnsAndIssues | WorkspaceWithColumnsAndIssues;
+  workspaceId?: string;
   children: ReactNode;
 }
 
-export function BoardProvider({ initialBoard, children }: BoardProviderProps) {
+export function BoardProvider({ initialBoard, workspaceId, children }: BoardProviderProps) {
   const {
     selectedIssueId,
     setSelectedIssueId,
@@ -99,14 +102,20 @@ export function BoardProvider({ initialBoard, children }: BoardProviderProps) {
 
   // Refresh board data from server
   const refreshBoard = useCallback(async () => {
+    // Use workspaceId if provided, otherwise use the board's id
+    const id = workspaceId ?? initialBoard.id;
+    if (!id) return;
+
     setIsLoading(true);
     try {
-      const newBoard = await getOrCreateDefaultBoardWithIssues();
+      const newBoard = await getWorkspaceWithIssues(id);
       setServerBoard(newBoard);
+    } catch (error) {
+      console.error("Failed to refresh board:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [workspaceId, initialBoard.id]);
 
   // Update server board when initialBoard changes (e.g., from SSR)
   useEffect(() => {
@@ -283,8 +292,15 @@ export function BoardProvider({ initialBoard, children }: BoardProviderProps) {
     [selectedIssueId, removeLabelFromIssue]
   );
 
+  // Extract workspace purpose (defaults to "software" for legacy boards)
+  const workspacePurpose: WorkspacePurpose =
+    ("purpose" in board && (board.purpose === "software" || board.purpose === "marketing"))
+      ? board.purpose
+      : "software";
+
   const value: BoardContextValue = {
     board,
+    workspacePurpose,
     isLoading,
     refreshBoard,
     findColumn,

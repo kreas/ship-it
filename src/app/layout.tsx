@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { AuthKitProvider } from "@workos-inc/authkit-nextjs/components";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -9,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Linear Clone",
+  title: "🛳️ Ship It",
   description: "A Linear-style issue tracker with keyboard-first navigation",
 };
 
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased`}>
-        <TooltipProvider>{children}</TooltipProvider>
+        <AuthKitProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </AuthKitProvider>
       </body>
     </html>
   );

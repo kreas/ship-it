@@ -1,21 +1,32 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   LayoutGrid,
   List,
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Search,
   Plus,
   Inbox,
   Clock,
   Circle,
   Layers,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW } from "@/lib/design-tokens";
 import { useAppShell } from "./AppShell";
+import { useOptionalWorkspaceContext } from "@/components/workspace";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -81,6 +92,7 @@ function NavSection({ title, isCollapsed, children }: NavSectionProps) {
 }
 
 export function Sidebar() {
+  const router = useRouter();
   const {
     sidebarCollapsed,
     toggleSidebar,
@@ -89,6 +101,18 @@ export function Sidebar() {
     setCreateIssueOpen,
     setCommandPaletteOpen,
   } = useAppShell();
+
+  const workspaceContext = useOptionalWorkspaceContext();
+  const workspace = workspaceContext?.workspace;
+  const workspaces = workspaceContext?.workspaces ?? [];
+
+  const handleWorkspaceChange = (slug: string) => {
+    router.push(`/w/${slug}`);
+  };
+
+  const handleCreateWorkspace = () => {
+    router.push("/w/new");
+  };
 
   return (
     <aside
@@ -100,12 +124,43 @@ export function Sidebar() {
       {/* Logo/Workspace Header */}
       <div className="flex items-center justify-between h-12 px-3 border-b border-sidebar-border">
         {!sidebarCollapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-primary rounded flex items-center justify-center">
-              <Layers className="w-3 h-3 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-sm">Workspace</span>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 hover:bg-sidebar-accent rounded-md px-1 py-0.5 transition-colors">
+                <div className="w-5 h-5 bg-primary rounded flex items-center justify-center flex-shrink-0">
+                  <Layers className="w-3 h-3 text-primary-foreground" />
+                </div>
+                <span className="font-semibold text-sm truncate max-w-[120px]">
+                  {workspace?.name ?? "Workspace"}
+                </span>
+                <ChevronDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              {workspaces.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  onClick={() => handleWorkspaceChange(ws.slug)}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-4 h-4 bg-primary/20 rounded flex items-center justify-center flex-shrink-0">
+                      <Layers className="w-2.5 h-2.5 text-primary" />
+                    </div>
+                    <span className="truncate">{ws.name}</span>
+                  </div>
+                  {workspace?.id === ws.id && (
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleCreateWorkspace}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Workspace
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         {sidebarCollapsed && (
           <div className="w-5 h-5 mx-auto bg-primary rounded flex items-center justify-center">
@@ -209,6 +264,7 @@ export function Sidebar() {
           icon={<Settings className="w-4 h-4" />}
           label="Settings"
           isCollapsed={sidebarCollapsed}
+          onClick={() => workspace && router.push(`/w/${workspace.slug}/settings`)}
         />
         {sidebarCollapsed && (
           <button

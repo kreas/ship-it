@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getCurrentUserId } from "../auth";
 import { db } from "../db";
 import {
   issues,
-  boards,
+  workspaces,
   columns,
   labels,
   issueLabels,
@@ -24,60 +25,77 @@ import type {
   ActivityData,
 } from "../types";
 import { STATUS } from "../design-tokens";
+import { requireWorkspaceAccess } from "./workspace";
 
 // Helper to generate next identifier
-async function getNextIdentifier(boardId: string): Promise<string> {
-  const board = await db
-    .select({ identifier: boards.identifier, counter: boards.issueCounter })
-    .from(boards)
-    .where(eq(boards.id, boardId))
+async function getNextIdentifier(workspaceId: string): Promise<string> {
+  const workspace = await db
+    .select({ identifier: workspaces.identifier, counter: workspaces.issueCounter })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
     .get();
 
-  if (!board) throw new Error("Board not found");
+  if (!workspace) throw new Error("Workspace not found");
 
-  const newCounter = board.counter + 1;
+  const newCounter = workspace.counter + 1;
 
   await db
-    .update(boards)
+    .update(workspaces)
     .set({ issueCounter: newCounter })
-    .where(eq(boards.id, boardId));
+    .where(eq(workspaces.id, workspaceId));
 
-  return `${board.identifier}-${newCounter}`;
+  return `${workspace.identifier}-${newCounter}`;
 }
 
-// Helper to log activity
+// Helper to log activity with user ID
 async function logActivity(
   issueId: string,
   type: ActivityType,
-  data?: ActivityData
+  data?: ActivityData,
+  userId?: string | null
 ): Promise<void> {
   await db.insert(activities).values({
     id: crypto.randomUUID(),
     issueId,
+    userId: userId ?? null,
     type,
     data: data ? JSON.stringify(data) : null,
     createdAt: new Date(),
   });
 }
 
-// Get column's board ID
-async function getColumnBoardId(columnId: string): Promise<string | null> {
+// Get column's workspace ID
+async function getColumnWorkspaceId(columnId: string): Promise<string | null> {
   const column = await db
-    .select({ boardId: columns.boardId })
+    .select({ workspaceId: columns.workspaceId })
     .from(columns)
     .where(eq(columns.id, columnId))
     .get();
-  return column?.boardId ?? null;
+  return column?.workspaceId ?? null;
+}
+
+// Helper to get workspace slug for revalidation
+async function getWorkspaceSlug(workspaceId: string): Promise<string | null> {
+  const workspace = await db
+    .select({ slug: workspaces.slug })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .get();
+  return workspace?.slug ?? null;
 }
 
 export async function createIssue(
   columnId: string,
   input: CreateIssueInput
 ): Promise<IssueWithLabels> {
-  const boardId = await getColumnBoardId(columnId);
-  if (!boardId) throw new Error("Column not found");
+  const workspaceId = await getColumnWorkspaceId(columnId);
+  if (!workspaceId) throw new Error("Column not found");
 
-  const identifier = await getNextIdentifier(boardId);
+  // Verify user has access to this workspace
+  await requireWorkspaceAccess(workspaceId, "member");
+
+  const userId = await getCurrentUserId();
+  const identifier = await getNextIdentifier(workspaceId);
 
   // Get max position
   const maxPosition = await db
@@ -115,10 +133,12 @@ export async function createIssue(
     );
   }
 
-  // Log activity
-  await logActivity(newIssue.id, "created");
+  // Log activity with user ID
+  await logActivity(newIssue.id, "created", undefined, userId);
 
-  revalidatePath("/");
+  // Revalidate workspace path
+  const slug = await getWorkspaceSlug(workspaceId);
+  revalidatePath(slug ? `/w/${slug}` : "/");
 
   // Fetch labels for return
   const issueLabelsData =
@@ -143,6 +163,14 @@ export async function updateIssue(
     .get();
 
   if (!existingIssue) return;
+
+  // Get workspace ID for auth check
+  const workspaceId = await getColumnWorkspaceId(existingIssue.columnId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId, "member");
+  }
+
+  const userId = await getCurrentUserId();
 
   const updates: Partial<Issue> = {
     updatedAt: new Date(),
@@ -181,7 +209,7 @@ export async function updateIssue(
     await logActivity(issueId, "status_changed", {
       oldValue: existingIssue.status,
       newValue: input.status,
-    });
+    }, userId);
   }
 
   if (
@@ -192,7 +220,7 @@ export async function updateIssue(
     await logActivity(issueId, "priority_changed", {
       oldValue: existingIssue.priority,
       newValue: input.priority,
-    });
+    }, userId);
   }
 
   if (input.estimate !== undefined) {
@@ -208,7 +236,7 @@ export async function updateIssue(
     await logActivity(issueId, "cycle_changed", {
       oldValue: existingIssue.cycleId,
       newValue: input.cycleId ?? null,
-    });
+    }, userId);
   }
 
   await db.update(issues).set(updates).where(eq(issues.id, issueId));
@@ -217,10 +245,16 @@ export async function updateIssue(
   if (changedFields.length > 0) {
     await logActivity(issueId, "updated", {
       field: changedFields.map((c) => c.field).join(", "),
-    });
+    }, userId);
   }
 
-  revalidatePath("/");
+  // Revalidate workspace path
+  if (workspaceId) {
+    const slug = await getWorkspaceSlug(workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
+  }
 }
 
 export async function deleteIssue(issueId: string): Promise<void> {
@@ -232,6 +266,12 @@ export async function deleteIssue(issueId: string): Promise<void> {
 
   if (!issue) return;
 
+  // Get workspace ID for auth check
+  const workspaceId = await getColumnWorkspaceId(issue.columnId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId, "member");
+  }
+
   await db.delete(issues).where(eq(issues.id, issueId));
 
   // Update positions of remaining issues in column
@@ -242,7 +282,13 @@ export async function deleteIssue(issueId: string): Promise<void> {
       and(eq(issues.columnId, issue.columnId), gt(issues.position, issue.position))
     );
 
-  revalidatePath("/");
+  // Revalidate workspace path
+  if (workspaceId) {
+    const slug = await getWorkspaceSlug(workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
+  }
 }
 
 export async function moveIssue(
@@ -258,6 +304,13 @@ export async function moveIssue(
 
   if (!issue) return;
 
+  // Get workspace ID for auth check
+  const workspaceId = await getColumnWorkspaceId(issue.columnId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId, "member");
+  }
+
+  const userId = await getCurrentUserId();
   const sourceColumnId = issue.columnId;
   const sourcePosition = issue.position;
 
@@ -324,14 +377,20 @@ export async function moveIssue(
       })
       .where(eq(issues.id, issueId));
 
-    // Log the move
+    // Log the move with user ID
     await logActivity(issueId, "moved", {
       fromColumn: sourceColumnId,
       toColumn: targetColumnId,
-    });
+    }, userId);
   }
 
-  revalidatePath("/");
+  // Revalidate workspace path
+  if (workspaceId) {
+    const slug = await getWorkspaceSlug(workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
+  }
 }
 
 // Label operations
@@ -344,19 +403,25 @@ export async function addLabel(issueId: string, labelId: string): Promise<void> 
 
   if (!label) return;
 
+  // Check workspace access
+  await requireWorkspaceAccess(label.workspaceId, "member");
+
+  const userId = await getCurrentUserId();
+
   await db.insert(issueLabels).values({ issueId, labelId }).onConflictDoNothing();
 
   await logActivity(issueId, "label_added", {
     labelId,
     labelName: label.name,
-  });
+  }, userId);
 
   await db
     .update(issues)
     .set({ updatedAt: new Date() })
     .where(eq(issues.id, issueId));
 
-  revalidatePath("/");
+  const slug = await getWorkspaceSlug(label.workspaceId);
+  revalidatePath(slug ? `/w/${slug}` : "/");
 }
 
 export async function removeLabel(
@@ -369,6 +434,12 @@ export async function removeLabel(
     .where(eq(labels.id, labelId))
     .get();
 
+  if (label) {
+    await requireWorkspaceAccess(label.workspaceId, "member");
+  }
+
+  const userId = await getCurrentUserId();
+
   await db
     .delete(issueLabels)
     .where(
@@ -379,15 +450,18 @@ export async function removeLabel(
     await logActivity(issueId, "label_removed", {
       labelId,
       labelName: label.name,
-    });
+    }, userId);
+
+    const slug = await getWorkspaceSlug(label.workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
   }
 
   await db
     .update(issues)
     .set({ updatedAt: new Date() })
     .where(eq(issues.id, issueId));
-
-  revalidatePath("/");
 }
 
 // Comment operations
@@ -395,10 +469,27 @@ export async function addComment(
   issueId: string,
   body: string
 ): Promise<Comment> {
+  // Get issue to find workspace
+  const issue = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.id, issueId))
+    .get();
+
+  if (!issue) throw new Error("Issue not found");
+
+  const workspaceId = await getColumnWorkspaceId(issue.columnId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId, "member");
+  }
+
+  const userId = await getCurrentUserId();
   const now = new Date();
-  const comment: Comment = {
+
+  const comment = {
     id: crypto.randomUUID(),
     issueId,
+    userId,
     body,
     createdAt: now,
     updatedAt: now,
@@ -406,14 +497,19 @@ export async function addComment(
 
   await db.insert(comments).values(comment);
 
-  await logActivity(issueId, "comment_added");
+  await logActivity(issueId, "comment_added", undefined, userId);
 
   await db
     .update(issues)
     .set({ updatedAt: now })
     .where(eq(issues.id, issueId));
 
-  revalidatePath("/");
+  if (workspaceId) {
+    const slug = await getWorkspaceSlug(workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
+  }
 
   return comment;
 }
@@ -422,6 +518,21 @@ export async function updateComment(
   commentId: string,
   body: string
 ): Promise<void> {
+  // Get comment to check ownership
+  const comment = await db
+    .select()
+    .from(comments)
+    .where(eq(comments.id, commentId))
+    .get();
+
+  if (!comment) return;
+
+  const userId = await getCurrentUserId();
+  // Only allow author to edit their own comments
+  if (comment.userId && comment.userId !== userId) {
+    throw new Error("You can only edit your own comments");
+  }
+
   await db
     .update(comments)
     .set({ body, updatedAt: new Date() })
@@ -431,6 +542,20 @@ export async function updateComment(
 }
 
 export async function deleteComment(commentId: string): Promise<void> {
+  const comment = await db
+    .select()
+    .from(comments)
+    .where(eq(comments.id, commentId))
+    .get();
+
+  if (!comment) return;
+
+  const userId = await getCurrentUserId();
+  // Only allow author to delete their own comments
+  if (comment.userId && comment.userId !== userId) {
+    throw new Error("You can only delete your own comments");
+  }
+
   await db.delete(comments).where(eq(comments.id, commentId));
   revalidatePath("/");
 }

@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { db } from "../db";
 import { cycles } from "../db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import type { Cycle } from "../types";
+import { requireWorkspaceAccess } from "./workspace";
 
 export async function createCycle(
-  boardId: string,
+  workspaceId: string,
   data: {
     name: string;
     description?: string;
@@ -15,9 +16,11 @@ export async function createCycle(
     endDate?: Date;
   }
 ): Promise<Cycle> {
-  const cycle: Cycle = {
+  await requireWorkspaceAccess(workspaceId, "member");
+
+  const cycle = {
     id: crypto.randomUUID(),
-    boardId,
+    workspaceId,
     name: data.name,
     description: data.description ?? null,
     startDate: data.startDate ?? null,
@@ -51,11 +54,13 @@ export async function deleteCycle(cycleId: string): Promise<void> {
   revalidatePath("/");
 }
 
-export async function getBoardCycles(boardId: string): Promise<Cycle[]> {
+export async function getWorkspaceCycles(workspaceId: string): Promise<Cycle[]> {
+  await requireWorkspaceAccess(workspaceId);
+
   return db
     .select()
     .from(cycles)
-    .where(eq(cycles.boardId, boardId))
+    .where(eq(cycles.workspaceId, workspaceId))
     .orderBy(asc(cycles.startDate));
 }
 
