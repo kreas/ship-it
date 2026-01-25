@@ -12,10 +12,10 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import {
-  getIssueChatMessages,
-  saveChatMessage,
-  clearIssueChatMessages,
-} from "@/lib/actions/chat";
+  useIssueChatMessages,
+  useSaveChatMessage,
+  useClearChatMessages,
+} from "@/lib/hooks";
 import { useBoardContext } from "@/components/board/context/BoardProvider";
 import type { IssueWithLabels, Comment, ChatMessage } from "@/lib/types";
 
@@ -50,9 +50,14 @@ export function IssueChatPanel({
   const { workspacePurpose } = useBoardContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const lastSavedMessageRef = useRef<string | null>(null);
-  const hasLoadedRef = useRef(false);
+  const hasInitializedRef = useRef(false);
+
+  // Use TanStack Query for chat messages - auto-cancels on unmount
+  const { data: persistedMessages, isLoading: isLoadingHistory } =
+    useIssueChatMessages(issue.id);
+  const saveChatMutation = useSaveChatMessage(issue.id);
+  const clearChatMutation = useClearChatMessages(issue.id);
 
   // Build issue context for the API
   const issueContext: IssueContext = useMemo(
@@ -86,29 +91,18 @@ export function IssueChatPanel({
     },
   });
 
-  // Load persisted messages on mount
+  // Initialize chat messages from query data
   useEffect(() => {
-    if (hasLoadedRef.current) return;
+    if (hasInitializedRef.current || !persistedMessages) return;
 
-    let mounted = true;
-    setIsLoadingHistory(true);
-
-    getIssueChatMessages(issue.id).then((persisted) => {
-      if (mounted && persisted.length > 0) {
-        setMessages(persistedToUIMessages(persisted));
-        // Mark the last persisted message as already saved
-        lastSavedMessageRef.current = persisted[persisted.length - 1].id;
-      }
-      if (mounted) {
-        setIsLoadingHistory(false);
-        hasLoadedRef.current = true;
-      }
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [issue.id, setMessages]);
+    if (persistedMessages.length > 0) {
+      setMessages(persistedToUIMessages(persistedMessages));
+      // Mark the last persisted message as already saved
+      lastSavedMessageRef.current =
+        persistedMessages[persistedMessages.length - 1].id;
+    }
+    hasInitializedRef.current = true;
+  }, [persistedMessages, setMessages]);
 
   // Save new messages as they come in
   useEffect(() => {
@@ -127,17 +121,19 @@ export function IssueChatPanel({
       .join("\n");
 
     if (textContent) {
-      saveChatMessage(issue.id, lastMessage.role, textContent);
+      // Use mutation to save and update cache
+      saveChatMutation.mutate({ role: lastMessage.role, content: textContent });
       lastSavedMessageRef.current = lastMessage.id;
     }
-  }, [messages, status, issue.id, isLoadingHistory]);
+  }, [messages, status, isLoadingHistory, saveChatMutation]);
 
   // Handle clearing chat history
   const handleClearHistory = useCallback(async () => {
-    await clearIssueChatMessages(issue.id);
+    await clearChatMutation.mutateAsync();
     setMessages([]);
     lastSavedMessageRef.current = null;
-  }, [issue.id, setMessages]);
+    hasInitializedRef.current = false;
+  }, [clearChatMutation, setMessages]);
 
   // Add welcome message if no messages exist
   const displayMessages =

@@ -5,16 +5,16 @@ import {
   useContext,
   useState,
   useEffect,
-  useCallback,
   type ReactNode,
 } from "react";
 import { useParams } from "next/navigation";
 import {
-  getWorkspaceBySlug,
-  getWorkspaceMembers,
-} from "@/lib/actions/workspace";
-import { getWorkspaceLabels } from "@/lib/actions/board";
-import { getAllWorkspaceColumns } from "@/lib/actions/columns";
+  useWorkspace,
+  useWorkspaceMembers,
+  useWorkspaceLabels,
+  useWorkspaceColumns,
+  useInvalidateSettings,
+} from "@/lib/hooks";
 import { getCurrentUserId } from "@/lib/auth";
 import type {
   Workspace,
@@ -66,91 +66,53 @@ interface SettingsProviderProps {
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
   const params = useParams<{ slug: string }>();
-
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [members, setMembers] = useState<WorkspaceMemberWithUser[]>([]);
-  const [labels, setLabels] = useState<Label[]>([]);
-  const [columns, setColumns] = useState<Column[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const invalidate = useInvalidateSettings();
 
-  const refreshWorkspace = useCallback(async () => {
-    try {
-      const ws = await getWorkspaceBySlug(params.slug);
-      if (ws) {
-        setWorkspace(ws);
-      }
-    } catch (err) {
-      console.error("Failed to refresh workspace:", err);
-    }
-  }, [params.slug]);
+  // TanStack Query hooks
+  const {
+    data: workspace,
+    isLoading: isWorkspaceLoading,
+    error: workspaceError,
+    refetch: refetchWorkspace,
+  } = useWorkspace(params.slug);
 
-  const refreshMembers = useCallback(async () => {
-    if (!workspace) return;
-    try {
-      const wsMembers = await getWorkspaceMembers(workspace.id);
-      setMembers(wsMembers);
-    } catch (err) {
-      console.error("Failed to refresh members:", err);
-    }
-  }, [workspace]);
+  const {
+    data: members = [],
+    isLoading: isMembersLoading,
+    refetch: refetchMembers,
+  } = useWorkspaceMembers(workspace?.id ?? null);
 
-  const refreshLabels = useCallback(async () => {
-    if (!workspace) return;
-    try {
-      const wsLabels = await getWorkspaceLabels(workspace.id);
-      setLabels(wsLabels);
-    } catch (err) {
-      console.error("Failed to refresh labels:", err);
-    }
-  }, [workspace]);
+  const {
+    data: labels = [],
+    isLoading: isLabelsLoading,
+    refetch: refetchLabels,
+  } = useWorkspaceLabels(workspace?.id ?? null);
 
-  const refreshColumns = useCallback(async () => {
-    if (!workspace) return;
-    try {
-      const wsColumns = await getAllWorkspaceColumns(workspace.id);
-      setColumns(wsColumns);
-    } catch (err) {
-      console.error("Failed to refresh columns:", err);
-    }
-  }, [workspace]);
+  const {
+    data: columns = [],
+    isLoading: isColumnsLoading,
+    refetch: refetchColumns,
+  } = useWorkspaceColumns(workspace?.id ?? null);
 
-  // Initial data load
+  // Load current user ID
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [userId, ws] = await Promise.all([
-          getCurrentUserId(),
-          getWorkspaceBySlug(params.slug),
-        ]);
+    getCurrentUserId().then(setCurrentUserId);
+  }, []);
 
-        setCurrentUserId(userId);
-
-        if (!ws) {
-          setError("Workspace not found");
-          return;
-        }
-
-        setWorkspace(ws);
-
-        const [wsMembers, wsLabels, wsColumns] = await Promise.all([
-          getWorkspaceMembers(ws.id),
-          getWorkspaceLabels(ws.id),
-          getAllWorkspaceColumns(ws.id),
-        ]);
-        setMembers(wsMembers);
-        setLabels(wsLabels);
-        setColumns(wsColumns);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadData();
-  }, [params.slug]);
+  // Derive loading and error states
+  const isLoading =
+    isWorkspaceLoading ||
+    isMembersLoading ||
+    isLabelsLoading ||
+    isColumnsLoading;
+  const error = workspaceError
+    ? workspaceError instanceof Error
+      ? workspaceError.message
+      : "Failed to load workspace"
+    : !workspace && !isWorkspaceLoading
+      ? "Workspace not found"
+      : null;
 
   // Derive permissions
   const currentMember = members.find((m) => m.userId === currentUserId);
@@ -158,8 +120,34 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   const isAdmin = userRole === "admin";
   const isOwner = workspace?.ownerId === currentUserId;
 
+  // Refresh actions (for compatibility, now just trigger refetch)
+  const refreshWorkspace = async () => {
+    await refetchWorkspace();
+  };
+
+  const refreshMembers = async () => {
+    if (workspace) {
+      invalidate.invalidateMembers(workspace.id);
+      await refetchMembers();
+    }
+  };
+
+  const refreshLabels = async () => {
+    if (workspace) {
+      invalidate.invalidateLabels(workspace.id);
+      await refetchLabels();
+    }
+  };
+
+  const refreshColumns = async () => {
+    if (workspace) {
+      invalidate.invalidateColumns(workspace.id);
+      await refetchColumns();
+    }
+  };
+
   const value: SettingsContextValue = {
-    workspace,
+    workspace: workspace ?? null,
     members,
     labels,
     columns,
