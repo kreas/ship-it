@@ -7,6 +7,7 @@ import {
   useOptimistic,
   useTransition,
   useEffect,
+  useMemo,
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -109,6 +110,18 @@ export function BoardProvider({
   const [board, addOptimistic] = useOptimistic(serverBoard, issueReducer);
   const [, startTransition] = useTransition();
 
+  // Filter subtasks from board view - subtasks only appear in parent's detail panel
+  const boardForView = useMemo(
+    () => ({
+      ...board,
+      columns: board.columns.map((col) => ({
+        ...col,
+        issues: col.issues.filter((issue) => !issue.parentIssueId),
+      })),
+    }),
+    [board]
+  );
+
   // Mutations
   const createIssueMutation = useCreateIssue(wsId);
   const updateIssueMutation = useUpdateIssue(wsId);
@@ -208,6 +221,7 @@ export function BoardProvider({
         estimate: input.estimate ?? null,
         dueDate: input.dueDate ?? null,
         cycleId: input.cycleId ?? null,
+        parentIssueId: input.parentIssueId ?? null,
         position:
           board.columns.find((c) => c.id === columnId)?.issues.length ?? 0,
         createdAt: new Date(),
@@ -339,14 +353,14 @@ export function BoardProvider({
       : "software";
 
   const value: BoardContextValue = {
-    board,
+    board: boardForView,
     workspacePurpose,
     isLoading,
     refreshBoard,
     findColumn,
     findIssue,
     findIssueByIdentifier,
-    allIssues,
+    allIssues: allIssues.filter((issue) => !issue.parentIssueId),
     labels: board.labels,
     cycles: board.cycles,
     addIssue,

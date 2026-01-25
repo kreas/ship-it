@@ -34,3 +34,10 @@ export {
 } from "./use-issue-mutations";
 
 export { useURLState, URLStateProvider } from "./useURLState";
+
+export {
+  useIssueSubtasks,
+  useSubtaskCount,
+  useSubtaskOperations,
+  useConvertToSubtask,
+} from "./use-subtasks";

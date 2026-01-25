@@ -30,6 +30,13 @@ export type WorkspaceRole = "admin" | "member" | "viewer";
 // Extended types with relations
 export type IssueWithLabels = Issue & {
   labels: Label[];
+  subtasks?: IssueWithLabels[]; // Optional, loaded when needed
+};
+
+// Subtask count for progress tracking
+export type SubtaskCount = {
+  total: number;
+  completed: number;
 };
 
 export type IssueWithRelations = Issue & {
@@ -71,6 +78,7 @@ export type CreateIssueInput = {
   dueDate?: Date;
   cycleId?: string;
   labelIds?: string[];
+  parentIssueId?: string; // For creating subtasks
 };
 
 export type UpdateIssueInput = Partial<CreateIssueInput>;
@@ -101,7 +109,11 @@ export type ActivityType =
   | "label_removed"
   | "cycle_changed"
   | "comment_added"
-  | "moved";
+  | "moved"
+  | "subtask_added"
+  | "subtask_removed"
+  | "converted_to_subtask"
+  | "converted_to_issue";
 
 export type ActivityData = {
   field?: string;
@@ -113,4 +125,9 @@ export type ActivityData = {
   cycleName?: string;
   fromColumn?: string;
   toColumn?: string;
+  subtaskId?: string;
+  subtaskIdentifier?: string;
+  subtaskTitle?: string;
+  parentIssueId?: string;
+  parentIdentifier?: string;
 };

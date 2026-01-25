@@ -23,6 +23,7 @@ import type {
   UpdateIssueInput,
   ActivityType,
   ActivityData,
+  SubtaskCount,
 } from "../types";
 import { STATUS } from "../design-tokens";
 import { requireWorkspaceAccess } from "./workspace";
@@ -91,11 +92,36 @@ export async function createIssue(
   const userId = await getCurrentUserId();
   const identifier = await getNextIdentifier(workspaceId);
 
-  // Get max position
+  // For subtasks, validate parent exists and is not itself a subtask
+  let parentIssueId: string | null = null;
+  if (input.parentIssueId) {
+    const parentIssue = await db
+      .select()
+      .from(issues)
+      .where(eq(issues.id, input.parentIssueId))
+      .get();
+
+    if (!parentIssue) {
+      throw new Error("Parent issue not found");
+    }
+
+    // Prevent nested subtasks (subtasks cannot have subtasks)
+    if (parentIssue.parentIssueId) {
+      throw new Error("Subtasks cannot have their own subtasks");
+    }
+
+    parentIssueId = input.parentIssueId;
+  }
+
+  // Get max position (for subtasks, position within parent's subtask list)
   const maxPosition = await db
     .select({ maxPos: sql<number>`COALESCE(MAX(position), -1)` })
     .from(issues)
-    .where(eq(issues.columnId, columnId))
+    .where(
+      parentIssueId
+        ? eq(issues.parentIssueId, parentIssueId)
+        : eq(issues.columnId, columnId)
+    )
     .get();
 
   const now = new Date();
@@ -110,6 +136,7 @@ export async function createIssue(
     estimate: input.estimate ?? null,
     dueDate: input.dueDate ?? null,
     cycleId: input.cycleId ?? null,
+    parentIssueId,
     position: (maxPosition?.maxPos ?? -1) + 1,
     createdAt: now,
     updatedAt: now,
@@ -129,6 +156,20 @@ export async function createIssue(
 
   // Log activity with user ID
   await logActivity(newIssue.id, "created", undefined, userId);
+
+  // If this is a subtask, also log activity on parent
+  if (parentIssueId) {
+    await logActivity(
+      parentIssueId,
+      "subtask_added",
+      {
+        subtaskId: newIssue.id,
+        subtaskIdentifier: identifier,
+        subtaskTitle: input.title,
+      },
+      userId
+    );
+  }
 
   // Revalidate workspace path
   const slug = await getWorkspaceSlug(workspaceId);
@@ -286,18 +327,48 @@ export async function deleteIssue(issueId: string): Promise<void> {
     await requireWorkspaceAccess(workspaceId, "member");
   }
 
+  const userId = await getCurrentUserId();
+
+  // If this is a subtask, log activity on parent before deletion
+  if (issue.parentIssueId) {
+    await logActivity(
+      issue.parentIssueId,
+      "subtask_removed",
+      {
+        subtaskId: issueId,
+        subtaskIdentifier: issue.identifier,
+        subtaskTitle: issue.title,
+      },
+      userId
+    );
+  }
+
   await db.delete(issues).where(eq(issues.id, issueId));
 
-  // Update positions of remaining issues in column
-  await db
-    .update(issues)
-    .set({ position: sql`position - 1` })
-    .where(
-      and(
-        eq(issues.columnId, issue.columnId),
-        gt(issues.position, issue.position)
-      )
-    );
+  // Update positions of remaining issues in column (only for non-subtasks)
+  if (!issue.parentIssueId) {
+    await db
+      .update(issues)
+      .set({ position: sql`position - 1` })
+      .where(
+        and(
+          eq(issues.columnId, issue.columnId),
+          gt(issues.position, issue.position),
+          sql`parent_issue_id IS NULL`
+        )
+      );
+  } else {
+    // Update positions of sibling subtasks
+    await db
+      .update(issues)
+      .set({ position: sql`position - 1` })
+      .where(
+        and(
+          eq(issues.parentIssueId, issue.parentIssueId),
+          gt(issues.position, issue.position)
+        )
+      );
+  }
 
   // Revalidate workspace path
   if (workspaceId) {
@@ -320,6 +391,11 @@ export async function moveIssue(
     .get();
 
   if (!issue) return;
+
+  // Prevent moving subtasks independently - they move with their parent
+  if (issue.parentIssueId) {
+    throw new Error("Subtasks cannot be moved independently");
+  }
 
   // Get workspace ID for auth check
   const workspaceId = await getColumnWorkspaceId(issue.columnId);
@@ -393,6 +469,15 @@ export async function moveIssue(
         updatedAt: new Date(),
       })
       .where(eq(issues.id, issueId));
+
+    // Move all subtasks to the same column as parent
+    await db
+      .update(issues)
+      .set({
+        columnId: targetColumnId,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.parentIssueId, issueId));
 
     // Log the move with user ID
     await logActivity(
@@ -635,4 +720,234 @@ export async function getIssueActivities(issueId: string): Promise<Activity[]> {
     .from(activities)
     .where(eq(activities.issueId, issueId))
     .orderBy(activities.createdAt);
+}
+
+// ============================================================================
+// Subtask Operations
+// ============================================================================
+
+// Get all subtasks for an issue
+export async function getIssueSubtasks(
+  issueId: string
+): Promise<IssueWithLabels[]> {
+  const subtasks = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.parentIssueId, issueId))
+    .orderBy(issues.position);
+
+  // Fetch labels for each subtask
+  const subtasksWithLabels = await Promise.all(
+    subtasks.map(async (subtask) => {
+      const subtaskLabels = await db
+        .select({ label: labels })
+        .from(issueLabels)
+        .innerJoin(labels, eq(issueLabels.labelId, labels.id))
+        .where(eq(issueLabels.issueId, subtask.id));
+
+      return {
+        ...subtask,
+        labels: subtaskLabels.map((sl) => sl.label),
+      };
+    })
+  );
+
+  return subtasksWithLabels;
+}
+
+// Get subtask count for progress tracking
+export async function getSubtaskCount(issueId: string): Promise<SubtaskCount> {
+  const subtasks = await db
+    .select({ status: issues.status })
+    .from(issues)
+    .where(eq(issues.parentIssueId, issueId));
+
+  const total = subtasks.length;
+  const completed = subtasks.filter(
+    (s) => s.status === STATUS.DONE || s.status === STATUS.CANCELED
+  ).length;
+
+  return { total, completed };
+}
+
+// Convert a standalone issue to a subtask
+export async function convertToSubtask(
+  issueId: string,
+  parentIssueId: string
+): Promise<void> {
+  const issue = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.id, issueId))
+    .get();
+
+  if (!issue) throw new Error("Issue not found");
+
+  // Verify the issue is not already a subtask
+  if (issue.parentIssueId) {
+    throw new Error("Issue is already a subtask");
+  }
+
+  const parentIssue = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.id, parentIssueId))
+    .get();
+
+  if (!parentIssue) throw new Error("Parent issue not found");
+
+  // Prevent nested subtasks
+  if (parentIssue.parentIssueId) {
+    throw new Error("Cannot convert to subtask of another subtask");
+  }
+
+  // Verify the issue doesn't have its own subtasks
+  const existingSubtasks = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.parentIssueId, issueId))
+    .get();
+
+  if (existingSubtasks) {
+    throw new Error("Cannot convert issue with subtasks to a subtask");
+  }
+
+  // Get workspace for auth check
+  const workspaceId = await getColumnWorkspaceId(issue.columnId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId, "member");
+  }
+
+  const userId = await getCurrentUserId();
+
+  // Get max position among parent's subtasks
+  const maxPosition = await db
+    .select({ maxPos: sql<number>`COALESCE(MAX(position), -1)` })
+    .from(issues)
+    .where(eq(issues.parentIssueId, parentIssueId))
+    .get();
+
+  // Update the issue to be a subtask (inherit parent's column)
+  await db
+    .update(issues)
+    .set({
+      parentIssueId,
+      columnId: parentIssue.columnId,
+      position: (maxPosition?.maxPos ?? -1) + 1,
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, issueId));
+
+  // Log activity on both the issue and parent
+  await logActivity(
+    issueId,
+    "converted_to_subtask",
+    {
+      parentIssueId,
+      parentIdentifier: parentIssue.identifier,
+    },
+    userId
+  );
+
+  await logActivity(
+    parentIssueId,
+    "subtask_added",
+    {
+      subtaskId: issueId,
+      subtaskIdentifier: issue.identifier,
+      subtaskTitle: issue.title,
+    },
+    userId
+  );
+
+  // Revalidate workspace path
+  if (workspaceId) {
+    const slug = await getWorkspaceSlug(workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
+  }
+}
+
+// Convert a subtask to a standalone issue
+export async function convertToIssue(
+  subtaskId: string,
+  columnId: string
+): Promise<void> {
+  const subtask = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.id, subtaskId))
+    .get();
+
+  if (!subtask) throw new Error("Subtask not found");
+
+  if (!subtask.parentIssueId) {
+    throw new Error("Issue is not a subtask");
+  }
+
+  const parentIssue = await db
+    .select()
+    .from(issues)
+    .where(eq(issues.id, subtask.parentIssueId))
+    .get();
+
+  // Get workspace for auth check
+  const workspaceId = await getColumnWorkspaceId(columnId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId, "member");
+  }
+
+  const userId = await getCurrentUserId();
+
+  // Get max position in target column
+  const maxPosition = await db
+    .select({ maxPos: sql<number>`COALESCE(MAX(position), -1)` })
+    .from(issues)
+    .where(and(eq(issues.columnId, columnId), sql`parent_issue_id IS NULL`))
+    .get();
+
+  // Remove parent reference and assign to column
+  await db
+    .update(issues)
+    .set({
+      parentIssueId: null,
+      columnId,
+      position: (maxPosition?.maxPos ?? -1) + 1,
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, subtaskId));
+
+  // Log activity on the subtask
+  await logActivity(
+    subtaskId,
+    "converted_to_issue",
+    {
+      parentIssueId: subtask.parentIssueId ?? undefined,
+      parentIdentifier: parentIssue?.identifier ?? undefined,
+    },
+    userId
+  );
+
+  // Log activity on the parent if it exists
+  if (parentIssue) {
+    await logActivity(
+      parentIssue.id,
+      "subtask_removed",
+      {
+        subtaskId,
+        subtaskIdentifier: subtask.identifier,
+        subtaskTitle: subtask.title,
+      },
+      userId
+    );
+  }
+
+  // Revalidate workspace path
+  if (workspaceId) {
+    const slug = await getWorkspaceSlug(workspaceId);
+    revalidatePath(slug ? `/w/${slug}` : "/");
+  } else {
+    revalidatePath("/");
+  }
 }

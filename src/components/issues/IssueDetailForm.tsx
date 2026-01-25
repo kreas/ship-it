@@ -10,12 +10,15 @@ import { DatePicker } from "./properties/DatePicker";
 import { EstimateInput } from "./properties/EstimateInput";
 import { Comments } from "./Comments";
 import { ActivityFeed } from "./ActivityFeed";
+import { SubtaskList } from "./SubtaskList";
+import { SubtaskProgress } from "./SubtaskProgress";
 import {
   useIssueComments,
   useIssueActivities,
   useAddComment,
   useUpdateComment,
   useDeleteComment,
+  useSubtaskCount,
 } from "@/lib/hooks";
 import type {
   IssueWithLabels,
@@ -59,6 +62,10 @@ export function IssueDetailForm({
   // Use TanStack Query hooks for comments and activities
   const { data: comments = [] } = useIssueComments(issue.id);
   const { data: activities = [] } = useIssueActivities(issue.id);
+
+  // Subtask count for header (only for parent issues, not subtasks)
+  const isSubtask = !!issue.parentIssueId;
+  const { data: subtaskCount } = useSubtaskCount(isSubtask ? null : issue.id);
   const addCommentMutation = useAddComment(issue.id);
   const updateCommentMutation = useUpdateComment(issue.id);
   const deleteCommentMutation = useDeleteComment(issue.id);
@@ -209,6 +216,21 @@ export function IssueDetailForm({
               onCreateLabel={onCreateLabel}
             />
           </div>
+
+          {/* Subtasks - only show for parent issues (not subtasks) */}
+          {!isSubtask && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Subtasks
+                </label>
+                {subtaskCount && subtaskCount.total > 0 && (
+                  <SubtaskProgress count={subtaskCount} size="sm" />
+                )}
+              </div>
+              <SubtaskList issue={issue} />
+            </div>
+          )}
 
           {/* Description */}
           <div
