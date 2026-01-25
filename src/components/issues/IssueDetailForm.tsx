@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { cn } from "@/lib/utils";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { StatusSelect } from "./properties/StatusSelect";
 import { PrioritySelect } from "./properties/PrioritySelect";
 import { LabelSelect } from "./properties/LabelSelect";
@@ -243,18 +244,12 @@ export function IssueDetailForm({
             <label className="text-xs font-medium text-muted-foreground block mb-2">
               Description
             </label>
-            <TextareaAutosize
+            <MarkdownEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
               onBlur={handleDescriptionBlur}
-              className={cn(
-                "w-full text-sm resize-none bg-muted/50 rounded-md p-3",
-                "border border-transparent focus:border-border",
-                "focus:outline-none focus:ring-0",
-                "placeholder:text-muted-foreground"
-              )}
               placeholder="Add a description..."
-              minRows={3}
+              minHeight={120}
             />
           </div>
 
