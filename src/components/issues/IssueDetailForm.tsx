@@ -11,17 +11,16 @@ import { EstimateInput } from "./properties/EstimateInput";
 import { Comments } from "./Comments";
 import { ActivityFeed } from "./ActivityFeed";
 import {
-  getIssueComments,
-  getIssueActivities,
-  addComment,
-  updateComment,
-  deleteComment,
-} from "@/lib/actions/issues";
+  useIssueComments,
+  useIssueActivities,
+  useAddComment,
+  useUpdateComment,
+  useDeleteComment,
+} from "@/lib/hooks";
 import type {
   IssueWithLabels,
   Label,
   Comment,
-  Activity,
   UpdateIssueInput,
 } from "@/lib/types";
 import type { Status, Priority } from "@/lib/design-tokens";
@@ -55,18 +54,21 @@ export function IssueDetailForm({
   const [activeTab, setActiveTab] = useState<"comments" | "activity">(
     "comments"
   );
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [descriptionHighlight, setDescriptionHighlight] = useState(false);
 
-  // Load comments and activities
+  // Use TanStack Query hooks for comments and activities
+  const { data: comments = [] } = useIssueComments(issue.id);
+  const { data: activities = [] } = useIssueActivities(issue.id);
+  const addCommentMutation = useAddComment(issue.id);
+  const updateCommentMutation = useUpdateComment(issue.id);
+  const deleteCommentMutation = useDeleteComment(issue.id);
+
+  // Notify parent when comments load
   useEffect(() => {
-    getIssueComments(issue.id).then((loadedComments) => {
-      setComments(loadedComments);
-      onCommentsLoad?.(loadedComments);
-    });
-    getIssueActivities(issue.id).then(setActivities);
-  }, [issue.id, onCommentsLoad]);
+    if (comments.length > 0) {
+      onCommentsLoad?.(comments);
+    }
+  }, [comments, onCommentsLoad]);
 
   // Reset state when issue changes
   useEffect(() => {
@@ -110,28 +112,15 @@ export function IssueDetailForm({
   };
 
   const handleAddComment = async (body: string) => {
-    const comment = await addComment(issue.id, body);
-    const newComments = [...comments, comment];
-    setComments(newComments);
-    onCommentsLoad?.(newComments);
-    // Refresh activities
-    getIssueActivities(issue.id).then(setActivities);
+    await addCommentMutation.mutateAsync(body);
   };
 
   const handleUpdateComment = async (commentId: string, body: string) => {
-    await updateComment(commentId, body);
-    setComments((prev) =>
-      prev.map((c) =>
-        c.id === commentId ? { ...c, body, updatedAt: new Date() } : c
-      )
-    );
+    await updateCommentMutation.mutateAsync({ commentId, body });
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    await deleteComment(commentId);
-    const newComments = comments.filter((c) => c.id !== commentId);
-    setComments(newComments);
-    onCommentsLoad?.(newComments);
+    await deleteCommentMutation.mutateAsync(commentId);
   };
 
   return (

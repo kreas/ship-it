@@ -3,25 +3,26 @@
 import {
   createContext,
   useContext,
-  useState,
   useCallback,
   useOptimistic,
   useTransition,
   useEffect,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAppShell } from "@/components/layout";
-import { useURLState } from "@/lib/hooks";
 import {
-  createIssue,
-  updateIssue as updateIssueAction,
-  deleteIssue as deleteIssueAction,
-  moveIssue,
-  addLabel as addLabelAction,
-  removeLabel as removeLabelAction,
-} from "@/lib/actions/issues";
-import { createLabel as createLabelAction } from "@/lib/actions/board";
-import { getWorkspaceWithIssues } from "@/lib/actions/board";
+  useURLState,
+  useBoardQuery,
+  useCreateIssue,
+  useUpdateIssue,
+  useDeleteIssue,
+  useMoveIssue,
+  useAddLabelToIssue,
+  useRemoveLabelFromIssue,
+  useCreateLabel,
+} from "@/lib/hooks";
+import { queryKeys } from "@/lib/query-keys";
 import { issueReducer } from "./IssueContext";
 import type {
   BoardWithColumnsAndIssues,
@@ -94,30 +95,36 @@ export function BoardProvider({
   const { selectedIssueId, setSelectedIssueId, setDetailPanelOpen } =
     useAppShell();
   const { urlState, setIssue } = useURLState();
+  const queryClient = useQueryClient();
 
-  const [serverBoard, setServerBoard] = useState(initialBoard);
-  const [isLoading, setIsLoading] = useState(false);
+  const wsId = workspaceId ?? initialBoard.id;
+
+  // Use TanStack Query for board data
+  const { data: serverBoard = initialBoard, isLoading } = useBoardQuery(
+    wsId,
+    initialBoard
+  );
+
+  // Keep useOptimistic for instant UI feedback
   const [board, addOptimistic] = useOptimistic(serverBoard, issueReducer);
   const [, startTransition] = useTransition();
 
+  // Mutations
+  const createIssueMutation = useCreateIssue(wsId);
+  const updateIssueMutation = useUpdateIssue(wsId);
+  const deleteIssueMutation = useDeleteIssue(wsId);
+  const moveIssueMutation = useMoveIssue(wsId);
+  const addLabelMutation = useAddLabelToIssue(wsId);
+  const removeLabelMutation = useRemoveLabelFromIssue(wsId);
+  const createLabelMutation = useCreateLabel(wsId);
+
+  // refreshBoard now just invalidates the query
   const refreshBoard = useCallback(async () => {
-    const id = workspaceId ?? initialBoard.id;
-    if (!id) return;
-
-    setIsLoading(true);
-    try {
-      const newBoard = await getWorkspaceWithIssues(id);
-      setServerBoard(newBoard);
-    } catch (error) {
-      console.error("Failed to refresh board:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [workspaceId, initialBoard.id]);
-
-  useEffect(() => {
-    setServerBoard(initialBoard);
-  }, [initialBoard]);
+    if (!wsId) return;
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.board.detail(wsId),
+    });
+  }, [wsId, queryClient]);
 
   // Generic issue finder - DRY helper
   const findIssueBy = useCallback(
@@ -210,33 +217,30 @@ export function BoardProvider({
 
       startTransition(async () => {
         addOptimistic({ type: "addIssue", columnId, issue: tempIssue });
-        await createIssue(columnId, input);
-        await refreshBoard();
+        await createIssueMutation.mutateAsync({ columnId, input });
       });
     },
-    [board.columns, addOptimistic, refreshBoard]
+    [board.columns, addOptimistic, createIssueMutation]
   );
 
   const updateIssue = useCallback(
     (issueId: string, data: UpdateIssueInput) => {
       startTransition(async () => {
         addOptimistic({ type: "updateIssue", issueId, data });
-        await updateIssueAction(issueId, data);
-        await refreshBoard();
+        await updateIssueMutation.mutateAsync({ issueId, data });
       });
     },
-    [addOptimistic, refreshBoard]
+    [addOptimistic, updateIssueMutation]
   );
 
   const removeIssue = useCallback(
     (issueId: string) => {
       startTransition(async () => {
         addOptimistic({ type: "deleteIssue", issueId });
-        await deleteIssueAction(issueId);
-        await refreshBoard();
+        await deleteIssueMutation.mutateAsync(issueId);
       });
     },
-    [addOptimistic, refreshBoard]
+    [addOptimistic, deleteIssueMutation]
   );
 
   const moveIssueToColumn = useCallback(
@@ -248,11 +252,14 @@ export function BoardProvider({
           targetColumnId,
           targetPosition,
         });
-        await moveIssue(issueId, targetColumnId, targetPosition);
-        await refreshBoard();
+        await moveIssueMutation.mutateAsync({
+          issueId,
+          targetColumnId,
+          targetPosition,
+        });
       });
     },
-    [addOptimistic, refreshBoard]
+    [addOptimistic, moveIssueMutation]
   );
 
   const addLabelToIssue = useCallback(
@@ -265,39 +272,35 @@ export function BoardProvider({
 
       startTransition(async () => {
         addOptimistic({ type: "addLabel", issueId, label });
-        await addLabelAction(issueId, labelId);
-        await refreshBoard();
+        await addLabelMutation.mutateAsync({ issueId, labelId });
       });
     },
-    [board.labels, addOptimistic, refreshBoard, findIssue]
+    [board.labels, addOptimistic, addLabelMutation, findIssue]
   );
 
   const removeLabelFromIssue = useCallback(
     (issueId: string, labelId: string) => {
       startTransition(async () => {
         addOptimistic({ type: "removeLabel", issueId, labelId });
-        await removeLabelAction(issueId, labelId);
-        await refreshBoard();
+        await removeLabelMutation.mutateAsync({ issueId, labelId });
       });
     },
-    [addOptimistic, refreshBoard]
+    [addOptimistic, removeLabelMutation]
   );
 
   const createLabel = useCallback(
     async (name: string, color: string): Promise<Label | undefined> => {
-      const wsId = workspaceId ?? initialBoard.id;
       if (!wsId) return undefined;
 
       try {
-        const newLabel = await createLabelAction(wsId, name, color);
-        await refreshBoard();
+        const newLabel = await createLabelMutation.mutateAsync({ name, color });
         return newLabel;
       } catch (error) {
         console.error("Failed to create label:", error);
         return undefined;
       }
     },
-    [workspaceId, initialBoard.id, refreshBoard]
+    [wsId, createLabelMutation]
   );
 
   // Selected issue convenience methods
