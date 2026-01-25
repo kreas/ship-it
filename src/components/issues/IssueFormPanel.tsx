@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { StatusSelect } from "./properties/StatusSelect";
 import { PrioritySelect } from "./properties/PrioritySelect";
 import { LabelSelect } from "./properties/LabelSelect";
@@ -125,17 +126,11 @@ export function IssueFormPanel({
           <label className="text-xs font-medium text-muted-foreground block mb-2">
             Description
           </label>
-          <TextareaAutosize
+          <MarkdownEditor
             value={formState.description}
-            onChange={(e) => onFormChange({ description: e.target.value })}
-            className={cn(
-              "w-full text-sm resize-none bg-muted/50 rounded-md p-3",
-              "border border-transparent focus:border-border",
-              "focus:outline-none focus:ring-0",
-              "placeholder:text-muted-foreground"
-            )}
+            onChange={(value) => onFormChange({ description: value })}
             placeholder="Add a description... (e.g., As a [user], I want [goal], so that [benefit])"
-            minRows={4}
+            minHeight={140}
           />
         </div>
 

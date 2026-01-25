@@ -9,8 +9,8 @@ import {
   Trash2,
   ExternalLink,
 } from "lucide-react";
-import TextareaAutosize from "react-textarea-autosize";
 import { cn } from "@/lib/utils";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -209,18 +209,13 @@ function SubtaskItem({
 
           {/* Description */}
           <div>
-            <TextareaAutosize
+            <MarkdownEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
               onBlur={handleDescriptionBlur}
               placeholder="Add description..."
-              className={cn(
-                "w-full text-sm resize-none bg-background rounded-md px-2 py-1.5",
-                "border border-transparent focus:border-border",
-                "focus:outline-none focus:ring-0",
-                "placeholder:text-muted-foreground"
-              )}
-              minRows={2}
+              minHeight={60}
+              compact
             />
           </div>
         </div>

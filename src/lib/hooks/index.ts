@@ -41,3 +41,5 @@ export {
   useSubtaskOperations,
   useConvertToSubtask,
 } from "./use-subtasks";
+
+export { useColorMode } from "./use-color-mode";
