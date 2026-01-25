@@ -91,6 +91,9 @@ export const issues = sqliteTable("issues", {
   cycleId: text("cycle_id").references(() => cycles.id, {
     onDelete: "set null",
   }),
+  // Subtask support: references parent issue (1 level only - subtasks cannot have subtasks)
+  // Note: Self-reference handled at database level, not inline to avoid TS circular reference
+  parentIssueId: text("parent_issue_id"),
   position: integer("position").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),

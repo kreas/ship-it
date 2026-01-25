@@ -18,6 +18,10 @@ export const queryKeys = {
       [...queryKeys.issue.all, issueId, "activities"] as const,
     chat: (issueId: string) =>
       [...queryKeys.issue.all, issueId, "chat"] as const,
+    subtasks: (issueId: string) =>
+      [...queryKeys.issue.all, issueId, "subtasks"] as const,
+    subtaskCount: (issueId: string) =>
+      [...queryKeys.issue.all, issueId, "subtaskCount"] as const,
   },
   settings: {
     labels: (workspaceId: string) =>

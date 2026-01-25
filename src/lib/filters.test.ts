@@ -36,6 +36,7 @@ function createIssue(
     estimate: null,
     dueDate: null,
     cycleId: null,
+    parentIssueId: null,
     position: 0,
     createdAt: new Date(),
     updatedAt: new Date(),

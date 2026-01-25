@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 import { PriorityIcon } from "./PriorityIcon";
 import { StatusDot } from "./StatusDot";
 import { QuickActions } from "./QuickActions";
+import { SubtaskProgress } from "./SubtaskProgress";
 import { Calendar } from "lucide-react";
 import { format, isPast, isToday } from "date-fns";
+import { useSubtaskCount } from "@/lib/hooks";
 import type { IssueWithLabels, Label } from "@/lib/types";
 import type { Priority, Status } from "@/lib/design-tokens";
 
@@ -79,6 +81,11 @@ export function IssueCard({
     },
   });
 
+  // Fetch subtask count for this issue (only for parent issues)
+  const { data: subtaskCount } = useSubtaskCount(
+    issue.parentIssueId ? null : issue.id
+  );
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -125,10 +132,15 @@ export function IssueCard({
         {issue.title}
       </h3>
 
-      {/* Bottom row: Status + Labels + Due Date */}
+      {/* Bottom row: Status + Subtasks + Labels + Due Date */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <StatusDot status={issue.status as Status} size="sm" />
+
+          {/* Subtask progress */}
+          {subtaskCount && subtaskCount.total > 0 && (
+            <SubtaskProgress count={subtaskCount} size="sm" />
+          )}
 
           {/* Labels */}
           {visibleLabels.length > 0 && (
