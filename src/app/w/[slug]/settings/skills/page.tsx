@@ -14,6 +14,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import {
   updateWorkspaceSkill,
@@ -275,7 +276,7 @@ function SkillRow({
   );
 }
 
-type ImportMode = "upload" | "paste";
+type ImportMode = "upload" | "paste" | "ai";
 
 function ImportSkillForm({
   workspaceId,
@@ -289,6 +290,9 @@ function ImportSkillForm({
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [pasteContent, setPasteContent] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generatedMarkdown, setGeneratedMarkdown] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -353,6 +357,69 @@ function ImportSkillForm({
     }
   }, [pasteContent, workspaceId, onImported]);
 
+  const handleGenerate = useCallback(async () => {
+    if (!aiPrompt.trim()) return;
+
+    setError(null);
+    setIsGenerating(true);
+    setGeneratedMarkdown("");
+
+    try {
+      const res = await fetch("/api/skills/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          workspaceId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to generate skill");
+      }
+
+      setGeneratedMarkdown(data.markdown);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate skill");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [aiPrompt, workspaceId]);
+
+  const handleImportGenerated = useCallback(async () => {
+    if (!generatedMarkdown.trim()) return;
+
+    setError(null);
+    setIsUploading(true);
+
+    try {
+      const res = await fetch("/api/skills/import/markdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown: generatedMarkdown,
+          workspaceId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to import skill");
+      }
+
+      setAiPrompt("");
+      setGeneratedMarkdown("");
+      onImported();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to import skill");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [generatedMarkdown, workspaceId, onImported]);
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -413,6 +480,18 @@ function ImportSkillForm({
           <FileText className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
           Paste Markdown
         </button>
+        <button
+          onClick={() => setMode("ai")}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-md transition-colors",
+            mode === "ai"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Sparkles className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
+          AI-Assisted
+        </button>
       </div>
 
       {mode === "upload" ? (
@@ -468,7 +547,7 @@ function ImportSkillForm({
             </div>
           </div>
         </>
-      ) : (
+      ) : mode === "paste" ? (
         <>
           <div className="space-y-2">
             <textarea
@@ -498,6 +577,66 @@ Your markdown content here...`}
             Paste markdown with YAML frontmatter containing{" "}
             <code className="bg-muted px-1 rounded">name</code> and{" "}
             <code className="bg-muted px-1 rounded">description</code> fields.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Describe your skill
+              </label>
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Describe what you want the skill to do. For example: 'Rewrite blog content for a 5-year-old' or 'Generate SEO-optimized meta descriptions'"
+                className="w-full h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                disabled={isGenerating || isUploading}
+              />
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating || !aiPrompt.trim()}
+                className="w-full"
+              >
+                {isGenerating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate Skill
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {generatedMarkdown && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Generated Skill (review and edit if needed)
+                </label>
+                <textarea
+                  value={generatedMarkdown}
+                  onChange={(e) => setGeneratedMarkdown(e.target.value)}
+                  className="w-full h-64 rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={isUploading}
+                />
+                <Button
+                  onClick={handleImportGenerated}
+                  disabled={isUploading || !generatedMarkdown.trim()}
+                  className="w-full"
+                >
+                  {isUploading ? "Importing..." : "Import Generated Skill"}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Describe what you want the skill to do and AI will generate a
+            properly formatted skill for you. Review and edit before importing.
           </p>
         </>
       )}
