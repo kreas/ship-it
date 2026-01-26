@@ -59,6 +59,7 @@ export async function createWorkspaceSkill(
       name: input.name,
       description: input.description,
       content: input.content,
+      assets: input.assets ? JSON.stringify(input.assets) : null,
       isEnabled: true,
       createdAt: now,
       updatedAt: now,

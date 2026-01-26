@@ -55,6 +55,20 @@ export function generateStorageKey(
 }
 
 /**
+ * Generate a storage key for a skill asset
+ * Format: skills/{workspaceId}/{skillId}/{path}
+ */
+export function generateSkillAssetKey(
+  workspaceId: string,
+  skillId: string,
+  filepath: string
+): string {
+  // Sanitize filepath: keep path separators, remove special characters
+  const sanitized = filepath.replace(/[^a-zA-Z0-9._/-]/g, "_");
+  return `skills/${workspaceId}/${skillId}/${sanitized}`;
+}
+
+/**
  * Generate a presigned URL for uploading a file directly to R2
  * Expires in 15 minutes
  */

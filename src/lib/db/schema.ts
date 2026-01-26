@@ -185,6 +185,8 @@ export const workspaceSkills = sqliteTable("workspace_skills", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   content: text("content").notNull(),
+  // JSON array of asset objects: { filename, storageKey, mimeType }
+  assets: text("assets"),
   isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),

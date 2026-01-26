@@ -106,13 +106,23 @@ export type CreateCommentInput = {
   body: string;
 };
 
+export type SkillAsset = {
+  filename: string;
+  storageKey: string;
+  mimeType: string;
+};
+
 export type CreateWorkspaceSkillInput = {
   name: string;
   description: string;
   content: string;
+  assets?: SkillAsset[];
 };
 
-export type UpdateWorkspaceSkillInput = Partial<CreateWorkspaceSkillInput> & {
+export type UpdateWorkspaceSkillInput = {
+  name?: string;
+  description?: string;
+  content?: string;
   isEnabled?: boolean;
 };
 
