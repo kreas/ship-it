@@ -45,6 +45,7 @@
     "drizzle-orm": "^0.45.1",
     "gray-matter": "^4.0.3",
     "iron-session": "^8.0.4",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
     "marked": "^17.0.1",
     "nanoid": "^5.1.6",
