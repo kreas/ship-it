@@ -275,6 +275,8 @@ function SkillRow({
   );
 }
 
+type ImportMode = "upload" | "paste";
+
 function ImportSkillForm({
   workspaceId,
   onImported,
@@ -282,9 +284,11 @@ function ImportSkillForm({
   workspaceId: string;
   onImported: () => void;
 }) {
+  const [mode, setMode] = useState<ImportMode>("upload");
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [pasteContent, setPasteContent] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -317,6 +321,37 @@ function ImportSkillForm({
     },
     [workspaceId, onImported]
   );
+
+  const handlePaste = useCallback(async () => {
+    if (!pasteContent.trim()) return;
+
+    setError(null);
+    setIsUploading(true);
+
+    try {
+      const res = await fetch("/api/skills/import/markdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown: pasteContent,
+          workspaceId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to import skill");
+      }
+
+      setPasteContent("");
+      onImported();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to import skill");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [pasteContent, workspaceId, onImported]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -352,62 +387,126 @@ function ImportSkillForm({
 
   return (
     <div className="space-y-4">
-      <div
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={cn(
-          "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-          dragActive
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-primary/50 hover:bg-muted/50",
-          isUploading && "opacity-50 pointer-events-none"
-        )}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".md,.zip"
-          onChange={handleChange}
-          className="hidden"
-        />
-
-        {isUploading ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-muted-foreground">Importing skill...</p>
-          </div>
-        ) : (
-          <>
-            <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-            <p className="text-sm font-medium text-foreground mb-1">
-              Drop a skill file here or click to browse
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Supports .md files or .zip skill packages
-            </p>
-          </>
-        )}
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+        <button
+          onClick={() => setMode("upload")}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-md transition-colors",
+            mode === "upload"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Upload className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
+          Upload File
+        </button>
+        <button
+          onClick={() => setMode("paste")}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-md transition-colors",
+            mode === "paste"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <FileText className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />
+          Paste Markdown
+        </button>
       </div>
+
+      {mode === "upload" ? (
+        <>
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+              dragActive
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50 hover:bg-muted/50",
+              isUploading && "opacity-50 pointer-events-none"
+            )}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".md,.zip"
+              onChange={handleChange}
+              className="hidden"
+            />
+
+            {isUploading ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground">Importing skill...</p>
+              </div>
+            ) : (
+              <>
+                <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                <p className="text-sm font-medium text-foreground mb-1">
+                  Drop a skill file here or click to browse
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Supports .md files or .zip skill packages
+                </p>
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <FileText className="w-4 h-4" />
+              <span>.md - Single skill file</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Package className="w-4 h-4" />
+              <span>.zip - Skill package with assets</span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <textarea
+              value={pasteContent}
+              onChange={(e) => setPasteContent(e.target.value)}
+              placeholder={`---
+name: my-skill
+description: When to use this skill
+---
+
+# Skill Instructions
+
+Your markdown content here...`}
+              className="w-full h-64 rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              disabled={isUploading}
+            />
+            <Button
+              onClick={handlePaste}
+              disabled={isUploading || !pasteContent.trim()}
+              className="w-full"
+            >
+              {isUploading ? "Importing..." : "Import Skill"}
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Paste markdown with YAML frontmatter containing{" "}
+            <code className="bg-muted px-1 rounded">name</code> and{" "}
+            <code className="bg-muted px-1 rounded">description</code> fields.
+          </p>
+        </>
+      )}
 
       {error && (
         <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
-
-      <div className="flex gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <FileText className="w-4 h-4" />
-          <span>.md - Single skill file</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Package className="w-4 h-4" />
-          <span>.zip - Skill package with assets</span>
-        </div>
-      </div>
     </div>
   );
 }
