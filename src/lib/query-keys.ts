@@ -39,4 +39,12 @@ export const queryKeys = {
     servers: (query: string, page: number, verifiedOnly: boolean) =>
       ["smithery", "servers", query, page, verifiedOnly] as const,
   },
+  workspaceChat: {
+    all: (workspaceId: string) => ["workspaceChats", workspaceId] as const,
+    detail: (chatId: string) => ["workspaceChats", "detail", chatId] as const,
+    messages: (chatId: string) =>
+      ["workspaceChats", "messages", chatId] as const,
+    attachments: (chatId: string) =>
+      ["workspaceChats", "attachments", chatId] as const,
+  },
 } as const;
