@@ -54,3 +54,18 @@ export {
 } from "./use-attachments";
 
 export { useSendToAI } from "./use-send-to-ai";
+
+export { useServerSearch } from "./use-server-search";
+
+export {
+  useWorkspaceChats,
+  useWorkspaceChat,
+  useChatMessages,
+  useCreateChat,
+  useUpdateChatTitle,
+  useDeleteChat,
+  useSaveWorkspaceChatMessage,
+  useClearWorkspaceChatMessages,
+  useChatAttachments,
+  useInvalidateChatAttachments,
+} from "./use-workspace-chat";

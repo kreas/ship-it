@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
+import Smithery from "@smithery/api";
 import { db } from "@/lib/db";
 import { workspaceMcpServers } from "@/lib/db/schema";
 import {
@@ -10,6 +11,11 @@ import {
   getAllMcpServers,
   testServerConnection,
 } from "@/lib/mcp";
+
+// Initialize Smithery client for registry search
+const smithery = new Smithery({
+  apiKey: process.env.SMITHERY_API_KEY,
+});
 
 /**
  * MCP server definition with current enabled status and connection state.
@@ -219,5 +225,83 @@ export async function toggleMcpServer(
   } else {
     const result = await enableMcpServer(workspaceId, serverKey);
     return { ...result, isEnabled: result.success };
+  }
+}
+
+/**
+ * Smithery server result from the registry API
+ */
+export type SmitheryServerResult = {
+  id: string;
+  qualifiedName: string;
+  displayName: string;
+  description: string;
+  iconUrl: string | null;
+  verified: boolean;
+  useCount: number;
+  isDeployed: boolean;
+  homepage: string;
+};
+
+export type SearchServersResponse = {
+  servers: SmitheryServerResult[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    totalCount: number;
+  };
+};
+
+/**
+ * Search Smithery registry for MCP servers
+ */
+export async function searchSmitheryServers(
+  query: string,
+  page: number = 1,
+  pageSize: number = 10,
+  verifiedOnly: boolean = true
+): Promise<SearchServersResponse> {
+  if (!process.env.SMITHERY_API_KEY) {
+    return {
+      servers: [],
+      pagination: { currentPage: 1, pageSize, totalPages: 0, totalCount: 0 },
+    };
+  }
+
+  try {
+    const response = await smithery.servers.list({
+      q: query || undefined,
+      page,
+      pageSize,
+      isDeployed: "true",
+      verified: verifiedOnly ? "true" : undefined,
+    });
+
+    return {
+      servers: response.servers.map((server) => ({
+        id: server.id,
+        qualifiedName: server.qualifiedName,
+        displayName: server.displayName,
+        description: server.description,
+        iconUrl: server.iconUrl,
+        verified: server.verified,
+        useCount: server.useCount,
+        isDeployed: server.isDeployed,
+        homepage: server.homepage,
+      })),
+      pagination: {
+        currentPage: response.pagination.currentPage ?? 1,
+        pageSize: response.pagination.pageSize ?? pageSize,
+        totalPages: response.pagination.totalPages ?? 0,
+        totalCount: response.pagination.totalCount ?? 0,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to search Smithery servers:", error);
+    return {
+      servers: [],
+      pagination: { currentPage: 1, pageSize, totalPages: 0, totalCount: 0 },
+    };
   }
 }

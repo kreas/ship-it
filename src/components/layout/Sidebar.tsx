@@ -16,6 +16,7 @@ import {
   Layers,
   Check,
   Wand2,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW } from "@/lib/design-tokens";
@@ -35,6 +36,7 @@ interface NavItemProps {
   isActive?: boolean;
   isCollapsed: boolean;
   onClick?: () => void;
+  href?: string;
   shortcut?: string;
 }
 
@@ -44,11 +46,22 @@ function NavItem({
   isActive,
   isCollapsed,
   onClick,
+  href,
   shortcut,
 }: NavItemProps) {
+  const router = useRouter();
+
+  const handleClick = () => {
+    if (href) {
+      router.push(href);
+    } else if (onClick) {
+      onClick();
+    }
+  };
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         "flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm transition-colors",
         "hover:bg-sidebar-accent",
@@ -274,6 +287,13 @@ export function Sidebar() {
             icon={<Clock className="w-4 h-4" />}
             label="Cycles"
             isCollapsed={sidebarCollapsed}
+          />
+          <NavItem
+            icon={<MessageSquare className="w-4 h-4" />}
+            label="Chat"
+            isCollapsed={sidebarCollapsed}
+            href={workspace ? `/w/${workspace.slug}/chat` : undefined}
+            shortcut="G C"
           />
         </NavSection>
       </nav>

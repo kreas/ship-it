@@ -12,6 +12,9 @@ import type {
   attachments,
   workspaceSkills,
   workspaceMcpServers,
+  workspaceChats,
+  workspaceChatMessages,
+  workspaceChatAttachments,
 } from "./db/schema";
 import type { Status, Priority } from "./design-tokens";
 
@@ -29,6 +32,9 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type WorkspaceSkill = typeof workspaceSkills.$inferSelect;
 export type WorkspaceMcpServer = typeof workspaceMcpServers.$inferSelect;
+export type WorkspaceChat = typeof workspaceChats.$inferSelect;
+export type WorkspaceChatMessage = typeof workspaceChatMessages.$inferSelect;
+export type WorkspaceChatAttachment = typeof workspaceChatAttachments.$inferSelect;
 
 // Attachment with signed URL for display
 export type AttachmentWithUrl = Attachment & { url: string };

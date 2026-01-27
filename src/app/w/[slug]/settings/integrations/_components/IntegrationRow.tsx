@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, Plug } from "lucide-react";
 import { toggleMcpServer } from "@/lib/actions/integrations";
+import { useSettingsContext } from "../../context";
 import { cn } from "@/lib/utils";
 import type { McpServerWithStatus } from "@/lib/actions/integrations";
 
@@ -12,36 +13,29 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 
 interface IntegrationRowProps {
   server: McpServerWithStatus;
-  isAdmin: boolean;
-  workspaceId: string;
-  onToggle: () => void;
 }
 
-export function IntegrationRow({
-  server,
-  isAdmin,
-  workspaceId,
-  onToggle,
-}: IntegrationRowProps) {
+export function IntegrationRow({ server }: IntegrationRowProps) {
+  const { workspace, isAdmin, refreshMcpServers } = useSettingsContext();
   const [isToggling, setIsToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const Icon = ICONS[server.icon] || Plug;
 
   const handleToggle = async () => {
-    if (!isAdmin || isToggling) return;
+    if (!isAdmin || isToggling || !workspace) return;
 
     setIsToggling(true);
     setError(null);
 
     try {
-      const result = await toggleMcpServer(workspaceId, server.key);
+      const result = await toggleMcpServer(workspace.id, server.key);
 
       if (!result.success) {
         setError(result.error || "Failed to toggle integration");
       }
 
-      onToggle();
+      refreshMcpServers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle integration");
     } finally {
