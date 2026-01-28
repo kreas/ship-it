@@ -7,6 +7,11 @@ import {
   getChatAttachments,
 } from "@/lib/actions/workspace-chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
+import type { WorkspaceSoul } from "@/lib/types";
+import { buildSoulSystemPrompt } from "@/lib/soul-utils";
+import { db } from "@/lib/db";
+import { workspaces } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export const maxDuration = 30;
 
@@ -54,10 +59,18 @@ If the user asks you to read or review a file, first use listFiles to see what f
 
 Be conversational and helpful. Provide clear, actionable responses.`;
 
-function getSystemPrompt(purpose: WorkspacePurpose): string {
-  return purpose === "marketing"
+function getSystemPrompt(purpose: WorkspacePurpose, soul: WorkspaceSoul | null): string {
+  const basePrompt = purpose === "marketing"
     ? MARKETING_SYSTEM_PROMPT
     : SOFTWARE_SYSTEM_PROMPT;
+
+  // If a soul/persona is configured, prepend it to the system prompt
+  if (soul && soul.name) {
+    const soulPrompt = buildSoulSystemPrompt(soul);
+    return `${soulPrompt}\n\n---\n\n${basePrompt}`;
+  }
+
+  return basePrompt;
 }
 
 const createFileSchema = z.object({
@@ -189,6 +202,24 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
+  // Load workspace soul/persona if workspaceId is provided
+  let soul: WorkspaceSoul | null = null;
+  if (workspaceId) {
+    const workspace = await db
+      .select({ soul: workspaces.soul })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .get();
+
+    if (workspace?.soul) {
+      try {
+        soul = JSON.parse(workspace.soul) as WorkspaceSoul;
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+  }
+
   // Load workspace skills and MCP tools
   const skills = workspaceId
     ? await loadSkillsForWorkspace(workspaceId, purpose)
@@ -198,7 +229,7 @@ export async function POST(req: Request) {
   const tools = chatId ? createWorkspaceChatTools(chatId) : {};
 
   return createChatResponse(messages, {
-    system: getSystemPrompt(purpose),
+    system: getSystemPrompt(purpose, soul),
     tools,
     builtInTools: {
       webSearch: true,

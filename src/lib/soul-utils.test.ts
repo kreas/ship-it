@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exportSoulAsMarkdown, createDefaultSoul } from "./soul-utils";
+import { exportSoulAsMarkdown, createDefaultSoul, buildSoulSystemPrompt } from "./soul-utils";
 import type { WorkspaceSoul } from "./types";
 
 function createTestSoul(overrides: Partial<WorkspaceSoul> = {}): WorkspaceSoul {
@@ -145,6 +145,96 @@ describe("exportSoulAsMarkdown", () => {
     expect(markdown).toContain("- **Sprint:** A 2-week cycle");
     expect(markdown).toContain("- **Backlog:** List of work items");
     expect(markdown).toContain("- **Standup:** Daily sync meeting");
+  });
+});
+
+describe("buildSoulSystemPrompt", () => {
+  it("builds a system prompt with all soul fields", () => {
+    const soul = createTestSoul();
+    const prompt = buildSoulSystemPrompt(soul);
+
+    // Check identity
+    expect(prompt).toContain("You are Luna, an AI assistant");
+
+    // Check personality
+    expect(prompt).toContain("**Personality:**");
+    expect(prompt).toContain("A helpful and friendly AI assistant.");
+
+    // Check communication style
+    expect(prompt).toContain("**Communication Style:**");
+    expect(prompt).toContain("- Tone: friendly");
+    expect(prompt).toContain("- Response length: moderate");
+
+    // Check goals
+    expect(prompt).toContain("**Primary Goals:**");
+    expect(prompt).toContain("- Help users complete tasks");
+
+    // Check expertise
+    expect(prompt).toContain("**Areas of Expertise:**");
+    expect(prompt).toContain("- Software Development");
+
+    // Check do rules
+    expect(prompt).toContain("**Things you SHOULD do:**");
+    expect(prompt).toContain("- Be concise");
+
+    // Check don't rules
+    expect(prompt).toContain("**Things you should NOT do:**");
+    expect(prompt).toContain("- Provide medical advice");
+
+    // Check terminology
+    expect(prompt).toContain("**Domain Terminology:**");
+    expect(prompt).toContain("- Sprint: A 2-week development cycle");
+
+    // Check greeting
+    expect(prompt).toContain("**When starting a conversation, greet users with:**");
+    expect(prompt).toContain("Hello! How can I help you today?");
+  });
+
+  it("omits empty sections", () => {
+    const soul = createTestSoul({
+      personality: "",
+      primaryGoals: [],
+      domainExpertise: [],
+      doRules: [],
+      dontRules: [],
+      terminology: {},
+      greeting: undefined,
+    });
+    const prompt = buildSoulSystemPrompt(soul);
+
+    // Should NOT contain empty sections
+    expect(prompt).not.toContain("**Personality:**");
+    expect(prompt).not.toContain("**Primary Goals:**");
+    expect(prompt).not.toContain("**Areas of Expertise:**");
+    expect(prompt).not.toContain("**Things you SHOULD do:**");
+    expect(prompt).not.toContain("**Things you should NOT do:**");
+    expect(prompt).not.toContain("**Domain Terminology:**");
+    expect(prompt).not.toContain("**When starting a conversation");
+
+    // Should still contain identity and communication style
+    expect(prompt).toContain("You are Luna");
+    expect(prompt).toContain("**Communication Style:**");
+  });
+
+  it("handles soul without name", () => {
+    const soul = createTestSoul({ name: "" });
+    const prompt = buildSoulSystemPrompt(soul);
+
+    // Should not have identity line when no name
+    expect(prompt).not.toContain("You are , an AI assistant");
+    // Should still have other content
+    expect(prompt).toContain("**Communication Style:**");
+  });
+
+  it("formats different tone and response length", () => {
+    const soul = createTestSoul({
+      tone: "professional",
+      responseLength: "detailed",
+    });
+    const prompt = buildSoulSystemPrompt(soul);
+
+    expect(prompt).toContain("- Tone: professional");
+    expect(prompt).toContain("- Response length: detailed");
   });
 });
 
