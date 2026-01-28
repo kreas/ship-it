@@ -138,32 +138,34 @@ export function SoulPreview({
               {mode === "view" ? "Workspace AI personality" : "Soul configuration preview"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {mode === "view" && onEditWithAI && (
               <button
                 onClick={onEditWithAI}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                className="flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                title="Edit with AI"
               >
                 <Sparkles className="w-4 h-4" />
-                Edit with AI
+                <span className="sr-only">Edit with AI</span>
               </button>
             )}
             {mode === "edit" && onViewSoul && (
               <button
                 onClick={onViewSoul}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                className="flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                title="View Soul"
               >
                 <Eye className="w-4 h-4" />
-                View Soul
+                <span className="sr-only">View Soul</span>
               </button>
             )}
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              className="flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
               title="Export as Markdown"
             >
               <Download className="w-4 h-4" />
-              Export
+              <span className="sr-only">Export</span>
             </button>
           </div>
         </div>
