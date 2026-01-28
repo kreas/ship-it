@@ -194,9 +194,152 @@ try {
 
 ## Transport Notes
 
-- **HTTP transport** is used for stateless request/response servers
-- **SSE transport** is available for streaming servers (not currently used)
+- **HTTP transport** is used for simple stateless request/response servers
+- **SSE transport** is used for Smithery-hosted servers and streaming connections
 - Don't call `mcpClient.close()` for HTTP transport as it causes AbortError
+
+## Smithery Registry
+
+[Smithery](https://smithery.ai) is a registry of MCP servers that can be discovered and integrated into workspaces. The codebase uses the `@smithery/api` package to search the registry.
+
+**Documentation:** [smithery.ai/docs](https://smithery.ai/docs)
+
+### Package
+
+```json
+{
+  "@smithery/api": "^0.29.0"
+}
+```
+
+### Configuration
+
+Add your Smithery API key to environment variables:
+
+```bash
+SMITHERY_API_KEY=your_api_key_here
+```
+
+### Searching the Registry
+
+Use the `searchSmitheryServers` function to search for MCP servers:
+
+```typescript
+import { searchSmitheryServers } from "@/lib/actions/integrations";
+
+const results = await searchSmitheryServers(
+  "search query",  // Search term
+  1,               // Page number
+  10,              // Page size
+  true             // Verified only
+);
+
+// Results structure:
+// {
+//   servers: SmitheryServerResult[],
+//   pagination: { currentPage, pageSize, totalPages, totalCount }
+// }
+```
+
+### Server Result Type
+
+```typescript
+type SmitheryServerResult = {
+  id: string;
+  qualifiedName: string;      // e.g., "@smithery/weather"
+  displayName: string;        // Human-readable name
+  description: string;
+  iconUrl: string | null;
+  verified: boolean;          // Smithery-verified server
+  useCount: number;           // Popularity metric
+  isDeployed: boolean;        // Available for use
+  homepage: string;           // Documentation URL
+};
+```
+
+### Client-Side Search Hook
+
+The `useServerSearch` hook provides debounced search with pagination:
+
+```typescript
+import { useServerSearch } from "@/lib/hooks";
+
+function ServerSearchUI() {
+  const {
+    query,
+    setQuery,
+    verifiedOnly,
+    setVerifiedOnly,
+    results,
+    isLoading,
+    page,
+    handlePrevPage,
+    handleNextPage,
+    hasNextPage,
+    hasPrevPage,
+  } = useServerSearch({ pageSize: 10 });
+
+  // Render search UI...
+}
+```
+
+Features:
+- 300ms debounce on search input
+- TanStack Query caching (5 min stale, 30 min gc)
+- Pagination controls
+- Verified-only filter
+
+### Connecting to Smithery Servers
+
+Use the AI SDK's `createMCPClient` with SSE transport to connect to Smithery-hosted servers:
+
+```typescript
+import { createMCPClient } from "@ai-sdk/mcp";
+
+const client = await createMCPClient({
+  transport: {
+    type: "sse",
+    url: "https://server.smithery.ai/@smithery/weather/sse",
+  },
+});
+
+const tools = await client.tools();
+```
+
+### Adding Smithery Servers
+
+To add a discovered Smithery server as a baked-in option:
+
+1. Get the server's qualified name from its Smithery page (e.g., `@smithery/weather`)
+2. Add it to `/src/lib/mcp/servers.ts` using **SSE transport**:
+
+```typescript
+export const MCP_SERVERS = {
+  // ... existing servers
+  weatherApi: {
+    key: "weatherApi",
+    name: "Weather API",
+    description: "Get weather data for any location",
+    mcpUrl: "https://server.smithery.ai/@smithery/weather/sse",
+    transportType: "sse" as const,  // Smithery uses SSE
+    icon: "Cloud",
+    requiresAuth: false,
+  },
+} as const;
+```
+
+The Smithery SSE URL format is:
+```
+https://server.smithery.ai/{qualifiedName}/sse
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `/src/lib/actions/integrations.ts` | `searchSmitheryServers()` server action |
+| `/src/lib/hooks/use-server-search.ts` | Client-side search hook |
+| `/src/app/w/[slug]/settings/integrations/_components/` | Search UI components |
 
 ## Key Files
 
