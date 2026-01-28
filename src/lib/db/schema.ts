@@ -24,6 +24,7 @@ export const workspaces = sqliteTable("workspaces", {
   identifier: text("identifier").notNull().default("AUTO"), // For issue IDs like AUTO-123
   issueCounter: integer("issue_counter").notNull().default(0),
   purpose: text("purpose").notNull().default("software"), // "software" | "marketing"
+  soul: text("soul"), // JSON-serialized WorkspaceSoul
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),
@@ -240,5 +241,16 @@ export const workspaceChatAttachments = sqliteTable("workspace_chat_attachments"
   content: text("content").notNull(), // The actual file content
   mimeType: text("mime_type").notNull().default("text/markdown"),
   size: integer("size").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Soul Chat Messages - conversation history for soul configuration
+export const soulChatMessages = sqliteTable("soul_chat_messages", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // "user" | "assistant"
+  content: text("content").notNull(), // JSON-serialized message parts
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

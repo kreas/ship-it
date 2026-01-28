@@ -25,7 +25,7 @@ import {
 import { prepareFilesForSubmission } from "@/lib/chat/file-utils";
 
 export function ChatPanel() {
-  const { selectedChatId, workspace, workspacePurpose, viewAttachment } = useChatContext();
+  const { selectedChatId, workspace, workspacePurpose, soul, viewAttachment } = useChatContext();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -169,6 +169,20 @@ export function ChatPanel() {
     lastSavedMessageRef.current = null;
   }, [clearChatMutation, setMessages]);
 
+  // Build personalized welcome message based on soul configuration
+  const getWelcomeMessage = () => {
+    if (soul?.greeting) {
+      return soul.greeting;
+    }
+
+    const name = soul?.name || "your workspace assistant";
+    const intro = `Hi! I'm ${name}. I can help you with:\n\n`;
+    const capabilities = `- **Research**: Search the web for information, documentation, and best practices\n- **Analysis**: Run calculations, analyze data, and generate code examples\n- **Planning**: Discuss strategies, brainstorm ideas, and solve problems`;
+    const outro = `\n\nHow can I help you today?`;
+
+    return intro + capabilities + outro;
+  };
+
   // Add welcome message if no messages exist
   const displayMessages =
     messages.length === 0
@@ -179,7 +193,7 @@ export function ChatPanel() {
             parts: [
               {
                 type: "text" as const,
-                text: `Hi! I'm your workspace assistant. I can help you with:\n\n- **Research**: Search the web for information, documentation, and best practices\n- **Analysis**: Run calculations, analyze data, and generate code examples\n- **Planning**: Discuss strategies, brainstorm ideas, and solve problems\n\nHow can I help you today?`,
+                text: getWelcomeMessage(),
               },
             ],
           },
@@ -222,7 +236,7 @@ export function ChatPanel() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-        <h3 className="text-sm font-medium">AI Assistant</h3>
+        <h3 className="text-sm font-medium">{soul?.name || "AI Assistant"}</h3>
         {messages.length > 0 && (
           <button
             onClick={handleClearHistory}

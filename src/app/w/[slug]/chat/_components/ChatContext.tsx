@@ -13,13 +13,15 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useWorkspaceChats, useCreateChat, useDeleteChat } from "@/lib/hooks";
 import { getWorkspaceBySlug } from "@/lib/actions/workspace";
 import { getChatAttachment } from "@/lib/actions/workspace-chat";
-import type { Workspace, WorkspaceChat, WorkspaceChatAttachment } from "@/lib/types";
+import { getSoul } from "@/lib/actions/soul";
+import type { Workspace, WorkspaceChat, WorkspaceChatAttachment, WorkspaceSoul } from "@/lib/types";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
 
 interface ChatContextValue {
   // Workspace
   workspace: Workspace | null;
   workspacePurpose: WorkspacePurpose;
+  soul: WorkspaceSoul | null;
   isLoading: boolean;
 
   // Chats
@@ -61,6 +63,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   // Workspace state
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [soul, setSoul] = useState<WorkspaceSoul | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Chat selection state
@@ -71,13 +74,16 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [isLoadingAttachment, setIsLoadingAttachment] = useState(false);
   const hasLoadedAttachmentFromUrl = useRef(false);
 
-  // Load workspace data
+  // Load workspace data and soul
   useEffect(() => {
     if (params.slug) {
       getWorkspaceBySlug(params.slug)
-        .then((ws) => {
+        .then(async (ws) => {
           if (ws) {
             setWorkspace(ws);
+            // Load soul configuration
+            const workspaceSoul = await getSoul(ws.id);
+            setSoul(workspaceSoul);
           }
         })
         .finally(() => setIsLoading(false));
@@ -205,6 +211,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const value: ChatContextValue = {
     workspace,
     workspacePurpose,
+    soul,
     isLoading,
     chats,
     isLoadingChats,

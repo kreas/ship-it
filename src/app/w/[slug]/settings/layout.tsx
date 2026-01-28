@@ -2,7 +2,7 @@
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, Columns3, Tag, Users, Sparkles, Plug } from "lucide-react";
+import { ArrowLeft, Building2, Columns3, Tag, Users, Sparkles, Plug, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsProvider, useSettingsContext } from "./context";
 
@@ -84,6 +84,12 @@ function SettingsSidebar() {
               icon={<Sparkles className="w-4 h-4" />}
               label="AI Skills"
               isActive={pathname === `${baseSettingsPath}/skills`}
+            />
+            <NavItem
+              href={`${baseSettingsPath}/soul`}
+              icon={<Heart className="w-4 h-4" />}
+              label="Persona"
+              isActive={pathname === `${baseSettingsPath}/soul`}
             />
             <NavItem
               href={`${baseSettingsPath}/integrations`}

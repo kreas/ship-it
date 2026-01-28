@@ -6,6 +6,8 @@ import {
   loadSkillsForWorkspace,
 } from "@/lib/chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
+import type { WorkspaceSoul } from "@/lib/types";
+import { buildSoulSystemPrompt, getWorkspaceSoul } from "@/lib/soul-utils";
 
 export const maxDuration = 30;
 
@@ -87,10 +89,18 @@ Task format:
 - Description: Include deliverables and success criteria as checkboxes
 - Priority: 1 (High) for launch-critical, 2 (Medium) for standard work, 3 (Low) for nice-to-haves`;
 
-function getSystemPrompt(purpose: WorkspacePurpose): string {
-  return purpose === "marketing"
+function getSystemPrompt(purpose: WorkspacePurpose, soul: WorkspaceSoul | null): string {
+  const basePrompt = purpose === "marketing"
     ? MARKETING_SYSTEM_PROMPT
     : SOFTWARE_SYSTEM_PROMPT;
+
+  // If a soul/persona is configured, prepend it to the system prompt
+  if (soul && soul.name) {
+    const soulPrompt = buildSoulSystemPrompt(soul);
+    return `${soulPrompt}\n\n---\n\n${basePrompt}`;
+  }
+
+  return basePrompt;
 }
 
 export async function POST(req: Request) {
@@ -102,6 +112,9 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
+  // Load workspace soul/persona
+  const soul = await getWorkspaceSoul(workspaceId);
+
   // Load skills - use workspace skills if workspaceId provided, otherwise just purpose-based
   const skills = workspaceId
     ? await loadSkillsForWorkspace(workspaceId, purpose)
@@ -111,7 +124,7 @@ export async function POST(req: Request) {
   const tools = createPlanningTools();
 
   return createChatResponse(messages, {
-    system: getSystemPrompt(purpose),
+    system: getSystemPrompt(purpose, soul),
     tools,
     model: "claude-opus-4-5-20251101",
     maxSteps: 10, // Allow AI to continue after creating issues
