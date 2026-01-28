@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Code, Megaphone, ArrowLeft } from "lucide-react";
+import { Code, Megaphone, ArrowLeft, DollarSign, LucideIcon } from "lucide-react";
 import { createWorkspace } from "@/lib/actions/workspace";
 import { PURPOSE_CONFIG, type WorkspacePurpose } from "@/lib/design-tokens";
 
 type Step = "purpose" | "name";
+
+const PURPOSE_UI: Record<WorkspacePurpose, { icon: LucideIcon; bgColor: string; textColor: string }> = {
+  software: { icon: Code, bgColor: "bg-blue-500/10", textColor: "text-blue-500" },
+  marketing: { icon: Megaphone, bgColor: "bg-orange-500/10", textColor: "text-orange-500" },
+  sales: { icon: DollarSign, bgColor: "bg-green-500/10", textColor: "text-green-500" },
+};
 
 export default function NewWorkspacePage() {
   const router = useRouter();
@@ -45,12 +51,12 @@ export default function NewWorkspacePage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
+    <div
+      className="flex items-center justify-center min-h-screen"
+      style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent)" }}
+    >
       <div className="w-full max-w-lg p-8">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
-            <Layers className="w-6 h-6 text-primary-foreground" />
-          </div>
           <h1 className="text-2xl font-bold text-foreground">
             Create Workspace
           </h1>
@@ -63,41 +69,30 @@ export default function NewWorkspacePage() {
 
         {step === "purpose" ? (
           <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => handlePurposeSelect("software")}
-              className="flex flex-col items-center gap-3 p-6 rounded-lg border border-input bg-card hover:border-primary hover:bg-accent transition-colors cursor-pointer"
-            >
-              <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Code className="w-6 h-6 text-blue-500" />
-              </div>
-              <div className="text-center">
-                <div className="font-medium text-foreground">
-                  {PURPOSE_CONFIG.software.label}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {PURPOSE_CONFIG.software.description}
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handlePurposeSelect("marketing")}
-              className="flex flex-col items-center gap-3 p-6 rounded-lg border border-input bg-card hover:border-primary hover:bg-accent transition-colors cursor-pointer"
-            >
-              <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <Megaphone className="w-6 h-6 text-orange-500" />
-              </div>
-              <div className="text-center">
-                <div className="font-medium text-foreground">
-                  {PURPOSE_CONFIG.marketing.label}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {PURPOSE_CONFIG.marketing.description}
-                </div>
-              </div>
-            </button>
+            {(Object.keys(PURPOSE_CONFIG) as WorkspacePurpose[]).map((key) => {
+              const config = PURPOSE_CONFIG[key];
+              const { icon: Icon, bgColor, textColor } = PURPOSE_UI[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handlePurposeSelect(key)}
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 bg-card/50 hover:border-border/80 hover:shadow-lg hover:shadow-black/20 transition-all cursor-pointer"
+                >
+                  <div className={`w-12 h-12 rounded-lg ${bgColor} flex items-center justify-center`}>
+                    <Icon className={`w-6 h-6 ${textColor}`} />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-foreground">
+                      {config.label}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {config.description}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -110,16 +105,17 @@ export default function NewWorkspacePage() {
               Back
             </button>
 
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 mb-4">
-              {purpose === "software" ? (
-                <Code className="w-4 h-4 text-blue-500" />
-              ) : (
-                <Megaphone className="w-4 h-4 text-orange-500" />
-              )}
-              <span className="text-sm text-muted-foreground">
-                {purpose && PURPOSE_CONFIG[purpose].label}
-              </span>
-            </div>
+            {purpose && (() => {
+              const { icon: Icon, textColor } = PURPOSE_UI[purpose];
+              return (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 mb-4">
+                  <Icon className={`w-4 h-4 ${textColor}`} />
+                  <span className="text-sm text-muted-foreground">
+                    {PURPOSE_CONFIG[purpose].label}
+                  </span>
+                </div>
+              );
+            })()}
 
             <div>
               <label

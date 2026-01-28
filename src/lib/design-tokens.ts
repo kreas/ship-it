@@ -170,6 +170,7 @@ export type GroupBy = (typeof GROUP_BY)[keyof typeof GROUP_BY];
 export const WORKSPACE_PURPOSE = {
   SOFTWARE: "software",
   MARKETING: "marketing",
+  SALES: "sales",
 } as const;
 
 export type WorkspacePurpose =
@@ -216,6 +217,25 @@ export const PURPOSE_CONFIG: Record<
       { name: "Design", color: "#ec4899" },
       { name: "Analytics", color: "#22c55e" },
       { name: "Social", color: "#f97316" },
+    ],
+  },
+  sales: {
+    label: "Sales",
+    description: "Track leads, deals, and your sales pipeline",
+    defaultColumns: [
+      { name: "New Leads", status: STATUS.BACKLOG },
+      { name: "Contacted", status: STATUS.TODO },
+      { name: "Qualified", status: STATUS.IN_PROGRESS },
+      { name: "Proposal", status: null }, // Manual-only column, no auto-move
+      { name: "Closed Won", status: STATUS.DONE },
+    ],
+    defaultLabels: [
+      { name: "Inbound", color: "#3b82f6" },
+      { name: "Outbound", color: "#f97316" },
+      { name: "Hot", color: "#ef4444" },
+      { name: "Warm", color: "#eab308" },
+      { name: "Enterprise", color: "#a855f7" },
+      { name: "SMB", color: "#22c55e" },
     ],
   },
 };
