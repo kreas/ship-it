@@ -8,10 +8,7 @@ import {
 } from "@/lib/actions/workspace-chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
 import type { WorkspaceSoul } from "@/lib/types";
-import { buildSoulSystemPrompt } from "@/lib/soul-utils";
-import { db } from "@/lib/db";
-import { workspaces } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { buildSoulSystemPrompt, getWorkspaceSoul } from "@/lib/soul-utils";
 
 export const maxDuration = 30;
 
@@ -202,23 +199,8 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
-  // Load workspace soul/persona if workspaceId is provided
-  let soul: WorkspaceSoul | null = null;
-  if (workspaceId) {
-    const workspace = await db
-      .select({ soul: workspaces.soul })
-      .from(workspaces)
-      .where(eq(workspaces.id, workspaceId))
-      .get();
-
-    if (workspace?.soul) {
-      try {
-        soul = JSON.parse(workspace.soul) as WorkspaceSoul;
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-  }
+  // Load workspace soul/persona
+  const soul = await getWorkspaceSoul(workspaceId);
 
   // Load workspace skills and MCP tools
   const skills = workspaceId

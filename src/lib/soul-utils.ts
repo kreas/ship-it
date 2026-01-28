@@ -1,4 +1,29 @@
 import type { WorkspaceSoul } from "./types";
+import { db } from "./db";
+import { workspaces } from "./db/schema";
+import { eq } from "drizzle-orm";
+
+/**
+ * Load the workspace soul/persona configuration from the database.
+ * Returns null if the workspace doesn't exist or has no soul configured.
+ */
+export async function getWorkspaceSoul(workspaceId: string | undefined): Promise<WorkspaceSoul | null> {
+  if (!workspaceId) return null;
+
+  const workspace = await db
+    .select({ soul: workspaces.soul })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .get();
+
+  if (!workspace?.soul) return null;
+
+  try {
+    return JSON.parse(workspace.soul) as WorkspaceSoul;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Build a system prompt section from a WorkspaceSoul configuration.
