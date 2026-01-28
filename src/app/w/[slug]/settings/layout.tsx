@@ -88,7 +88,7 @@ function SettingsSidebar() {
             <NavItem
               href={`${baseSettingsPath}/soul`}
               icon={<Heart className="w-4 h-4" />}
-              label="Soul"
+              label="Persona"
               isActive={pathname === `${baseSettingsPath}/soul`}
             />
             <NavItem

@@ -31,7 +31,7 @@ export function SoulEmptyState({ onSubmit }: SoulEmptyStateProps) {
       <div className="max-w-xl w-full space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-semibold text-foreground">
-            Define Your Workspace Soul
+            Define Your AI Persona
           </h2>
           <p className="text-muted-foreground">
             Describe what you want your AI assistant to be like. An AI will help
@@ -62,12 +62,12 @@ export function SoulEmptyState({ onSubmit }: SoulEmptyStateProps) {
 
         <div className="text-center">
           <a
-            href="https://docs.example.com/workspace-souls"
+            href="https://docs.example.com/workspace-personas"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Learn more about workspace souls
+            Learn more about AI personas
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>

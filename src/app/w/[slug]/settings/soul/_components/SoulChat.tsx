@@ -274,7 +274,7 @@ export function SoulChat({
   };
 
   const handleDeleteConversation = async () => {
-    if (!confirm("Delete this conversation? The AI will start fresh but will know the current soul configuration.")) {
+    if (!confirm("Delete this conversation? The AI will start fresh but will know the current persona configuration.")) {
       return;
     }
 
@@ -307,7 +307,7 @@ export function SoulChat({
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
         <div>
-          <h3 className="text-sm font-medium text-foreground">Soul Configuration Chat</h3>
+          <h3 className="text-sm font-medium text-foreground">Persona Configuration</h3>
           <p className="text-xs text-muted-foreground">
             {messages.length === 0
               ? "Start a conversation to configure your AI"

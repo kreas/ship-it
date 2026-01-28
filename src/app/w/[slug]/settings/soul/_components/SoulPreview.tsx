@@ -121,7 +121,7 @@ export function SoulPreview({
 }: SoulPreviewProps) {
   const handleExport = () => {
     const markdown = exportSoulAsMarkdown(soul);
-    const filename = `${soul.name || "soul"}-system-prompt.md`.toLowerCase().replace(/\s+/g, "-");
+    const filename = `${soul.name || "persona"}-system-prompt.md`.toLowerCase().replace(/\s+/g, "-");
     downloadMarkdown(markdown, filename);
   };
 
@@ -132,10 +132,10 @@ export function SoulPreview({
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              {soul.name || "Untitled Soul"}
+              {soul.name || "Untitled Persona"}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {mode === "view" ? "Workspace AI personality" : "Soul configuration preview"}
+              {mode === "view" ? "Workspace AI persona" : "Persona configuration"}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -153,10 +153,10 @@ export function SoulPreview({
               <button
                 onClick={onViewSoul}
                 className="flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                title="View Soul"
+                title="View Persona"
               >
                 <Eye className="w-4 h-4" />
-                <span className="sr-only">View Soul</span>
+                <span className="sr-only">View Persona</span>
               </button>
             )}
             <button
@@ -274,7 +274,7 @@ export function SoulPreview({
           disabled={!soul.name || isSaving}
           className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isSaving ? "Saving..." : "Save Soul"}
+          {isSaving ? "Saving..." : "Save Persona"}
         </button>
         {!soul.name && (
           <p className="text-xs text-muted-foreground text-center mt-2">

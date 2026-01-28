@@ -108,9 +108,9 @@ export default function SoulSettingsPage() {
     return (
       <div className="p-8">
         <div className="max-w-2xl">
-          <h1 className="text-2xl font-semibold text-foreground mb-2">Soul</h1>
+          <h1 className="text-2xl font-semibold text-foreground mb-2">Persona</h1>
           <p className="text-muted-foreground">
-            You need admin access to configure the workspace soul.
+            You need admin access to configure the workspace AI persona.
           </p>
         </div>
       </div>
