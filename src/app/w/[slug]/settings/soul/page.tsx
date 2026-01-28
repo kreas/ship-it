@@ -6,25 +6,8 @@ import { SoulEmptyState } from "./_components/SoulEmptyState";
 import { SoulChat } from "./_components/SoulChat";
 import { SoulPreview } from "./_components/SoulPreview";
 import { getSoul, updateSoul } from "@/lib/actions/soul";
+import { createDefaultSoul } from "@/lib/soul-utils";
 import type { WorkspaceSoul } from "@/lib/types";
-
-function createDefaultSoul(): WorkspaceSoul {
-  const now = new Date().toISOString();
-  return {
-    name: "",
-    personality: "",
-    primaryGoals: [],
-    tone: "friendly",
-    responseLength: "moderate",
-    domainExpertise: [],
-    terminology: {},
-    doRules: [],
-    dontRules: [],
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
 
 type ViewMode = "view" | "edit";
 
@@ -49,8 +32,8 @@ export default function SoulSettingsPage() {
           setHasStarted(true);
           setViewMode("view"); // Default to view mode when soul exists
         }
-      } catch (error) {
-        console.error("Failed to load soul:", error);
+      } catch {
+        // Silent fail - soul just won't be loaded
       } finally {
         setIsLoading(false);
       }
@@ -78,8 +61,8 @@ export default function SoulSettingsPage() {
     try {
       const savedSoul = await updateSoul(workspace.id, soul);
       setSoul(savedSoul);
-    } catch (error) {
-      console.error("Failed to save soul:", error);
+    } catch {
+      // Silent fail - could add error toast here
     } finally {
       setIsSaving(false);
     }

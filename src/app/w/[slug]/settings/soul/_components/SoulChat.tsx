@@ -91,8 +91,7 @@ export function SoulChat({
         } else {
           setLoadedMessages([]);
         }
-      } catch (error) {
-        console.error("Failed to load chat messages:", error);
+      } catch {
         setLoadedMessages([]);
       }
     }
@@ -148,8 +147,7 @@ export function SoulChat({
             role: message.role as "user" | "assistant",
             content: JSON.stringify(message.parts),
           });
-        } catch (error) {
-          console.error("Failed to save message:", error);
+        } catch {
           savedMessageIdsRef.current.delete(message.id);
         }
       }
@@ -285,8 +283,8 @@ export function SoulChat({
       savedMessageIdsRef.current.clear();
       processedToolCallsRef.current.clear();
       initialPromptSentRef.current = false;
-    } catch (error) {
-      console.error("Failed to delete conversation:", error);
+    } catch {
+      // Silent fail - conversation remains
     } finally {
       setIsDeleting(false);
     }

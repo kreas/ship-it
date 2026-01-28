@@ -7,10 +7,10 @@ import type { WorkspaceSoul } from "@/lib/types";
 
 export const maxDuration = 30;
 
-const SYSTEM_PROMPT = `You are helping a user configure their workspace's AI personality (called a "Soul"). The soul defines how the workspace's AI assistant behaves, its name, goals, and interaction style.
+const SYSTEM_PROMPT = `You are helping a user configure their workspace's AI persona. The persona defines how the workspace's AI assistant behaves, its name, goals, and interaction style.
 
 **Your role:**
-You're having a conversation to understand what kind of AI assistant the user wants for their workspace. Based on their responses, you'll configure the soul using the available tools.
+You're having a conversation to understand what kind of AI assistant the user wants for their workspace. Based on their responses, you'll configure the persona using the available tools.
 
 **Configuration tools available:**
 - setSoulName: Set the AI's name
@@ -30,7 +30,7 @@ You're having a conversation to understand what kind of AI assistant the user wa
 3. Ask about communication style preference (formal/casual, brief/detailed)
 4. Ask about the primary goals and what the AI should focus on
 5. Ask about any specific behaviors they want (do's and don'ts)
-6. Configure the soul using the tools as you learn their preferences
+6. Configure the persona using the tools as you learn their preferences
 7. Summarize the final configuration and ask if they want to adjust anything
 
 **Guidelines:**
@@ -229,7 +229,7 @@ export async function POST(req: Request) {
     }
 
     if (configuredFields.length > 0) {
-      soulContext = `\n\n**Current soul configuration:**\n${configuredFields.join("\n")}`;
+      soulContext = `\n\n**Current persona configuration:**\n${configuredFields.join("\n")}`;
     }
   }
 

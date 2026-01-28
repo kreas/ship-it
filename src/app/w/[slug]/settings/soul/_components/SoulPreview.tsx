@@ -1,9 +1,10 @@
 "use client";
 
 import { Plus, Trash2, Pencil, Check, X, Sparkles, Eye, Download } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { WorkspaceSoul } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { exportSoulAsMarkdown } from "@/lib/soul-utils";
 
 interface SoulPreviewProps {
   soul: WorkspaceSoul;
@@ -13,73 +14,6 @@ interface SoulPreviewProps {
   mode: "view" | "edit";
   onEditWithAI?: () => void;
   onViewSoul?: () => void;
-}
-
-function exportSoulAsMarkdown(soul: WorkspaceSoul): string {
-  const lines: string[] = [];
-
-  lines.push(`# ${soul.name || "AI Assistant"}`);
-  lines.push("");
-
-  if (soul.personality) {
-    lines.push("## Personality");
-    lines.push(soul.personality);
-    lines.push("");
-  }
-
-  lines.push("## Communication Style");
-  lines.push(`- **Tone:** ${soul.tone}`);
-  lines.push(`- **Response Length:** ${soul.responseLength}`);
-  lines.push("");
-
-  if (soul.primaryGoals.length > 0) {
-    lines.push("## Primary Goals");
-    soul.primaryGoals.forEach((goal) => {
-      lines.push(`- ${goal}`);
-    });
-    lines.push("");
-  }
-
-  if (soul.domainExpertise.length > 0) {
-    lines.push("## Domain Expertise");
-    soul.domainExpertise.forEach((expertise) => {
-      lines.push(`- ${expertise}`);
-    });
-    lines.push("");
-  }
-
-  if (soul.doRules.length > 0) {
-    lines.push("## Do's (Things to Always Do)");
-    soul.doRules.forEach((rule) => {
-      lines.push(`- ${rule}`);
-    });
-    lines.push("");
-  }
-
-  if (soul.dontRules.length > 0) {
-    lines.push("## Don'ts (Things to Avoid)");
-    soul.dontRules.forEach((rule) => {
-      lines.push(`- ${rule}`);
-    });
-    lines.push("");
-  }
-
-  const terminologyEntries = Object.entries(soul.terminology);
-  if (terminologyEntries.length > 0) {
-    lines.push("## Terminology");
-    terminologyEntries.forEach(([term, definition]) => {
-      lines.push(`- **${term}:** ${definition}`);
-    });
-    lines.push("");
-  }
-
-  if (soul.greeting) {
-    lines.push("## Custom Greeting");
-    lines.push(soul.greeting);
-    lines.push("");
-  }
-
-  return lines.join("\n");
 }
 
 function downloadMarkdown(content: string, filename: string) {
@@ -182,11 +116,12 @@ export function SoulPreview({
         />
 
         {/* Personality */}
-        <EditableTextarea
+        <EditableField
           label="Personality"
           value={soul.personality}
           onChange={(personality) => onSoulChange({ ...soul, personality })}
           placeholder="Describe the personality..."
+          multiline
         />
 
         {/* Tone */}
@@ -257,13 +192,14 @@ export function SoulPreview({
         />
 
         {/* Greeting */}
-        <EditableTextarea
+        <EditableField
           label="Custom Greeting"
           value={soul.greeting || ""}
           onChange={(greeting) =>
             onSoulChange({ ...soul, greeting: greeting || undefined })
           }
           placeholder="Optional greeting message..."
+          multiline
         />
       </div>
 
@@ -286,20 +222,29 @@ export function SoulPreview({
   );
 }
 
-// Editable single-line field
+// Unified editable field component (supports single-line and multiline)
 function EditableField({
   label,
   value,
   onChange,
   placeholder,
+  multiline = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  multiline?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
+
+  // Sync editValue when value prop changes (fixes stale value bug)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(value);
+    }
+  }, [value, isEditing]);
 
   const handleSave = () => {
     onChange(editValue);
@@ -327,103 +272,56 @@ function EditableField({
       </div>
 
       {isEditing ? (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            className="flex-1 px-2 py-1 bg-background border border-input rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-              if (e.key === "Escape") handleCancel();
-            }}
-          />
-          <button
-            onClick={handleSave}
-            className="p-1 rounded text-green-500 hover:bg-muted"
-          >
-            <Check className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleCancel}
-            className="p-1 rounded text-muted-foreground hover:bg-muted"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <p className={cn("text-sm", value ? "text-foreground" : "text-muted-foreground italic")}>
-          {value || placeholder}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// Editable textarea field
-function EditableTextarea({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
-
-  const handleSave = () => {
-    onChange(editValue);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value);
-    setIsEditing(false);
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-foreground">{label}</h3>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-          >
-            <Pencil className="w-3 h-3" />
-            Edit
-          </button>
-        )}
-      </div>
-
-      {isEditing ? (
-        <div className="space-y-2">
-          <textarea
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            className="w-full px-2 py-1 bg-background border border-input rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-h-[80px] resize-none"
-            autoFocus
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={handleCancel}
-              className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              Cancel
-            </button>
+        multiline ? (
+          <div className="space-y-2">
+            <textarea
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="w-full px-2 py-1 bg-background border border-input rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-h-[80px] resize-none"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleCancel}
+                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="flex-1 px-2 py-1 bg-background border border-input rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+                if (e.key === "Escape") handleCancel();
+              }}
+            />
             <button
               onClick={handleSave}
-              className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+              className="p-1 rounded text-green-500 hover:bg-muted"
             >
-              Save
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleCancel}
+              className="p-1 rounded text-muted-foreground hover:bg-muted"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        )
       ) : (
         <p className={cn("text-sm", value ? "text-foreground" : "text-muted-foreground italic")}>
           {value || placeholder}
