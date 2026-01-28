@@ -26,6 +26,8 @@ function createDefaultSoul(): WorkspaceSoul {
   };
 }
 
+type ViewMode = "view" | "edit";
+
 export default function SoulSettingsPage() {
   const { workspace, isAdmin } = useSettingsContext();
   const [soul, setSoul] = useState<WorkspaceSoul | null>(null);
@@ -33,6 +35,7 @@ export default function SoulSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined);
   const [hasStarted, setHasStarted] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("view");
 
   // Load existing soul
   useEffect(() => {
@@ -44,6 +47,7 @@ export default function SoulSettingsPage() {
         if (existingSoul) {
           setSoul(existingSoul);
           setHasStarted(true);
+          setViewMode("view"); // Default to view mode when soul exists
         }
       } catch (error) {
         console.error("Failed to load soul:", error);
@@ -60,6 +64,7 @@ export default function SoulSettingsPage() {
     setSoul(newSoul);
     setInitialPrompt(prompt);
     setHasStarted(true);
+    setViewMode("edit"); // Go to edit mode when creating new soul
   }, []);
 
   const handleSoulChange = useCallback((updatedSoul: WorkspaceSoul) => {
@@ -79,6 +84,14 @@ export default function SoulSettingsPage() {
       setIsSaving(false);
     }
   };
+
+  const handleEditWithAI = useCallback(() => {
+    setViewMode("edit");
+  }, []);
+
+  const handleViewSoul = useCallback(() => {
+    setViewMode("view");
+  }, []);
 
   if (!workspace || isLoading) {
     return (
@@ -109,11 +122,29 @@ export default function SoulSettingsPage() {
     return <SoulEmptyState onSubmit={handleInitialSubmit} />;
   }
 
-  // Show chat + preview
   if (!soul) {
     return null;
   }
 
+  // View mode: show form centered
+  if (viewMode === "view") {
+    return (
+      <div className="h-screen overflow-auto flex justify-center p-8">
+        <div className="w-full max-w-2xl">
+          <SoulPreview
+            soul={soul}
+            onSoulChange={handleSoulChange}
+            onSave={handleSave}
+            isSaving={isSaving}
+            mode="view"
+            onEditWithAI={handleEditWithAI}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Edit mode: show chat + preview side by side
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Left: Chat */}
@@ -132,6 +163,8 @@ export default function SoulSettingsPage() {
           onSoulChange={handleSoulChange}
           onSave={handleSave}
           isSaving={isSaving}
+          mode="edit"
+          onViewSoul={handleViewSoul}
         />
       </div>
     </div>

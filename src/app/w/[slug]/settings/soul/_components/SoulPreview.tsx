@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, Sparkles, Eye, Download } from "lucide-react";
 import { useState } from "react";
 import type { WorkspaceSoul } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,88 @@ interface SoulPreviewProps {
   onSoulChange: (soul: WorkspaceSoul) => void;
   onSave: () => void;
   isSaving: boolean;
+  mode: "view" | "edit";
+  onEditWithAI?: () => void;
+  onViewSoul?: () => void;
+}
+
+function exportSoulAsMarkdown(soul: WorkspaceSoul): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${soul.name || "AI Assistant"}`);
+  lines.push("");
+
+  if (soul.personality) {
+    lines.push("## Personality");
+    lines.push(soul.personality);
+    lines.push("");
+  }
+
+  lines.push("## Communication Style");
+  lines.push(`- **Tone:** ${soul.tone}`);
+  lines.push(`- **Response Length:** ${soul.responseLength}`);
+  lines.push("");
+
+  if (soul.primaryGoals.length > 0) {
+    lines.push("## Primary Goals");
+    soul.primaryGoals.forEach((goal) => {
+      lines.push(`- ${goal}`);
+    });
+    lines.push("");
+  }
+
+  if (soul.domainExpertise.length > 0) {
+    lines.push("## Domain Expertise");
+    soul.domainExpertise.forEach((expertise) => {
+      lines.push(`- ${expertise}`);
+    });
+    lines.push("");
+  }
+
+  if (soul.doRules.length > 0) {
+    lines.push("## Do's (Things to Always Do)");
+    soul.doRules.forEach((rule) => {
+      lines.push(`- ${rule}`);
+    });
+    lines.push("");
+  }
+
+  if (soul.dontRules.length > 0) {
+    lines.push("## Don'ts (Things to Avoid)");
+    soul.dontRules.forEach((rule) => {
+      lines.push(`- ${rule}`);
+    });
+    lines.push("");
+  }
+
+  const terminologyEntries = Object.entries(soul.terminology);
+  if (terminologyEntries.length > 0) {
+    lines.push("## Terminology");
+    terminologyEntries.forEach(([term, definition]) => {
+      lines.push(`- **${term}:** ${definition}`);
+    });
+    lines.push("");
+  }
+
+  if (soul.greeting) {
+    lines.push("## Custom Greeting");
+    lines.push(soul.greeting);
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+function downloadMarkdown(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 const TONE_OPTIONS: Array<{ value: WorkspaceSoul["tone"]; label: string }> = [
@@ -33,15 +115,58 @@ export function SoulPreview({
   onSoulChange,
   onSave,
   isSaving,
+  mode,
+  onEditWithAI,
+  onViewSoul,
 }: SoulPreviewProps) {
+  const handleExport = () => {
+    const markdown = exportSoulAsMarkdown(soul);
+    const filename = `${soul.name || "soul"}-system-prompt.md`.toLowerCase().replace(/\s+/g, "-");
+    downloadMarkdown(markdown, filename);
+  };
+
   return (
-    <div className="flex flex-col h-full bg-card/30">
+    <div className={cn("flex flex-col h-full", mode === "view" ? "bg-card rounded-lg border border-border" : "bg-card/30")}>
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold text-foreground">
-          {soul.name || "Untitled Soul"}
-        </h2>
-        <p className="text-sm text-muted-foreground">Soul configuration preview</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              {soul.name || "Untitled Soul"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {mode === "view" ? "Workspace AI personality" : "Soul configuration preview"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {mode === "view" && onEditWithAI && (
+              <button
+                onClick={onEditWithAI}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                Edit with AI
+              </button>
+            )}
+            {mode === "edit" && onViewSoul && (
+              <button
+                onClick={onViewSoul}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                View Soul
+              </button>
+            )}
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Export as Markdown"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
