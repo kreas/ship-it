@@ -24,6 +24,7 @@ export const workspaces = sqliteTable("workspaces", {
   identifier: text("identifier").notNull().default("AUTO"), // For issue IDs like AUTO-123
   issueCounter: integer("issue_counter").notNull().default(0),
   purpose: text("purpose").notNull().default("software"), // "software" | "marketing"
+  soul: text("soul"), // JSON-serialized WorkspaceSoul
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),

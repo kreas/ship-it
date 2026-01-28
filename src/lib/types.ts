@@ -170,3 +170,20 @@ export type ActivityData = {
   attachmentId?: string;
   attachmentFilename?: string;
 };
+
+// Workspace Soul - AI personality/system prompt configuration
+export interface WorkspaceSoul {
+  name: string; // Chatbot name (e.g., "Luna")
+  personality: string; // Interaction style description
+  primaryGoals: string[]; // 3-5 main objectives
+  tone: "professional" | "friendly" | "casual" | "formal";
+  responseLength: "concise" | "moderate" | "detailed";
+  domainExpertise: string[]; // Areas of expertise
+  terminology: Record<string, string>; // Domain-specific terms
+  doRules: string[]; // Things the AI SHOULD do
+  dontRules: string[]; // Things the AI should NOT do
+  greeting?: string; // Optional custom greeting
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
