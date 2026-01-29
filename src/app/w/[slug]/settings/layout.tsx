@@ -2,7 +2,7 @@
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, Columns3, Tag, Users, Sparkles, Plug, Heart } from "lucide-react";
+import { ArrowLeft, Building2, Columns3, Tag, Users, Sparkles, Plug, Heart, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsProvider, useSettingsContext } from "./context";
 
@@ -97,6 +97,12 @@ function SettingsSidebar() {
               label="Integrations"
               isActive={pathname === `${baseSettingsPath}/integrations`}
             />
+            <NavItem
+              href={`${baseSettingsPath}/usage`}
+              icon={<BarChart3 className="w-4 h-4" />}
+              label="Usage"
+              isActive={pathname === `${baseSettingsPath}/usage`}
+            />
           </div>
         </div>
       </nav>
@@ -109,9 +115,9 @@ function SettingsLayoutContent({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex">
+      <div className="h-screen bg-background flex overflow-hidden">
         <SettingsSidebar />
-        <main className="flex-1 flex items-center justify-center">
+        <main className="flex-1 flex items-center justify-center overflow-auto">
           <div className="flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-muted-foreground">Loading...</p>
@@ -123,9 +129,9 @@ function SettingsLayoutContent({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex">
+      <div className="h-screen bg-background flex overflow-hidden">
         <SettingsSidebar />
-        <main className="flex-1 flex items-center justify-center">
+        <main className="flex-1 flex items-center justify-center overflow-auto">
           <div className="text-center">
             <h1 className="text-xl font-semibold text-foreground mb-2">
               Error
@@ -138,7 +144,7 @@ function SettingsLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       <SettingsSidebar />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>
