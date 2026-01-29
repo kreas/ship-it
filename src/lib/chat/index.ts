@@ -12,8 +12,8 @@ import type { ParsedSkill } from "./skills";
 import { getMcpToolsForWorkspace } from "@/lib/mcp";
 import { recordTokenUsage } from "@/lib/token-usage";
 
-// export const DEFAULT_MODEL = "claude-sonnet-4.5";
-export const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+export const DEFAULT_MODEL = "claude-sonnet-4-5";
+// export const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 export const DEFAULT_MAX_DURATION = 30;
 
 // Re-export skills module
@@ -200,19 +200,21 @@ export async function createChatResponse(
 
   // Track token usage asynchronously (don't block the response)
   if (config.workspaceId) {
-    Promise.resolve(result.totalUsage).then((usage) => {
-      recordTokenUsage({
-        workspaceId: config.workspaceId!,
-        model: modelId,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        source: config.usageSource ?? "chat",
-      }).catch((error) => {
-        console.error("Failed to record token usage:", error);
+    Promise.resolve(result.totalUsage)
+      .then((usage) => {
+        recordTokenUsage({
+          workspaceId: config.workspaceId!,
+          model: modelId,
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+          source: config.usageSource ?? "chat",
+        }).catch((error) => {
+          console.error("Failed to record token usage:", error);
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to get token usage:", error);
       });
-    }).catch((error) => {
-      console.error("Failed to get token usage:", error);
-    });
   }
 
   return result.toUIMessageStreamResponse();
