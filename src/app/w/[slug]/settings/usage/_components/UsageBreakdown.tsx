@@ -1,7 +1,7 @@
 "use client";
 
 import type { UsageSummary } from "@/lib/actions/token-usage";
-import { formatCost, formatTokens, getModelDisplayName } from "@/lib/token-usage";
+import { formatCost, formatTokens, getModelDisplayName } from "@/lib/token-usage-formatters";
 
 interface UsageBreakdownProps {
   summary: UsageSummary;

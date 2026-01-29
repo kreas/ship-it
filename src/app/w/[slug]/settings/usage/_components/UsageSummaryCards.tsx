@@ -2,7 +2,7 @@
 
 import { Coins, Zap, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import type { UsageSummary } from "@/lib/actions/token-usage";
-import { formatCost, formatTokens } from "@/lib/token-usage";
+import { formatCost, formatTokens } from "@/lib/token-usage-formatters";
 
 interface UsageSummaryCardsProps {
   summary: UsageSummary;
