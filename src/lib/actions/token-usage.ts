@@ -32,6 +32,8 @@ export interface DailyUsage {
   totalTokens: number;
   costCents: number;
   requestCount: number;
+  // Breakdown by model (normalized names)
+  byModel: Record<string, number>;
 }
 
 /**
@@ -105,6 +107,14 @@ function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Helper to get normalized model name for grouping
+function getModelGroup(model: string): string {
+  if (model.includes("haiku")) return "Haiku";
+  if (model.includes("sonnet")) return "Sonnet";
+  if (model.includes("opus")) return "Opus";
+  return "Other";
+}
+
 export async function getDailyUsage(
   workspaceId: string,
   days: number = 30
@@ -143,6 +153,7 @@ export async function getDailyUsage(
         totalTokens: 0,
         costCents: 0,
         requestCount: 0,
+        byModel: {},
       });
     }
 
@@ -152,6 +163,10 @@ export async function getDailyUsage(
     daily.totalTokens += record.totalTokens;
     daily.costCents += record.costCents;
     daily.requestCount += 1;
+
+    // Track by model
+    const modelGroup = getModelGroup(record.model);
+    daily.byModel[modelGroup] = (daily.byModel[modelGroup] || 0) + record.totalTokens;
   }
 
   // Fill in missing days with zeros (using local timezone)
@@ -172,6 +187,7 @@ export async function getDailyUsage(
         totalTokens: 0,
         costCents: 0,
         requestCount: 0,
+        byModel: {},
       });
     }
     current.setDate(current.getDate() + 1);

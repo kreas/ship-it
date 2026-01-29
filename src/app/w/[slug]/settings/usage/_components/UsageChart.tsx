@@ -16,23 +16,39 @@ interface UsageChartProps {
 }
 
 const chartConfig = {
-  inputTokens: {
-    label: "Input Tokens",
+  Haiku: {
+    label: "Haiku",
     color: "var(--chart-1)",
   },
-  outputTokens: {
-    label: "Output Tokens",
+  Sonnet: {
+    label: "Sonnet",
     color: "var(--chart-2)",
+  },
+  Opus: {
+    label: "Opus",
+    color: "var(--chart-3)",
+  },
+  Other: {
+    label: "Other",
+    color: "var(--chart-4)",
   },
 } satisfies ChartConfig;
 
 export function UsageChart({ data }: UsageChartProps) {
-  // Format data for the chart
+  // Format data for the chart - flatten byModel into top-level fields
   const chartData = data.map((d) => ({
     date: d.date,
-    inputTokens: d.inputTokens,
-    outputTokens: d.outputTokens,
+    Haiku: d.byModel.Haiku || 0,
+    Sonnet: d.byModel.Sonnet || 0,
+    Opus: d.byModel.Opus || 0,
+    Other: d.byModel.Other || 0,
   }));
+
+  // Determine which models have any data
+  const hasHaiku = data.some((d) => d.byModel.Haiku);
+  const hasSonnet = data.some((d) => d.byModel.Sonnet);
+  const hasOpus = data.some((d) => d.byModel.Opus);
+  const hasOther = data.some((d) => d.byModel.Other);
 
   return (
     <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
@@ -65,18 +81,38 @@ export function UsageChart({ data }: UsageChartProps) {
         />
         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
         <ChartLegend content={<ChartLegendContent />} />
-        <Bar
-          dataKey="inputTokens"
-          stackId="a"
-          fill="var(--color-inputTokens)"
-          radius={[0, 0, 4, 4]}
-        />
-        <Bar
-          dataKey="outputTokens"
-          stackId="a"
-          fill="var(--color-outputTokens)"
-          radius={[4, 4, 0, 0]}
-        />
+        {hasHaiku && (
+          <Bar
+            dataKey="Haiku"
+            stackId="a"
+            fill="var(--color-Haiku)"
+            radius={[0, 0, 0, 0]}
+          />
+        )}
+        {hasSonnet && (
+          <Bar
+            dataKey="Sonnet"
+            stackId="a"
+            fill="var(--color-Sonnet)"
+            radius={[0, 0, 0, 0]}
+          />
+        )}
+        {hasOpus && (
+          <Bar
+            dataKey="Opus"
+            stackId="a"
+            fill="var(--color-Opus)"
+            radius={[0, 0, 0, 0]}
+          />
+        )}
+        {hasOther && (
+          <Bar
+            dataKey="Other"
+            stackId="a"
+            fill="var(--color-Other)"
+            radius={[4, 4, 0, 0]}
+          />
+        )}
       </BarChart>
     </ChartContainer>
   );
