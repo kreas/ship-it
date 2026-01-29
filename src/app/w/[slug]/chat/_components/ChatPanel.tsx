@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Trash2 } from "lucide-react";
 import { ChatMessage, LoadingMessage } from "./ChatMessage";
+import { ChatSpacer } from "@/components/ai-elements/ChatSpacer";
 import { useChatContext } from "./ChatContext";
 import { persistedToUIMessages } from "./chat-utils";
 import {
@@ -21,13 +22,14 @@ import {
   useClearWorkspaceChatMessages,
   useUpdateChatTitle,
   useAutoFocusOnComplete,
+  useChatAutoScroll,
 } from "@/lib/hooks";
 import { prepareFilesForSubmission } from "@/lib/chat/file-utils";
 
 export function ChatPanel() {
   const { selectedChatId, workspace, workspacePurpose, soul, viewAttachment } = useChatContext();
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -202,10 +204,8 @@ export function ChatPanel() {
 
   const isLoading = status === "streaming" || status === "submitted";
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  // Scroll to bottom on load, scroll user's message to top when they submit
+  const { spacerHeight } = useChatAutoScroll(containerRef, messages.length, status);
 
   // Auto-focus input when AI finishes responding
   useAutoFocusOnComplete(isLoading, textareaRef);
@@ -249,12 +249,14 @@ export function ChatPanel() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
         {displayMessages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+          <div key={message.id} data-message-role={message.role}>
+            <ChatMessage message={message} />
+          </div>
         ))}
         {isLoading && <LoadingMessage />}
-        <div ref={messagesEndRef} />
+        <ChatSpacer height={spacerHeight} />
       </div>
 
       {/* Input */}
