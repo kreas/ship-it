@@ -115,9 +115,9 @@ function SettingsLayoutContent({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex">
+      <div className="h-screen bg-background flex overflow-hidden">
         <SettingsSidebar />
-        <main className="flex-1 flex items-center justify-center">
+        <main className="flex-1 flex items-center justify-center overflow-auto">
           <div className="flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-muted-foreground">Loading...</p>
@@ -129,9 +129,9 @@ function SettingsLayoutContent({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex">
+      <div className="h-screen bg-background flex overflow-hidden">
         <SettingsSidebar />
-        <main className="flex-1 flex items-center justify-center">
+        <main className="flex-1 flex items-center justify-center overflow-auto">
           <div className="text-center">
             <h1 className="text-xl font-semibold text-foreground mb-2">
               Error
@@ -144,7 +144,7 @@ function SettingsLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       <SettingsSidebar />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>

@@ -1,10 +1,12 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 import type { DailyUsage } from "@/lib/actions/token-usage";
@@ -25,18 +27,11 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function UsageChart({ data }: UsageChartProps) {
-  // Format data for the chart
-  const chartData = data.map((d) => ({
-    date: new Date(d.date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    }),
-    inputTokens: d.inputTokens,
-    outputTokens: d.outputTokens,
-  }));
+  // Filter to only days with data for better visualization
+  const daysWithData = data.filter((d) => d.totalTokens > 0);
 
   // Check if there's any data
-  const hasData = data.some((d) => d.totalTokens > 0);
+  const hasData = daysWithData.length > 0;
 
   if (!hasData) {
     return (
@@ -51,9 +46,19 @@ export function UsageChart({ data }: UsageChartProps) {
     );
   }
 
+  // Format data for the chart - show only days with data or last 14 days if there's sparse data
+  const chartData = (daysWithData.length < 5 ? daysWithData : data.slice(-14)).map((d) => ({
+    date: new Date(d.date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+    inputTokens: d.inputTokens,
+    outputTokens: d.outputTokens,
+  }));
+
   return (
     <ChartContainer config={chartConfig} className="h-[300px] w-full">
-      <AreaChart
+      <BarChart
         accessibilityLayer
         data={chartData}
         margin={{ left: 12, right: 12, top: 12 }}
@@ -64,8 +69,6 @@ export function UsageChart({ data }: UsageChartProps) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          interval="preserveStartEnd"
-          minTickGap={50}
         />
         <YAxis
           tickLine={false}
@@ -81,25 +84,18 @@ export function UsageChart({ data }: UsageChartProps) {
           cursor={false}
           content={<ChartTooltipContent indicator="dot" />}
         />
-        <Area
+        <ChartLegend content={<ChartLegendContent />} />
+        <Bar
           dataKey="inputTokens"
-          type="natural"
           fill="var(--color-inputTokens)"
-          fillOpacity={0.3}
-          stroke="var(--color-inputTokens)"
-          strokeWidth={2}
-          stackId="a"
+          radius={[4, 4, 0, 0]}
         />
-        <Area
+        <Bar
           dataKey="outputTokens"
-          type="natural"
           fill="var(--color-outputTokens)"
-          fillOpacity={0.3}
-          stroke="var(--color-outputTokens)"
-          strokeWidth={2}
-          stackId="a"
+          radius={[4, 4, 0, 0]}
         />
-      </AreaChart>
+      </BarChart>
     </ChartContainer>
   );
 }
