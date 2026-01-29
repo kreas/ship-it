@@ -1,0 +1,476 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useSettingsContext } from "../context";
+import { BrandSearchForm } from "./_components/BrandSearchForm";
+import { BrandDisambiguation } from "./_components/BrandDisambiguation";
+import { BrandPreview } from "./_components/BrandPreview";
+import { BrandLoadingState } from "./_components/BrandLoadingState";
+import {
+  getWorkspaceBrand,
+  createBrand,
+  setWorkspaceBrand as linkWorkspaceBrand,
+  unlinkWorkspaceBrand,
+} from "@/lib/actions/brand";
+import type { Brand, BrandSearchResult, CreateBrandInput } from "@/lib/types";
+import { Globe, Pencil, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+type PageState =
+  | "loading"
+  | "empty"
+  | "search"
+  | "searching"
+  | "disambiguation"
+  | "researching"
+  | "preview"
+  | "linked";
+
+export default function BrandSettingsPage() {
+  const { workspace, currentUserId } = useSettingsContext();
+  const [state, setState] = useState<PageState>("loading");
+  const [workspaceBrand, setWorkspaceBrandState] = useState<Brand | null>(null);
+  const [disambiguationResults, setDisambiguationResults] = useState<BrandSearchResult[]>([]);
+  const [previewBrand, setPreviewBrand] = useState<Partial<Brand> | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load initial data
+  useEffect(() => {
+    async function loadData() {
+      if (!currentUserId || !workspace?.id) return;
+
+      try {
+        const wsBrand = await getWorkspaceBrand(workspace.id);
+        setWorkspaceBrandState(wsBrand);
+        setState(wsBrand ? "linked" : "empty");
+      } catch (err) {
+        console.error("Failed to load brand data:", err);
+        setError("Failed to load brand data");
+        setState("empty");
+      }
+    }
+
+    loadData();
+  }, [currentUserId, workspace?.id]);
+
+  // Handle search (name or URL)
+  const handleSearch = useCallback(async (query: string, type: "name" | "url") => {
+    setState("searching");
+    setError(null);
+
+    try {
+      const response = await fetch("/api/brand/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, type }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Research failed");
+      }
+
+      const data = await response.json();
+
+      if (data.needsDisambiguation) {
+        setDisambiguationResults(data.results);
+        setState("disambiguation");
+      } else if (data.brand) {
+        setPreviewBrand(data.brand);
+        setState("preview");
+      } else {
+        setError("No results found");
+        setState("search");
+      }
+    } catch (err) {
+      console.error("Search error:", err);
+      setError("Failed to research brand. Please try again.");
+      setState("search");
+    }
+  }, []);
+
+  // Handle disambiguation selection
+  const handleDisambiguationSelect = useCallback(async (result: BrandSearchResult) => {
+    setState("researching");
+    setError(null);
+
+    try {
+      const response = await fetch("/api/brand/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "selection", selection: result }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Research failed");
+      }
+
+      const data = await response.json();
+
+      if (data.brand) {
+        setPreviewBrand(data.brand);
+        setState("preview");
+      } else {
+        setError("Failed to get brand details");
+        setState("disambiguation");
+      }
+    } catch (err) {
+      console.error("Research error:", err);
+      setError("Failed to research brand. Please try again.");
+      setState("disambiguation");
+    }
+  }, []);
+
+  // Handle create from scratch
+  const handleCreateFromScratch = useCallback(() => {
+    setPreviewBrand({});
+    setState("preview");
+  }, []);
+
+  // Handle save brand
+  const handleSaveBrand = useCallback(async (data: CreateBrandInput) => {
+    if (!workspace?.id) return;
+
+    setIsActionLoading(true);
+    setError(null);
+
+    try {
+      const newBrand = await createBrand(data);
+      await linkWorkspaceBrand(workspace.id, newBrand.id);
+
+      setWorkspaceBrandState(newBrand);
+      setState("linked");
+    } catch (err) {
+      console.error("Save error:", err);
+      setError("Failed to save brand. Please try again.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  }, [workspace?.id]);
+
+  // Handle remove brand
+  const handleRemoveBrand = useCallback(async () => {
+    if (!workspace?.id) return;
+
+    setIsActionLoading(true);
+    setError(null);
+
+    try {
+      await unlinkWorkspaceBrand(workspace.id);
+      setWorkspaceBrandState(null);
+      setState("empty");
+    } catch (err) {
+      console.error("Remove error:", err);
+      setError("Failed to remove brand. Please try again.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  }, [workspace?.id]);
+
+  // Handle edit brand (go back to preview with current data)
+  const handleEditBrand = useCallback(() => {
+    if (workspaceBrand) {
+      setPreviewBrand(workspaceBrand);
+      setState("preview");
+    }
+  }, [workspaceBrand]);
+
+  // Render the brand detail view (linked state)
+  const renderBrandDetail = () => {
+    if (!workspaceBrand) return null;
+
+    const primaryColor = workspaceBrand.primaryColor || "#3b82f6";
+
+    return (
+      <div className="min-h-full">
+        {/* Header with gradient */}
+        <div
+          className="relative px-6 py-8"
+          style={{
+            background: `linear-gradient(to bottom, ${primaryColor}66, var(--background))`,
+          }}
+        >
+          {/* Actions */}
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              onClick={handleEditBrand}
+              disabled={isActionLoading}
+              className="p-2 rounded-lg bg-background/50 hover:bg-background/80 transition-colors text-foreground"
+              title="Edit brand"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleRemoveBrand}
+              disabled={isActionLoading}
+              className="p-2 rounded-lg bg-background/50 hover:bg-destructive/80 transition-colors text-foreground hover:text-destructive-foreground"
+              title="Remove brand"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Brand header */}
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Brand
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-1">
+            {workspaceBrand.name}
+          </h1>
+          {workspaceBrand.tagline && (
+            <p className="text-muted-foreground">
+              {workspaceBrand.tagline}
+            </p>
+          )}
+
+          {/* Logo and description */}
+          <div className="flex gap-6 mt-6">
+            {workspaceBrand.logoUrl ? (
+              <div className="w-32 h-32 rounded-lg bg-white flex items-center justify-center p-2 shrink-0">
+                <img
+                  src={workspaceBrand.logoUrl}
+                  alt={workspaceBrand.name}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div
+                className="w-32 h-32 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <Globe className="w-12 h-12 text-white/80" />
+              </div>
+            )}
+
+            {workspaceBrand.description && (
+              <p className="text-foreground/80 leading-relaxed max-w-2xl">
+                {workspaceBrand.description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-6">
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList variant="line" className="border-b border-border">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="guidelines" disabled>Brand Guidelines</TabsTrigger>
+              <TabsTrigger value="audience" disabled>Audience</TabsTrigger>
+              <TabsTrigger value="tone" disabled>Tone & Style</TabsTrigger>
+              <TabsTrigger value="competitors" disabled>Competitors</TabsTrigger>
+              <TabsTrigger value="files" disabled>Files</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Website */}
+                {workspaceBrand.websiteUrl && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      Website
+                    </h3>
+                    <a
+                      href={workspaceBrand.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {workspaceBrand.websiteUrl}
+                    </a>
+                  </div>
+                )}
+
+                {/* Industry */}
+                {workspaceBrand.industry && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      Industry
+                    </h3>
+                    <p className="text-foreground">{workspaceBrand.industry}</p>
+                  </div>
+                )}
+
+                {/* Colors */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                    Brand Colors
+                  </h3>
+                  <div className="flex gap-3">
+                    {workspaceBrand.primaryColor && (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-lg border border-border"
+                          style={{ backgroundColor: workspaceBrand.primaryColor }}
+                          title={`Primary: ${workspaceBrand.primaryColor}`}
+                        />
+                        <span className="text-sm text-muted-foreground font-mono">
+                          {workspaceBrand.primaryColor}
+                        </span>
+                      </div>
+                    )}
+                    {workspaceBrand.secondaryColor && (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-lg border border-border"
+                          style={{ backgroundColor: workspaceBrand.secondaryColor }}
+                          title={`Secondary: ${workspaceBrand.secondaryColor}`}
+                        />
+                        <span className="text-sm text-muted-foreground font-mono">
+                          {workspaceBrand.secondaryColor}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="guidelines" className="py-6">
+              <div className="text-center py-12 text-muted-foreground">
+                Brand guidelines coming soon
+              </div>
+            </TabsContent>
+
+            <TabsContent value="audience" className="py-6">
+              <div className="text-center py-12 text-muted-foreground">
+                Audience insights coming soon
+              </div>
+            </TabsContent>
+
+            <TabsContent value="tone" className="py-6">
+              <div className="text-center py-12 text-muted-foreground">
+                Tone & style guidelines coming soon
+              </div>
+            </TabsContent>
+
+            <TabsContent value="competitors" className="py-6">
+              <div className="text-center py-12 text-muted-foreground">
+                Competitor analysis coming soon
+              </div>
+            </TabsContent>
+
+            <TabsContent value="files" className="py-6">
+              <div className="text-center py-12 text-muted-foreground">
+                Brand files coming soon
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    );
+  };
+
+  // Render empty state
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+        <Globe className="w-8 h-8 text-muted-foreground" />
+      </div>
+      <h2 className="text-xl font-semibold text-foreground mb-2">
+        No brand linked
+      </h2>
+      <p className="text-muted-foreground text-center max-w-md mb-6">
+        Add a brand to this workspace to maintain consistent messaging and styling across your content.
+      </p>
+      <button
+        onClick={() => setState("search")}
+        className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+      >
+        Add Brand
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="h-full">
+      {error && (
+        <div className="mx-6 mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
+      {state === "loading" && (
+        <div className="p-6">
+          <BrandLoadingState message="Loading brand settings..." />
+        </div>
+      )}
+
+      {state === "linked" && renderBrandDetail()}
+
+      {state === "empty" && (
+        <div className="p-6">
+          {renderEmptyState()}
+        </div>
+      )}
+
+      {state === "search" && (
+        <div className="p-6">
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold text-foreground">Add Brand</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Search for a brand by name or enter a website URL
+            </p>
+          </div>
+          <BrandSearchForm onSearch={handleSearch} isLoading={false} />
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setState("empty")}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state === "searching" && (
+        <div className="p-6">
+          <BrandLoadingState message="Searching for brand..." />
+        </div>
+      )}
+
+      {state === "disambiguation" && (
+        <div className="p-6">
+          <BrandDisambiguation
+            results={disambiguationResults}
+            onSelect={handleDisambiguationSelect}
+            onCreateFromScratch={handleCreateFromScratch}
+            isLoading={false}
+          />
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setState("search")}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Back to search
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state === "researching" && (
+        <div className="p-6">
+          <BrandLoadingState message="Researching brand details..." />
+        </div>
+      )}
+
+      {state === "preview" && (
+        <div className="p-6">
+          <BrandPreview
+            brand={previewBrand}
+            onSave={handleSaveBrand}
+            onCancel={() => {
+              if (workspaceBrand) {
+                setState("linked");
+              } else {
+                setState("search");
+              }
+            }}
+            isLoading={isActionLoading}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
