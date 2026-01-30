@@ -61,11 +61,19 @@ export function BrandPreview({
         {/* Logo Preview */}
         <div className="flex justify-center">
           {formData.logoUrl ? (
-            <img
-              src={formData.logoUrl}
-              alt={formData.name}
-              className="w-24 h-24 rounded-lg object-contain bg-white border border-border"
-            />
+            <div
+              className="w-24 h-24 rounded-lg flex items-center justify-center p-2 border border-border"
+              style={{
+                // Use analyzed background if available, otherwise default to white
+                backgroundColor: brand?.logoBackground === "dark" ? "#1f2937" : "#ffffff",
+              }}
+            >
+              <img
+                src={formData.logoUrl}
+                alt={formData.name}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
           ) : (
             <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center border border-border">
               <Globe className="w-10 h-10 text-muted-foreground" />

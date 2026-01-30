@@ -89,16 +89,64 @@ async function downloadImage(
 }
 
 /**
+ * Analyze an SVG file to determine if it has predominantly light colors.
+ * Parses the SVG content and looks for fill/stroke colors.
+ */
+function analyzeSvgColors(svgContent: string): "light" | "dark" {
+  // Look for common light color patterns in SVG
+  const lightColorPatterns = [
+    /fill\s*[=:]\s*["']?(#fff|#ffffff|white|#f[0-9a-f]{5})/gi,
+    /stroke\s*[=:]\s*["']?(#fff|#ffffff|white|#f[0-9a-f]{5})/gi,
+    /fill\s*[=:]\s*["']?rgb\s*\(\s*2[0-4][0-9]|25[0-5]/gi, // RGB values > 240
+    /style\s*=\s*["'][^"']*fill\s*:\s*(#fff|#ffffff|white)/gi,
+  ];
+
+  const darkColorPatterns = [
+    /fill\s*[=:]\s*["']?(#000|#000000|black|#[0-3][0-9a-f]{5})/gi,
+    /stroke\s*[=:]\s*["']?(#000|#000000|black|#[0-3][0-9a-f]{5})/gi,
+    /fill\s*[=:]\s*["']?rgb\s*\(\s*[0-5]?[0-9]/gi, // RGB values < 60
+  ];
+
+  let lightMatches = 0;
+  let darkMatches = 0;
+
+  for (const pattern of lightColorPatterns) {
+    const matches = svgContent.match(pattern);
+    if (matches) lightMatches += matches.length;
+  }
+
+  for (const pattern of darkColorPatterns) {
+    const matches = svgContent.match(pattern);
+    if (matches) darkMatches += matches.length;
+  }
+
+  // If more light colors found, logo needs dark background
+  if (lightMatches > darkMatches) {
+    return "dark";
+  }
+  return "light";
+}
+
+/**
  * Analyze a logo image using AI vision to determine optimal background color.
  *
  * Uses Claude's vision capabilities to understand the logo's colors,
  * transparency, and visual characteristics to recommend whether it
  * should be displayed on a light or dark background.
+ *
+ * For SVG files (which can't be processed by vision API), parses the
+ * SVG content to analyze fill/stroke colors.
  */
 export async function analyzeLogoBackground(
   imageBuffer: Buffer,
   contentType: string
 ): Promise<"light" | "dark"> {
+  // Handle SVG files separately (vision API doesn't support SVG)
+  if (contentType === "image/svg+xml" || contentType.includes("svg")) {
+    const svgContent = imageBuffer.toString("utf-8");
+    return analyzeSvgColors(svgContent);
+  }
+
   try {
     const result = await generateText({
       model: anthropic("claude-haiku-4-5-20251001"),
