@@ -2,10 +2,12 @@
  * Logo processing utilities
  * - Download logos from URLs
  * - Upload to R2 for persistence
- * - Analyze logo to determine optimal background color
+ * - Analyze logo to determine optimal background color using AI vision
  */
 
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText } from "ai";
 
 // Create S3 client for R2
 function createS3Client(): S3Client {
@@ -87,75 +89,54 @@ async function downloadImage(
 }
 
 /**
- * Analyze an image to determine if it needs a light or dark background.
+ * Analyze a logo image using AI vision to determine optimal background color.
  *
- * This works by:
- * 1. Parsing the image to get pixel data
- * 2. Finding edge/border pixels (which are often transparent or the logo color)
- * 3. Calculating the average brightness of non-transparent pixels
- * 4. If the logo is predominantly light (like white text), it needs a dark background
- * 5. If the logo is predominantly dark, it needs a light background
- *
- * For images with transparency, we focus on the non-transparent pixels.
+ * Uses Claude's vision capabilities to understand the logo's colors,
+ * transparency, and visual characteristics to recommend whether it
+ * should be displayed on a light or dark background.
  */
 export async function analyzeLogoBackground(
   imageBuffer: Buffer,
   contentType: string
 ): Promise<"light" | "dark"> {
-  // For PNG images, we can analyze transparency and colors
-  // For simplicity, we'll use a heuristic based on the image data
-
   try {
-    // Check if it's a PNG with potential transparency
-    const isPng = contentType === "image/png";
+    const result = await generateText({
+      model: anthropic("claude-haiku-4-5-20251001"),
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              image: imageBuffer,
+            },
+            {
+              type: "text",
+              text: `Analyze this logo image and determine whether it should be displayed on a LIGHT background (white/cream) or a DARK background (dark gray/black).
 
-    // Simple brightness analysis using raw bytes
-    // This is a simplified approach - for production, you might want to use
-    // a proper image processing library like sharp
+Consider:
+- If the logo is predominantly white, light-colored, or has white/light text, it needs a DARK background to be visible
+- If the logo is predominantly dark, black, or has dark text, it needs a LIGHT background to be visible
+- If the logo has transparency and the main visual elements are light-colored, it needs a DARK background
+- If the logo has good contrast and would work on either, prefer LIGHT background
 
-    let totalBrightness = 0;
-    let pixelCount = 0;
+Respond with ONLY one word: either "light" or "dark" (lowercase, no quotes, no explanation).`,
+            },
+          ],
+        },
+      ],
+    });
 
-    // Sample pixels from the buffer
-    // For PNG/JPEG, the actual pixel data starts after headers
-    // This is a rough heuristic - sample bytes throughout the image
-    const sampleSize = Math.min(imageBuffer.length, 10000);
-    const step = Math.max(1, Math.floor(imageBuffer.length / sampleSize));
+    const answer = result.text.trim().toLowerCase();
 
-    for (let i = 0; i < imageBuffer.length; i += step * 4) {
-      if (i + 2 < imageBuffer.length) {
-        const r = imageBuffer[i];
-        const g = imageBuffer[i + 1];
-        const b = imageBuffer[i + 2];
-
-        // Skip if this looks like header data (very low values in sequence)
-        if (r === 0 && g === 0 && b === 0) continue;
-
-        // Calculate perceived brightness (human eye is more sensitive to green)
-        const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        totalBrightness += brightness;
-        pixelCount++;
-      }
-    }
-
-    if (pixelCount === 0) {
-      // Default to light background if we couldn't analyze
-      return "light";
-    }
-
-    const avgBrightness = totalBrightness / pixelCount;
-
-    // If average brightness > 0.6, the logo is light and needs dark background
-    // If average brightness < 0.4, the logo is dark and needs light background
-    // In between, default to light background
-    if (avgBrightness > 0.6) {
-      return "dark"; // Light logo needs dark background
+    if (answer === "dark") {
+      return "dark";
     } else {
-      return "light"; // Dark logo needs light background
+      return "light"; // Default to light if unclear
     }
   } catch (error) {
-    console.error("Failed to analyze logo:", error);
-    return "light"; // Default to light background
+    console.error("Failed to analyze logo with AI:", error);
+    return "light"; // Default to light background on error
   }
 }
 
