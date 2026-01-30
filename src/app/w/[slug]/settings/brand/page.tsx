@@ -31,8 +31,11 @@ type PageState =
 export default function BrandSettingsPage() {
   const { workspace, currentUserId } = useSettingsContext();
   const [state, setState] = useState<PageState>("loading");
-  const [workspaceBrand, setWorkspaceBrandState] = useState<BrandWithLogoUrl | null>(null);
-  const [disambiguationResults, setDisambiguationResults] = useState<BrandSearchResult[]>([]);
+  const [workspaceBrand, setWorkspaceBrandState] =
+    useState<BrandWithLogoUrl | null>(null);
+  const [disambiguationResults, setDisambiguationResults] = useState<
+    BrandSearchResult[]
+  >([]);
   const [previewBrand, setPreviewBrand] = useState<Partial<Brand> | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,81 +60,87 @@ export default function BrandSettingsPage() {
   }, [currentUserId, workspace?.id]);
 
   // Handle disambiguation selection (defined first since handleSearch uses it)
-  const handleDisambiguationSelect = useCallback(async (result: BrandSearchResult) => {
-    setState("researching");
-    setError(null);
+  const handleDisambiguationSelect = useCallback(
+    async (result: BrandSearchResult) => {
+      setState("researching");
+      setError(null);
 
-    try {
-      const response = await fetch("/api/brand/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "selection", selection: result }),
-      });
+      try {
+        const response = await fetch("/api/brand/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "selection", selection: result }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Research failed");
-      }
+        if (!response.ok) {
+          throw new Error("Research failed");
+        }
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (data.brand) {
-        setPreviewBrand(data.brand);
-        setState("preview");
-      } else {
-        setError("Failed to get brand details");
+        if (data.brand) {
+          setPreviewBrand(data.brand);
+          setState("preview");
+        } else {
+          setError("Failed to get brand details");
+          setState("disambiguation");
+        }
+      } catch (err) {
+        console.error("Research error:", err);
+        setError("Failed to research brand. Please try again.");
         setState("disambiguation");
       }
-    } catch (err) {
-      console.error("Research error:", err);
-      setError("Failed to research brand. Please try again.");
-      setState("disambiguation");
-    }
-  }, []);
+    },
+    []
+  );
 
   // Handle search (name or URL)
-  const handleSearch = useCallback(async (query: string, type: "name" | "url") => {
-    setState("searching");
-    setError(null);
+  const handleSearch = useCallback(
+    async (query: string, type: "name" | "url") => {
+      setState("searching");
+      setError(null);
 
-    try {
-      const response = await fetch("/api/brand/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, type }),
-      });
+      try {
+        const response = await fetch("/api/brand/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, type }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Research failed");
-      }
+        if (!response.ok) {
+          throw new Error("Research failed");
+        }
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (data.needsDisambiguation && data.results?.length > 1) {
-        // Multiple results - let user choose
-        setDisambiguationResults(data.results);
-        setState("disambiguation");
-      } else if (data.brand) {
-        // URL or selection search returned full brand details
-        setPreviewBrand(data.brand);
-        setState("preview");
-      } else if (data.results?.length === 1) {
-        // Name search found exactly one result - auto-research it for full details
-        const result = data.results[0];
-        handleDisambiguationSelect(result);
-      } else if (data.results?.length > 0) {
-        // Multiple results without disambiguation flag - show selection UI
-        setDisambiguationResults(data.results);
-        setState("disambiguation");
-      } else {
-        setError("No results found");
+        if (data.needsDisambiguation && data.results?.length > 1) {
+          // Multiple results - let user choose
+          setDisambiguationResults(data.results);
+          setState("disambiguation");
+        } else if (data.brand) {
+          // URL or selection search returned full brand details
+          setPreviewBrand(data.brand);
+          setState("preview");
+        } else if (data.results?.length === 1) {
+          // Name search found exactly one result - auto-research it for full details
+          const result = data.results[0];
+          handleDisambiguationSelect(result);
+        } else if (data.results?.length > 0) {
+          // Multiple results without disambiguation flag - show selection UI
+          setDisambiguationResults(data.results);
+          setState("disambiguation");
+        } else {
+          setError("No results found");
+          setState("search");
+        }
+      } catch (err) {
+        console.error("Search error:", err);
+        setError("Failed to research brand. Please try again.");
         setState("search");
       }
-    } catch (err) {
-      console.error("Search error:", err);
-      setError("Failed to research brand. Please try again.");
-      setState("search");
-    }
-  }, [handleDisambiguationSelect]);
+    },
+    [handleDisambiguationSelect]
+  );
 
   // Handle create from scratch
   const handleCreateFromScratch = useCallback(() => {
@@ -140,27 +149,30 @@ export default function BrandSettingsPage() {
   }, []);
 
   // Handle save brand
-  const handleSaveBrand = useCallback(async (data: CreateBrandInput) => {
-    if (!workspace?.id) return;
+  const handleSaveBrand = useCallback(
+    async (data: CreateBrandInput) => {
+      if (!workspace?.id) return;
 
-    setIsActionLoading(true);
-    setError(null);
+      setIsActionLoading(true);
+      setError(null);
 
-    try {
-      const newBrand = await createBrand(data);
-      await linkWorkspaceBrand(workspace.id, newBrand.id);
+      try {
+        const newBrand = await createBrand(data);
+        await linkWorkspaceBrand(workspace.id, newBrand.id);
 
-      // Reload the brand to get resolved logo URL
-      const linkedBrand = await getWorkspaceBrand(workspace.id);
-      setWorkspaceBrandState(linkedBrand);
-      setState("linked");
-    } catch (err) {
-      console.error("Save error:", err);
-      setError("Failed to save brand. Please try again.");
-    } finally {
-      setIsActionLoading(false);
-    }
-  }, [workspace?.id]);
+        // Reload the brand to get resolved logo URL
+        const linkedBrand = await getWorkspaceBrand(workspace.id);
+        setWorkspaceBrandState(linkedBrand);
+        setState("linked");
+      } catch (err) {
+        console.error("Save error:", err);
+        setError("Failed to save brand. Please try again.");
+      } finally {
+        setIsActionLoading(false);
+      }
+    },
+    [workspace?.id]
+  );
 
   // Handle remove brand
   const handleRemoveBrand = useCallback(async () => {
@@ -196,49 +208,46 @@ export default function BrandSettingsPage() {
     const primaryColor = workspaceBrand.primaryColor || "#3b82f6";
 
     return (
-      <div className="min-h-full">
-        {/* Header with gradient */}
-        <div
-          className="relative px-6 py-8"
-          style={{
-            background: `linear-gradient(to bottom, ${primaryColor}66, var(--background))`,
-          }}
-        >
-          {/* Actions */}
-          <div className="absolute top-4 right-4 flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleEditBrand}
-              disabled={isActionLoading}
-              className="bg-background/50 hover:bg-background/80"
-              title="Edit brand"
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleRemoveBrand}
-              disabled={isActionLoading}
-              className="bg-background/50 hover:bg-destructive/80 hover:text-destructive-foreground"
-              title="Remove brand"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
+      <main
+        className="min-h-125 page-content"
+        style={{
+          background: `linear-gradient(to bottom, ${primaryColor}26, var(--background))`,
+        }}
+      >
+        <div className="page-actions">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleEditBrand}
+            disabled={isActionLoading}
+            className="bg-background/50 hover:bg-background/80"
+            title="Edit brand"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleRemoveBrand}
+            disabled={isActionLoading}
+            className="bg-background/50 hover:bg-destructive/80 hover:text-destructive-foreground"
+            title="Remove brand"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
 
+        {/* Header with gradient */}
+        <header className="relative py-8 container">
           {/* Brand header */}
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <div className="text-xs font-medium text-foreground/80 uppercase tracking-wider mb-2">
             Brand
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-1">
             {workspaceBrand.name}
           </h1>
           {workspaceBrand.tagline && (
-            <p className="text-muted-foreground">
-              {workspaceBrand.tagline}
-            </p>
+            <p className="text-foreground">{workspaceBrand.tagline}</p>
           )}
 
           {/* Logo and description */}
@@ -248,7 +257,10 @@ export default function BrandSettingsPage() {
                 className="w-32 h-32 rounded-lg flex items-center justify-center p-2 shrink-0"
                 style={{
                   // Use dark background for light logos, light background for dark logos
-                  backgroundColor: workspaceBrand.logoBackground === "dark" ? "#1f2937" : "#ffffff",
+                  backgroundColor:
+                    workspaceBrand.logoBackground === "dark"
+                      ? "#1f2937"
+                      : "#ffffff",
                 }}
               >
                 <img
@@ -272,18 +284,28 @@ export default function BrandSettingsPage() {
               </p>
             )}
           </div>
-        </div>
+        </header>
 
         {/* Tabs */}
-        <div className="px-6">
+        <section id="brand-tabs" className="container">
           <Tabs defaultValue="overview" className="w-full">
             <TabsList variant="line" className="border-b border-border">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="guidelines" disabled>Brand Guidelines</TabsTrigger>
-              <TabsTrigger value="audience" disabled>Audience</TabsTrigger>
-              <TabsTrigger value="tone" disabled>Tone & Style</TabsTrigger>
-              <TabsTrigger value="competitors" disabled>Competitors</TabsTrigger>
-              <TabsTrigger value="files" disabled>Files</TabsTrigger>
+              <TabsTrigger value="guidelines" disabled>
+                Brand Guidelines
+              </TabsTrigger>
+              <TabsTrigger value="audience" disabled>
+                Audience
+              </TabsTrigger>
+              <TabsTrigger value="tone" disabled>
+                Tone & Style
+              </TabsTrigger>
+              <TabsTrigger value="competitors" disabled>
+                Competitors
+              </TabsTrigger>
+              <TabsTrigger value="files" disabled>
+                Files
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="py-6">
@@ -325,7 +347,9 @@ export default function BrandSettingsPage() {
                       <div className="flex items-center gap-2">
                         <div
                           className="w-8 h-8 rounded-lg border border-border"
-                          style={{ backgroundColor: workspaceBrand.primaryColor }}
+                          style={{
+                            backgroundColor: workspaceBrand.primaryColor,
+                          }}
                           title={`Primary: ${workspaceBrand.primaryColor}`}
                         />
                         <span className="text-sm text-muted-foreground font-mono">
@@ -337,7 +361,9 @@ export default function BrandSettingsPage() {
                       <div className="flex items-center gap-2">
                         <div
                           className="w-8 h-8 rounded-lg border border-border"
-                          style={{ backgroundColor: workspaceBrand.secondaryColor }}
+                          style={{
+                            backgroundColor: workspaceBrand.secondaryColor,
+                          }}
                           title={`Secondary: ${workspaceBrand.secondaryColor}`}
                         />
                         <span className="text-sm text-muted-foreground font-mono">
@@ -380,8 +406,8 @@ export default function BrandSettingsPage() {
               </div>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
+        </section>
+      </main>
     );
   };
 
@@ -395,11 +421,10 @@ export default function BrandSettingsPage() {
         No brand linked
       </h2>
       <p className="text-muted-foreground text-center max-w-md mb-6">
-        Add a brand to this workspace to maintain consistent messaging and styling across your content.
+        Add a brand to this workspace to maintain consistent messaging and
+        styling across your content.
       </p>
-      <Button onClick={() => setState("search")}>
-        Add Brand
-      </Button>
+      <Button onClick={() => setState("search")}>Add Brand</Button>
     </div>
   );
 
@@ -419,27 +444,21 @@ export default function BrandSettingsPage() {
 
       {state === "linked" && renderBrandDetail()}
 
-      {state === "empty" && (
-        <div className="p-6">
-          {renderEmptyState()}
-        </div>
-      )}
+      {state === "empty" && <div className="p-6">{renderEmptyState()}</div>}
 
       {state === "search" && (
         <div className="p-6">
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-foreground">Add Brand</h1>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Add Brand
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Search for a brand by name or enter a website URL
             </p>
           </div>
           <BrandSearchForm onSearch={handleSearch} isLoading={false} />
           <div className="mt-4 text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setState("empty")}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setState("empty")}>
               Cancel
             </Button>
           </div>
