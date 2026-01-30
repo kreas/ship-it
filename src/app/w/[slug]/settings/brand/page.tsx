@@ -17,6 +17,8 @@ import type { Brand, BrandSearchResult, CreateBrandInput } from "@/lib/types";
 import { Globe, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GradientPage } from "@/components/ui/gradient-page";
+import { PageHeader } from "@/components/ui/page-header";
 
 type PageState =
   | "loading"
@@ -208,55 +210,44 @@ export default function BrandSettingsPage() {
     const primaryColor = workspaceBrand.primaryColor || "#3b82f6";
 
     return (
-      <main
-        className="min-h-125 page-content"
-        style={{
-          background: `linear-gradient(to bottom, ${primaryColor}26, var(--background))`,
-        }}
+      <GradientPage
+        color={primaryColor}
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleEditBrand}
+              disabled={isActionLoading}
+              className="bg-background/50 hover:bg-background/80"
+              title="Edit brand"
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleRemoveBrand}
+              disabled={isActionLoading}
+              className="bg-background/50 hover:bg-destructive/80 hover:text-destructive-foreground"
+              title="Remove brand"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </>
+        }
       >
-        <div className="page-actions">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleEditBrand}
-            disabled={isActionLoading}
-            className="bg-background/50 hover:bg-background/80"
-            title="Edit brand"
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleRemoveBrand}
-            disabled={isActionLoading}
-            className="bg-background/50 hover:bg-destructive/80 hover:text-destructive-foreground"
-            title="Remove brand"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {/* Header with gradient */}
-        <header className="relative py-8 container">
-          {/* Brand header */}
-          <div className="text-xs font-medium text-foreground/80 uppercase tracking-wider mb-2">
-            Brand
-          </div>
-          <h1 className="text-3xl font-bold text-foreground mb-1">
-            {workspaceBrand.name}
-          </h1>
-          {workspaceBrand.tagline && (
-            <p className="text-foreground">{workspaceBrand.tagline}</p>
-          )}
-
+        <PageHeader
+          label="Brand"
+          title={workspaceBrand.name}
+          subtitle={workspaceBrand.tagline ?? undefined}
+        >
           {/* Logo and description */}
           <div className="flex gap-6 mt-6">
             {workspaceBrand.resolvedLogoUrl ? (
               <div
                 className="w-32 h-32 rounded-lg flex items-center justify-center p-2 shrink-0"
                 style={{
-                  // Use dark background for light logos, light background for dark logos
                   backgroundColor:
                     workspaceBrand.logoBackground === "dark"
                       ? "#1f2937"
@@ -284,7 +275,7 @@ export default function BrandSettingsPage() {
               </p>
             )}
           </div>
-        </header>
+        </PageHeader>
 
         {/* Tabs */}
         <section id="brand-tabs" className="container">
@@ -407,7 +398,7 @@ export default function BrandSettingsPage() {
             </TabsContent>
           </Tabs>
         </section>
-      </main>
+      </GradientPage>
     );
   };
 
