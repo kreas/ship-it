@@ -23,6 +23,8 @@ import {
 } from "@/lib/actions/skills";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { GradientPage } from "@/components/ui/gradient-page";
+import { PageHeader } from "@/components/ui/page-header";
 import { useSettingsContext } from "../context";
 import type { WorkspaceSkill, SkillAsset } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -651,7 +653,7 @@ Your markdown content here...`}
 }
 
 export default function SkillsSettingsPage() {
-  const { workspace, skills, isAdmin, refreshSkills } = useSettingsContext();
+  const { workspace, skills, isAdmin, refreshSkills, brand } = useSettingsContext();
 
   const handleEdit = async (
     skill: WorkspaceSkill,
@@ -687,70 +689,70 @@ export default function SkillsSettingsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">AI Skills</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Import custom skills to extend AI assistant capabilities
-        </p>
-      </div>
+    <GradientPage color={brand?.primaryColor ?? undefined}>
+      <PageHeader
+        label="Settings"
+        title="AI Skills"
+        subtitle="Import custom skills to extend AI assistant capabilities"
+      />
 
-      {/* Help Section */}
-      <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
-        <div className="flex gap-2">
-          <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-          <div className="text-sm text-muted-foreground">
-            <p className="font-medium text-foreground mb-1">Skill Format</p>
-            <p>
-              Skills use markdown files with YAML frontmatter. The frontmatter
-              must include <code className="bg-muted px-1 rounded">name</code>{" "}
-              and{" "}
-              <code className="bg-muted px-1 rounded">description</code> fields.
-            </p>
-            <p className="mt-2">
-              <strong>ZIP packages</strong> can include additional files in{" "}
-              <code className="bg-muted px-1 rounded">references/</code>,{" "}
-              <code className="bg-muted px-1 rounded">scripts/</code>, and{" "}
-              <code className="bg-muted px-1 rounded">assets/</code> directories.
-              Reference files are merged into the skill content.
-            </p>
+      <section className="container">
+        {/* Help Section */}
+        <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
+          <div className="flex gap-2">
+            <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Skill Format</p>
+              <p>
+                Skills use markdown files with YAML frontmatter. The frontmatter
+                must include <code className="bg-muted px-1 rounded">name</code>{" "}
+                and{" "}
+                <code className="bg-muted px-1 rounded">description</code> fields.
+              </p>
+              <p className="mt-2">
+                <strong>ZIP packages</strong> can include additional files in{" "}
+                <code className="bg-muted px-1 rounded">references/</code>,{" "}
+                <code className="bg-muted px-1 rounded">scripts/</code>, and{" "}
+                <code className="bg-muted px-1 rounded">assets/</code> directories.
+                Reference files are merged into the skill content.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Import Section */}
-      {isAdmin && workspace && (
-        <div className="mb-6">
-          <ImportSkillForm
-            workspaceId={workspace.id}
-            onImported={refreshSkills}
-          />
-        </div>
-      )}
-
-      {/* Skills List */}
-      <div className="rounded-lg border border-border bg-card">
-        {skills.length === 0 ? (
-          <div className="px-6 py-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              No skills imported yet.{" "}
-              {isAdmin ? "Import a skill to get started." : ""}
-            </p>
-          </div>
-        ) : (
-          skills.map((skill) => (
-            <SkillRow
-              key={skill.id}
-              skill={skill}
-              isAdmin={isAdmin}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
+        {/* Import Section */}
+        {isAdmin && workspace && (
+          <div className="mb-6">
+            <ImportSkillForm
+              workspaceId={workspace.id}
+              onImported={refreshSkills}
             />
-          ))
+          </div>
         )}
-      </div>
-    </div>
+
+        {/* Skills List */}
+        <div className="rounded-lg border border-border bg-card">
+          {skills.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No skills imported yet.{" "}
+                {isAdmin ? "Import a skill to get started." : ""}
+              </p>
+            </div>
+          ) : (
+            skills.map((skill) => (
+              <SkillRow
+                key={skill.id}
+                skill={skill}
+                isAdmin={isAdmin}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onToggle={handleToggle}
+              />
+            ))
+          )}
+        </div>
+      </section>
+    </GradientPage>
   );
 }
