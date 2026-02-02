@@ -143,3 +143,17 @@ export function useConvertToSubtask(workspaceId: string) {
     },
   });
 }
+
+// Hook to get a function that invalidates subtask queries
+export function useInvalidateSubtasks(issueId: string) {
+  const queryClient = useQueryClient();
+
+  return () => {
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.issue.subtasks(issueId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.issue.subtaskCount(issueId),
+    });
+  };
+}

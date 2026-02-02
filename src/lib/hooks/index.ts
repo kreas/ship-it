@@ -42,6 +42,7 @@ export {
   useIssueSubtasks,
   useSubtaskCount,
   useSubtaskOperations,
+  useInvalidateSubtasks,
   useConvertToSubtask,
 } from "./use-subtasks";
 
