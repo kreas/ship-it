@@ -17,6 +17,7 @@ import {
   Check,
   Wand2,
   MessageSquare,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW } from "@/lib/design-tokens";
@@ -300,6 +301,12 @@ export function Sidebar() {
 
       {/* Footer Actions */}
       <div className="p-2 border-t border-sidebar-border">
+        <NavItem
+          icon={<Home className="w-4 h-4" />}
+          label="All Projects"
+          isCollapsed={sidebarCollapsed}
+          href="/projects"
+        />
         <NavItem
           icon={<Settings className="w-4 h-4" />}
           label="Settings"
