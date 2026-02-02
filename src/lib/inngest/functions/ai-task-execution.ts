@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { db } from "@/lib/db";
-import { issues, workspaces, attachments, activities, columns } from "@/lib/db/schema";
+import { issues, workspaces, attachments, activities, columns, backgroundJobs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
@@ -108,7 +108,9 @@ async function attachContentFromBackgroundJob(
 }
 
 /**
- * Build system prompt with parent issue context
+ * Build system prompt with parent issue context.
+ * Returns two parts: static (cacheable) and dynamic (per-task).
+ * The static part is placed first to maximize cache hits across parallel tasks.
  */
 function buildSystemPrompt(
   parentIssue: { identifier: string; title: string; description: string | null } | null,
@@ -116,27 +118,18 @@ function buildSystemPrompt(
   subtaskDescription: string | null,
   aiInstructions: string | null,
   soul?: WorkspaceSoul | null
-): string {
-  const parts: string[] = [];
+): { staticPart: string; dynamicPart: string } {
+  // Static part - same across all tasks in a workspace (cacheable)
+  const staticParts: string[] = [];
 
-  // Add workspace soul/persona if configured
   if (soul) {
-    parts.push(`You are ${soul.name}. ${soul.personality}
+    staticParts.push(`You are ${soul.name}. ${soul.personality}
 
 Tone: ${soul.tone}
 Response Length: ${soul.responseLength}`);
   }
 
-  parts.push(`You are completing a subtask as part of a larger project. Use the tools available to research if needed.
-
-## Parent Issue Context
-${parentIssue ? `**${parentIssue.identifier}: ${parentIssue.title}**
-${parentIssue.description || "No description provided."}` : "No parent context available."}
-
-## Your Subtask
-**Title:** ${subtaskTitle}
-${subtaskDescription ? `**Description:** ${subtaskDescription}` : ""}
-${aiInstructions ? `**Special Instructions:** ${aiInstructions}` : ""}
+  staticParts.push(`You are completing a subtask as part of a larger project. Use the tools available to research if needed.
 
 ## Tools Available
 - **web_search**: Search the web for current information
@@ -145,7 +138,22 @@ ${aiInstructions ? `**Special Instructions:** ${aiInstructions}` : ""}
 ## Output Format
 Provide your complete response as well-formatted markdown. Be thorough but concise. Focus on actionable, specific content relevant to the parent issue context.`);
 
-  return parts.join("\n\n");
+  // Dynamic part - unique per task
+  const dynamicParts: string[] = [];
+
+  dynamicParts.push(`## Parent Issue Context
+${parentIssue ? `**${parentIssue.identifier}: ${parentIssue.title}**
+${parentIssue.description || "No description provided."}` : "No parent context available."}`);
+
+  dynamicParts.push(`## Your Subtask
+**Title:** ${subtaskTitle}
+${subtaskDescription ? `**Description:** ${subtaskDescription}` : ""}
+${aiInstructions ? `**Special Instructions:** ${aiInstructions}` : ""}`);
+
+  return {
+    staticPart: staticParts.join("\n\n"),
+    dynamicPart: dynamicParts.join("\n\n"),
+  };
 }
 
 /**
@@ -159,10 +167,12 @@ export const executeAITask = inngest.createFunction(
     retries: 1,
     concurrency: { limit: 5 },
     onFailure: async ({ event, error }) => {
-      const issueId = event.data.event.data.issueId;
+      const { issueId, workspaceId } = event.data.event.data;
+      const runId = event.data.run_id;
       console.error(`[AI Task] Function failed for ${issueId}:`, error);
 
       try {
+        // Update issue status
         await db
           .update(issues)
           .set({
@@ -171,16 +181,26 @@ export const executeAITask = inngest.createFunction(
             updatedAt: new Date(),
           })
           .where(eq(issues.id, issueId));
+
+        // Update job status
+        await db
+          .update(backgroundJobs)
+          .set({
+            status: "failed",
+            completedAt: new Date(),
+            error: error.message,
+          })
+          .where(eq(backgroundJobs.runId, runId));
       } catch (dbError) {
-        console.error(`[AI Task] Failed to update issue status:`, dbError);
+        console.error(`[AI Task] Failed to update status:`, dbError);
       }
     },
   },
   { event: "ai/task.execute" },
-  async ({ event, step }) => {
+  async ({ event, step, runId }) => {
     const { issueId, workspaceId, parentIssueId } = event.data;
 
-    // Step 1: Load context and mark as running
+    // Step 1: Load context, create job record, and mark as running
     const context = await step.run("load-context", async () => {
       const subtask = await db
         .select()
@@ -204,6 +224,25 @@ export const executeAITask = inngest.createFunction(
         .where(eq(workspaces.id, workspaceId))
         .get();
 
+      // Create job record for tracking
+      await db.insert(backgroundJobs).values({
+        id: crypto.randomUUID(),
+        workspaceId,
+        functionId: "ai-task-execution",
+        functionName: "AI Task Execution",
+        runId,
+        status: "running",
+        startedAt: new Date(),
+        metadata: JSON.stringify({
+          issueId,
+          parentIssueId,
+          subtaskTitle: subtask.title,
+          subtaskIdentifier: subtask.identifier,
+        }),
+        attempt: 1,
+        maxAttempts: 2,
+      }).onConflictDoNothing(); // In case of retry, don't create duplicate
+
       // Mark subtask as running
       await db
         .update(issues)
@@ -215,11 +254,11 @@ export const executeAITask = inngest.createFunction(
       return { subtask, parentIssue: parentIssue ?? null, soul };
     });
 
-    // Step 2: Execute AI with web tools
+    // Step 2: Execute AI with web tools and prompt caching
     const executionResult = await step.run("execute-ai", async () => {
       const { subtask, parentIssue, soul } = context;
 
-      const systemPrompt = buildSystemPrompt(
+      const { staticPart, dynamicPart } = buildSystemPrompt(
         parentIssue,
         subtask.title,
         subtask.description,
@@ -227,10 +266,27 @@ export const executeAITask = inngest.createFunction(
         soul
       );
 
+      // Combine system prompt parts - static part first for better cache hits
+      const fullSystemPrompt = `${staticPart}\n\n${dynamicPart}`;
+
+      // Use messages array with cache control for prompt caching
+      // Cache the system prompt - when multiple tasks run in parallel,
+      // subsequent requests within 5 minutes can reuse the cached prefix
+      const cacheControl = { cacheControl: { type: "ephemeral" as const } };
+
       const result = await generateText({
         model: anthropic(EXECUTION_MODEL),
-        system: systemPrompt,
-        prompt: "Complete the subtask described above. Use web_search and web_fetch if you need current information. Provide your response as markdown.",
+        messages: [
+          {
+            role: "system" as const,
+            content: fullSystemPrompt,
+            providerOptions: { anthropic: cacheControl },
+          },
+          {
+            role: "user" as const,
+            content: "Complete the subtask described above. Use web_search and web_fetch if you need current information. Provide your response as markdown.",
+          },
+        ],
         tools: {
           web_search: anthropic.tools.webSearch_20250305({ maxUses: MAX_TOOL_USES }),
           web_fetch: anthropic.tools.webFetch_20250910({ maxUses: MAX_TOOL_USES }),
@@ -238,22 +294,35 @@ export const executeAITask = inngest.createFunction(
         maxRetries: 0,
       });
 
+      // Extract cache token details (same pattern as chat implementation)
+      const usage = result.usage as typeof result.usage & {
+        inputTokenDetails?: {
+          cacheReadTokens?: number;
+          cacheWriteTokens?: number;
+        };
+      };
+      const cacheDetails = usage.inputTokenDetails;
+
       return {
         content: result.text,
         usage: {
-          inputTokens: result.usage.inputTokens ?? 0,
-          outputTokens: result.usage.outputTokens ?? 0,
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+          cacheCreationInputTokens: cacheDetails?.cacheWriteTokens ?? 0,
+          cacheReadInputTokens: cacheDetails?.cacheReadTokens ?? 0,
         },
       };
     });
 
-    // Step 3: Track token usage
+    // Step 3: Track token usage (including cache metrics)
     await step.run("track-usage", async () => {
       await recordTokenUsage({
         workspaceId,
         model: EXECUTION_MODEL,
         inputTokens: executionResult.usage.inputTokens,
         outputTokens: executionResult.usage.outputTokens,
+        cacheCreationInputTokens: executionResult.usage.cacheCreationInputTokens,
+        cacheReadInputTokens: executionResult.usage.cacheReadInputTokens,
         source: "ai-task-execution",
       });
     });
@@ -280,7 +349,7 @@ export const executeAITask = inngest.createFunction(
       }
     });
 
-    // Step 5: Finalize - update subtask with results
+    // Step 5: Finalize - update subtask and job with results
     const finalResult = await step.run("finalize", async () => {
       const hasContent = !!executionResult.content;
       const status = hasContent ? "completed" : "failed";
@@ -290,6 +359,7 @@ export const executeAITask = inngest.createFunction(
         ? `Task completed. Output saved as ${attachmentResult.attached ? "attachment" : "text"}.`
         : "Task failed - no content generated.";
 
+      // Update issue status
       await db
         .update(issues)
         .set({
@@ -300,6 +370,20 @@ export const executeAITask = inngest.createFunction(
           updatedAt: new Date(),
         })
         .where(eq(issues.id, issueId));
+
+      // Update job status
+      await db
+        .update(backgroundJobs)
+        .set({
+          status,
+          completedAt: new Date(),
+          result: JSON.stringify({
+            summary,
+            attached: attachmentResult.attached,
+            attachmentId: "attachmentId" in attachmentResult ? attachmentResult.attachmentId : undefined,
+          }),
+        })
+        .where(eq(backgroundJobs.runId, runId));
 
       return { status, summary, attached: attachmentResult.attached };
     });

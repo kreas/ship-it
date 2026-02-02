@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { SubtaskItem } from "./SubtaskItem";
 import { SuggestedSubtaskItem } from "./SuggestedSubtaskItem";
 import { useBoardContext } from "@/components/board/context";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import {
   useIssueSubtasks,
   useSubtaskOperations,
@@ -35,8 +37,15 @@ export function SubtaskList({ issue, className }: SubtaskListProps) {
   // Get workspaceId from context instead of props
   const { board } = useBoardContext();
   const workspaceId = board.id;
+  const queryClient = useQueryClient();
 
-  const { data: subtasks = [], isLoading } = useIssueSubtasks(issue.id);
+  // Check if there are running AI tasks to enable polling
+  const [hasRunningTasks, setHasRunningTasks] = useState(false);
+
+  const { data: subtasks = [], isLoading } = useIssueSubtasks(issue.id, {
+    // Poll every 3 seconds while tasks are running
+    refetchInterval: hasRunningTasks ? 3000 : false,
+  });
   const { createSubtask, updateSubtask, removeSubtask, promoteToIssue } =
     useSubtaskOperations(issue.id, workspaceId);
 
@@ -62,6 +71,45 @@ export function SubtaskList({ issue, className }: SubtaskListProps) {
   }, [subtasks]);
 
   const hasRunnableAITasks = runnableAISubtasks.length > 0;
+
+  // Track running tasks for polling and completion detection
+  const runningAITasks = useMemo(() => {
+    return subtasks.filter((s) => {
+      if (!s.aiAssignable) return false;
+      const status = s.aiExecutionStatus as AIExecutionStatus;
+      return status === "pending" || status === "running";
+    });
+  }, [subtasks]);
+
+  // Track previous running task IDs to detect completions
+  const previousRunningIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentRunningIds = new Set(runningAITasks.map((t) => t.id));
+    const previousRunningIds = previousRunningIdsRef.current;
+
+    // Check for tasks that just completed (were running, now aren't)
+    const completedTaskIds = [...previousRunningIds].filter(
+      (id) => !currentRunningIds.has(id)
+    );
+
+    if (completedTaskIds.length > 0) {
+      // Invalidate attachments for the parent issue when tasks complete
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.issue.attachments(issue.id),
+      });
+      // Also refresh activities
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.issue.activities(issue.id),
+      });
+    }
+
+    // Update previous running IDs
+    previousRunningIdsRef.current = currentRunningIds;
+
+    // Update polling state
+    setHasRunningTasks(currentRunningIds.size > 0);
+  }, [runningAITasks, queryClient, issue.id]);
 
   useEffect(() => {
     if (isAddingSubtask && inputRef.current) {
