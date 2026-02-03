@@ -5,7 +5,6 @@ import type {
   cycles,
   comments,
   activities,
-  chatMessages,
   users,
   workspaces,
   workspaceMembers,
@@ -13,7 +12,6 @@ import type {
   workspaceSkills,
   workspaceMcpServers,
   workspaceChats,
-  workspaceChatMessages,
   workspaceChatAttachments,
   brands,
   backgroundJobs,
@@ -31,12 +29,10 @@ export type Label = typeof labels.$inferSelect;
 export type Cycle = typeof cycles.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
-export type ChatMessage = typeof chatMessages.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type WorkspaceSkill = typeof workspaceSkills.$inferSelect;
 export type WorkspaceMcpServer = typeof workspaceMcpServers.$inferSelect;
 export type WorkspaceChat = typeof workspaceChats.$inferSelect;
-export type WorkspaceChatMessage = typeof workspaceChatMessages.$inferSelect;
 export type WorkspaceChatAttachment = typeof workspaceChatAttachments.$inferSelect;
 export type Brand = typeof brands.$inferSelect;
 
@@ -292,3 +288,27 @@ export type IssueWithAI = Issue & {
   aiJobId: string | null;
   aiExecutionResult: unknown | null; // Parsed from JSON
 };
+
+// R2 Chat Storage Types
+export type R2ChatType = "issue" | "workspace" | "soul";
+
+export interface R2ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string; // JSON-serialized via serializeMessageParts()
+  createdAt: string;
+}
+
+export interface R2ChatConversation {
+  version: 1;
+  metadata: {
+    workspaceId: string;
+    chatType: R2ChatType;
+    userId: string;
+    entityId: string;
+    createdAt: string;
+    updatedAt: string;
+    messageCount: number;
+  };
+  messages: R2ChatMessage[];
+}

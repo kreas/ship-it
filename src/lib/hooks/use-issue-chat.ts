@@ -6,8 +6,8 @@ import {
   getIssueChatMessages,
   saveChatMessage,
   clearIssueChatMessages,
+  type ChatMessage,
 } from "@/lib/actions/chat";
-import type { ChatMessage } from "@/lib/types";
 
 export function useIssueChatMessages(issueId: string | null) {
   return useQuery({

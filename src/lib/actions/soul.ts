@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "../db";
-import { workspaces, soulChatMessages } from "../db/schema";
-import { eq, asc } from "drizzle-orm";
-import type { WorkspaceSoul } from "../types";
+import { workspaces } from "../db/schema";
+import { eq } from "drizzle-orm";
+import type { WorkspaceSoul, R2ChatMessage } from "../types";
 import { requireWorkspaceAccess } from "./workspace";
+import { getMessages, appendMessage, deleteConversation } from "../storage/r2-chat";
 
 /**
  * Get the soul configuration for a workspace
@@ -89,19 +90,16 @@ export interface SoulChatMessage {
 export async function getSoulChatMessages(
   workspaceId: string
 ): Promise<SoulChatMessage[]> {
-  await requireWorkspaceAccess(workspaceId);
+  const { user } = await requireWorkspaceAccess(workspaceId);
 
-  const messages = await db
-    .select()
-    .from(soulChatMessages)
-    .where(eq(soulChatMessages.workspaceId, workspaceId))
-    .orderBy(asc(soulChatMessages.createdAt));
+  // Use "config" as entityId since soul chat is per-workspace config
+  const messages = await getMessages(workspaceId, "soul", user.id, "config");
 
-  return messages.map((m) => ({
+  return messages.map((m: R2ChatMessage) => ({
     id: m.id,
-    role: m.role as "user" | "assistant",
+    role: m.role,
     content: m.content,
-    createdAt: m.createdAt!,
+    createdAt: new Date(m.createdAt),
   }));
 }
 
@@ -112,14 +110,13 @@ export async function saveSoulChatMessage(
   workspaceId: string,
   message: { id: string; role: "user" | "assistant"; content: string }
 ): Promise<void> {
-  await requireWorkspaceAccess(workspaceId);
+  const { user } = await requireWorkspaceAccess(workspaceId);
 
-  await db.insert(soulChatMessages).values({
+  // Use "config" as entityId since soul chat is per-workspace config
+  await appendMessage(workspaceId, "soul", user.id, "config", {
     id: message.id,
-    workspaceId,
     role: message.role,
     content: message.content,
-    createdAt: new Date(),
   });
 }
 
@@ -129,10 +126,8 @@ export async function saveSoulChatMessage(
 export async function deleteSoulChatMessages(
   workspaceId: string
 ): Promise<void> {
-  await requireWorkspaceAccess(workspaceId, "admin");
+  const { user } = await requireWorkspaceAccess(workspaceId, "admin");
 
-  await db
-    .delete(soulChatMessages)
-    .where(eq(soulChatMessages.workspaceId, workspaceId));
+  // Use "config" as entityId since soul chat is per-workspace config
+  await deleteConversation(workspaceId, "soul", user.id, "config");
 }
-

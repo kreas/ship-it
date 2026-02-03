@@ -5,7 +5,8 @@ import {
   formatFileSize,
   createAttachmentPart,
 } from "./chat-utils";
-import type { WorkspaceChatMessage, WorkspaceChatAttachment } from "@/lib/types";
+import type { WorkspaceChatAttachment } from "@/lib/types";
+import type { WorkspaceChatMessage } from "@/lib/actions/workspace-chat";
 
 // Helper to create a mock message
 function createMessage(

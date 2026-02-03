@@ -145,3 +145,36 @@ export async function uploadContent(
 
   await client.send(command);
 }
+
+/**
+ * Get content directly from R2
+ * Returns null if the object doesn't exist
+ */
+export async function getContent(storageKey: string): Promise<string | null> {
+  const client = createS3Client();
+  const bucket = getBucketName();
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: storageKey,
+  });
+
+  try {
+    const response = await client.send(command);
+    if (!response.Body) {
+      return null;
+    }
+    return await response.Body.transformToString();
+  } catch (error: unknown) {
+    // Return null for NotFound errors (object doesn't exist)
+    if (
+      error &&
+      typeof error === "object" &&
+      "name" in error &&
+      error.name === "NoSuchKey"
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
