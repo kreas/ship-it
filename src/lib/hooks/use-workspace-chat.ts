@@ -14,8 +14,9 @@ import {
   clearChatMessages,
   getChatAttachments,
   linkAttachmentToMessage,
+  type WorkspaceChatMessage,
 } from "@/lib/actions/workspace-chat";
-import type { WorkspaceChat, WorkspaceChatMessage } from "@/lib/types";
+import type { WorkspaceChat } from "@/lib/types";
 
 export function useWorkspaceChats(workspaceId: string | null) {
   return useQuery({

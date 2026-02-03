@@ -1,15 +1,22 @@
 "use server";
 
 import { db } from "../db";
-import { chatMessages, issues, columns } from "../db/schema";
-import { eq, asc } from "drizzle-orm";
-import type { ChatMessage } from "../types";
+import { issues, columns } from "../db/schema";
+import { eq } from "drizzle-orm";
+import type { R2ChatMessage } from "../types";
 import { requireWorkspaceAccess } from "./workspace";
+import { getMessages, appendMessage, deleteConversation } from "../storage/r2-chat";
+
+interface IssueAccessResult {
+  workspaceId: string;
+  userId: string;
+}
 
 /**
  * Get workspace ID from an issue and verify access
+ * Returns the workspaceId and userId for R2 storage
  */
-async function requireIssueAccess(issueId: string): Promise<void> {
+async function requireIssueAccess(issueId: string): Promise<IssueAccessResult> {
   const issue = await db
     .select({ columnId: issues.columnId })
     .from(issues)
@@ -30,19 +37,38 @@ async function requireIssueAccess(issueId: string): Promise<void> {
     throw new Error("Column not found");
   }
 
-  await requireWorkspaceAccess(column.workspaceId, "member");
+  const { user } = await requireWorkspaceAccess(column.workspaceId, "member");
+
+  return {
+    workspaceId: column.workspaceId,
+    userId: user.id,
+  };
+}
+
+// Return type that matches what consumers expect
+export interface ChatMessage {
+  id: string;
+  issueId: string;
+  role: string;
+  content: string;
+  createdAt: Date;
 }
 
 export async function getIssueChatMessages(
   issueId: string
 ): Promise<ChatMessage[]> {
-  await requireIssueAccess(issueId);
+  const { workspaceId, userId } = await requireIssueAccess(issueId);
 
-  return db
-    .select()
-    .from(chatMessages)
-    .where(eq(chatMessages.issueId, issueId))
-    .orderBy(asc(chatMessages.createdAt));
+  const messages = await getMessages(workspaceId, "issue", userId, issueId);
+
+  // Transform R2ChatMessage to ChatMessage format for compatibility
+  return messages.map((m: R2ChatMessage) => ({
+    id: m.id,
+    issueId,
+    role: m.role,
+    content: m.content,
+    createdAt: new Date(m.createdAt),
+  }));
 }
 
 export async function saveChatMessage(
@@ -50,23 +76,27 @@ export async function saveChatMessage(
   role: string,
   content: string
 ): Promise<ChatMessage> {
-  await requireIssueAccess(issueId);
+  const { workspaceId, userId } = await requireIssueAccess(issueId);
 
-  const message: ChatMessage = {
-    id: crypto.randomUUID(),
+  const messageId = crypto.randomUUID();
+
+  await appendMessage(workspaceId, "issue", userId, issueId, {
+    id: messageId,
+    role: role as "user" | "assistant",
+    content,
+  });
+
+  return {
+    id: messageId,
     issueId,
     role,
     content,
     createdAt: new Date(),
   };
-
-  await db.insert(chatMessages).values(message);
-
-  return message;
 }
 
 export async function clearIssueChatMessages(issueId: string): Promise<void> {
-  await requireIssueAccess(issueId);
+  const { workspaceId, userId } = await requireIssueAccess(issueId);
 
-  await db.delete(chatMessages).where(eq(chatMessages.issueId, issueId));
+  await deleteConversation(workspaceId, "issue", userId, issueId);
 }

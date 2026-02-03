@@ -3,21 +3,25 @@
 import { db } from "../db";
 import {
   workspaceChats,
-  workspaceChatMessages,
   workspaceChatAttachments,
 } from "../db/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import type {
   WorkspaceChat,
-  WorkspaceChatMessage,
   WorkspaceChatAttachment,
+  R2ChatMessage,
 } from "../types";
 import { requireWorkspaceAccess } from "./workspace";
+import { getMessages, appendMessage, deleteConversation } from "../storage/r2-chat";
 
 /**
  * Get workspace ID from a chat and verify access
+ * Returns workspaceId and userId for R2 storage
  */
-async function requireChatAccess(chatId: string): Promise<string> {
+async function requireChatAccess(chatId: string): Promise<{
+  workspaceId: string;
+  userId: string;
+}> {
   const chat = await db
     .select({ workspaceId: workspaceChats.workspaceId })
     .from(workspaceChats)
@@ -28,14 +32,17 @@ async function requireChatAccess(chatId: string): Promise<string> {
     throw new Error("Chat not found");
   }
 
-  await requireWorkspaceAccess(chat.workspaceId, "member");
-  return chat.workspaceId;
+  const { user } = await requireWorkspaceAccess(chat.workspaceId, "member");
+  return { workspaceId: chat.workspaceId, userId: user.id };
 }
 
 /**
  * Get workspace ID from an attachment via its chat and verify access
  */
-async function requireAttachmentAccess(attachmentId: string): Promise<string> {
+async function requireAttachmentAccess(attachmentId: string): Promise<{
+  workspaceId: string;
+  userId: string;
+}> {
   const attachment = await db
     .select({ chatId: workspaceChatAttachments.chatId })
     .from(workspaceChatAttachments)
@@ -110,21 +117,39 @@ export async function updateChatTitle(
 }
 
 export async function deleteWorkspaceChat(chatId: string): Promise<void> {
-  await requireChatAccess(chatId);
+  const { workspaceId, userId } = await requireChatAccess(chatId);
 
+  // Delete the conversation from R2
+  await deleteConversation(workspaceId, "workspace", userId, chatId);
+
+  // Delete the chat metadata from DB (cascade deletes attachments)
   await db.delete(workspaceChats).where(eq(workspaceChats.id, chatId));
+}
+
+// Return type that matches what consumers expect
+export interface WorkspaceChatMessage {
+  id: string;
+  chatId: string;
+  role: string;
+  content: string;
+  createdAt: Date;
 }
 
 export async function getChatMessages(
   chatId: string
 ): Promise<WorkspaceChatMessage[]> {
-  await requireChatAccess(chatId);
+  const { workspaceId, userId } = await requireChatAccess(chatId);
 
-  return db
-    .select()
-    .from(workspaceChatMessages)
-    .where(eq(workspaceChatMessages.chatId, chatId))
-    .orderBy(asc(workspaceChatMessages.createdAt));
+  const messages = await getMessages(workspaceId, "workspace", userId, chatId);
+
+  // Transform R2ChatMessage to WorkspaceChatMessage format for compatibility
+  return messages.map((m: R2ChatMessage) => ({
+    id: m.id,
+    chatId,
+    role: m.role,
+    content: m.content,
+    createdAt: new Date(m.createdAt),
+  }));
 }
 
 export async function saveChatMessage(
@@ -132,17 +157,15 @@ export async function saveChatMessage(
   role: string,
   content: string
 ): Promise<WorkspaceChatMessage> {
-  await requireChatAccess(chatId);
+  const { workspaceId, userId } = await requireChatAccess(chatId);
 
-  const message: WorkspaceChatMessage = {
-    id: crypto.randomUUID(),
-    chatId,
-    role,
+  const messageId = crypto.randomUUID();
+
+  await appendMessage(workspaceId, "workspace", userId, chatId, {
+    id: messageId,
+    role: role as "user" | "assistant",
     content,
-    createdAt: new Date(),
-  };
-
-  await db.insert(workspaceChatMessages).values(message);
+  });
 
   // Update the chat's updatedAt timestamp
   await db
@@ -150,18 +173,22 @@ export async function saveChatMessage(
     .set({ updatedAt: new Date() })
     .where(eq(workspaceChats.id, chatId));
 
-  return message;
+  return {
+    id: messageId,
+    chatId,
+    role,
+    content,
+    createdAt: new Date(),
+  };
 }
 
 export async function clearChatMessages(chatId: string): Promise<void> {
-  await requireChatAccess(chatId);
+  const { workspaceId, userId } = await requireChatAccess(chatId);
 
-  await db
-    .delete(workspaceChatMessages)
-    .where(eq(workspaceChatMessages.chatId, chatId));
+  await deleteConversation(workspaceId, "workspace", userId, chatId);
 }
 
-// Attachment operations
+// Attachment operations (unchanged - still stored in database)
 
 export async function getChatAttachments(
   chatId: string
@@ -249,16 +276,12 @@ export async function getAttachmentsByMessageId(
 export async function getChatMessagesWithAttachments(
   chatId: string
 ): Promise<(WorkspaceChatMessage & { attachments: WorkspaceChatAttachment[] })[]> {
-  await requireChatAccess(chatId);
+  const { workspaceId, userId } = await requireChatAccess(chatId);
 
-  // Note: getChatMessages and getChatAttachments also check auth but we check once here
-  // to avoid duplicate checks. Could refactor to use internal versions without auth.
-  const messages = await db
-    .select()
-    .from(workspaceChatMessages)
-    .where(eq(workspaceChatMessages.chatId, chatId))
-    .orderBy(asc(workspaceChatMessages.createdAt));
+  // Get messages from R2
+  const r2Messages = await getMessages(workspaceId, "workspace", userId, chatId);
 
+  // Get attachments from DB
   const attachments = await db
     .select()
     .from(workspaceChatAttachments)
@@ -276,8 +299,12 @@ export async function getChatMessagesWithAttachments(
   }
 
   // Merge attachments into messages
-  return messages.map((msg) => ({
-    ...msg,
-    attachments: attachmentsByMessage.get(msg.id) || [],
+  return r2Messages.map((m: R2ChatMessage) => ({
+    id: m.id,
+    chatId,
+    role: m.role,
+    content: m.content,
+    createdAt: new Date(m.createdAt),
+    attachments: attachmentsByMessage.get(m.id) || [],
   }));
 }

@@ -1,5 +1,6 @@
 import type { UIMessage } from "@ai-sdk/react";
-import type { WorkspaceChatMessage, WorkspaceChatAttachment } from "@/lib/types";
+import type { WorkspaceChatAttachment } from "@/lib/types";
+import type { WorkspaceChatMessage } from "@/lib/actions/workspace-chat";
 
 // Attachment placeholder pattern: [attachment:uuid]
 const ATTACHMENT_PLACEHOLDER_PATTERN = /\[attachment:([a-f0-9-]+)\]/g;
