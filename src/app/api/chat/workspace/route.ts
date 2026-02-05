@@ -9,6 +9,7 @@ import {
 import type { WorkspacePurpose } from "@/lib/design-tokens";
 import type { WorkspaceSoul, Brand } from "@/lib/types";
 import { loadWorkspaceContext } from "@/lib/brand-utils";
+import { createSkillTools } from "@/lib/chat/tools/skill-creator-tool";
 
 export const maxDuration = 30;
 
@@ -27,10 +28,16 @@ const SOFTWARE_SYSTEM_PROMPT = `You are a helpful AI assistant for a software de
 - Create file: Save generated content (guides, code, documentation) as a file attachment
 - List files: List all files created in this conversation
 - Read file: Read the contents of a previously created file attachment
+- Create skill: Save a repeatable workflow or instruction set as a reusable skill for this workspace
+- Update skill: Modify an existing skill (requires user confirmation since it affects all users)
 
 When you generate substantial content like documentation, guides, code files, or analysis reports, use the createFile tool to save it as an attachment so the user can easily access and download it.
 
 If the user asks you to read or review a file, first use listFiles to see what files exist, then use readFile with the attachment ID.
+
+When the user wants to save a repeatable workflow, instruction set, or specialized capability, use the create_skill tool. Skills need a name (lowercase with hyphens), description, and markdown content with instructions.
+
+When updating a skill, ALWAYS warn the user first that the change will affect all users in the workspace and get their explicit confirmation before proceeding.
 
 Be conversational and helpful. Provide clear, actionable responses.`;
 
@@ -49,10 +56,16 @@ const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing 
 - Create file: Save generated content (reports, copy, briefs) as a file attachment
 - List files: List all files created in this conversation
 - Read file: Read the contents of a previously created file attachment
+- Create skill: Save a repeatable workflow or instruction set as a reusable skill for this workspace
+- Update skill: Modify an existing skill (requires user confirmation since it affects all users)
 
 When you generate substantial content like marketing briefs, reports, or copy documents, use the createFile tool to save it as an attachment so the user can easily access and download it.
 
 If the user asks you to read or review a file, first use listFiles to see what files exist, then use readFile with the attachment ID.
+
+When the user wants to save a repeatable workflow, instruction set, or specialized capability, use the create_skill tool. Skills need a name (lowercase with hyphens), description, and markdown content with instructions.
+
+When updating a skill, ALWAYS warn the user first that the change will affect all users in the workspace and get their explicit confirmation before proceeding.
 
 Be conversational and helpful. Provide clear, actionable responses.`;
 
@@ -206,7 +219,9 @@ export async function POST(req: Request) {
     : [];
 
   // Create tools - only if we have a chatId for attachments
-  const tools = chatId ? createWorkspaceChatTools(chatId) : {};
+  const chatTools = chatId ? createWorkspaceChatTools(chatId) : {};
+  const skillTools = createSkillTools(workspaceId);
+  const tools = { ...chatTools, ...skillTools };
 
   return createChatResponse(messages, {
     system: getSystemPrompt(purpose, soul, brand),

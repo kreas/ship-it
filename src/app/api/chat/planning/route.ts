@@ -9,6 +9,7 @@ import {
 import type { WorkspacePurpose } from "@/lib/design-tokens";
 import type { WorkspaceSoul, Brand } from "@/lib/types";
 import { loadWorkspaceContext } from "@/lib/brand-utils";
+import { createSkillTools } from "@/lib/chat/tools/skill-creator-tool";
 
 export const maxDuration = 30;
 
@@ -20,12 +21,14 @@ Your primary goal is to decompose work into independently executable tickets. Ea
 - Take no more than a few hours to a day of work
 - Be testable/verifiable on its own
 
-**Available research tools:**
+**Available tools:**
 - Web search: Research best practices, documentation, library comparisons
 - Code execution: Generate code examples, run calculations, demonstrate patterns
 - Web fetch: Read content from URLs the user shares
+- Create skill: Save a repeatable planning workflow or instruction set as a reusable skill
+- Update skill: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
 
-Use these tools when they add concrete value to planning. Don't overuse them.
+Use research tools when they add concrete value to planning. Don't overuse them.
 
 Communication style:
 - Ask ONE question at a time to gather requirements
@@ -59,12 +62,14 @@ Your primary goal is to decompose work into independently executable tickets. Ea
 - Take no more than a few hours to a day of work
 - Have a clear "done" state
 
-**Available research tools:**
+**Available tools:**
 - Web search: Research competitors, trends, best practices, audience insights
 - Code execution: Run calculations, analyze data, generate examples
 - Web fetch: Read content from URLs the user shares
+- Create skill: Save a repeatable planning workflow or instruction set as a reusable skill
+- Update skill: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
 
-Use these tools when they add concrete value to planning. Don't overuse them.
+Use research tools when they add concrete value to planning. Don't overuse them.
 
 Communication style:
 - Ask ONE question at a time to gather requirements
@@ -120,7 +125,9 @@ export async function POST(req: Request) {
     : await loadSkillsForPurpose(purpose);
 
   // Create planning tools
-  const tools = createPlanningTools();
+  const planningTools = createPlanningTools();
+  const skillTools = createSkillTools(workspaceId);
+  const tools = { ...planningTools, ...skillTools };
 
   return createChatResponse(messages, {
     system: getSystemPrompt(purpose, soul, brand),

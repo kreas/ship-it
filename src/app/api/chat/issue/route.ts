@@ -11,6 +11,7 @@ import {
 import type { WorkspacePurpose } from "@/lib/design-tokens";
 import type { WorkspaceSoul, Brand } from "@/lib/types";
 import { loadWorkspaceContext } from "@/lib/brand-utils";
+import { createSkillTools } from "@/lib/chat/tools/skill-creator-tool";
 
 export const maxDuration = 30;
 
@@ -125,6 +126,8 @@ ${issueContext.description ? `This issue already has a description. **Ask the us
 - **deleteSubtask**: Delete an existing subtask - use this to remove redundant or poorly-structured subtasks
 - **updateDescription**: Update the issue description${issueContext.description ? " (ask user first since one exists)" : " (use eagerly since none exists)"}
 - **attachContent**: Attach generated content as a file (only when explicitly asked to create something NOW)
+- **create_skill**: Save a repeatable workflow or instruction set as a reusable skill for this workspace
+- **update_skill**: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
 - Web search, code execution, web fetch: Only use when user explicitly asks you to execute immediately
 
 Be conversational and helpful. Ask clarifying questions when needed.`;
@@ -152,7 +155,9 @@ export async function POST(req: Request) {
     : await loadSkillsForPurpose(purpose);
 
   // Create tools with issue context
-  const tools = createIssueTools({ issueId: issueContext.id });
+  const issueTools = createIssueTools({ issueId: issueContext.id });
+  const skillTools = createSkillTools(workspaceId);
+  const tools = { ...issueTools, ...skillTools };
 
   return createChatResponse(messages, {
     system: buildSystemPrompt(issueContext, purpose, soul, brand),
