@@ -17,6 +17,16 @@ export type Events = {
       metadata?: { description?: string };
     };
   };
+  "brand/summary.generate": {
+    data: {
+      brandId: string;
+      brandName: string;
+      websiteUrl?: string;
+      industry?: string;
+      tagline?: string;
+      description?: string;
+    };
+  };
   "ai/task.execute": {
     data: {
       issueId: string; // The subtask to execute

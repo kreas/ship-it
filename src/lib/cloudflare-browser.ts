@@ -128,3 +128,73 @@ export async function captureScreenshotForBrandColors(
     },
   });
 }
+
+export interface FetchMarkdownParams {
+  /** URL to fetch */
+  url: string;
+  /** Navigation options */
+  gotoOptions?: GotoOptions;
+  /** Regex patterns for requests to reject (e.g., CSS files) */
+  rejectRequestPattern?: string[];
+}
+
+/**
+ * Fetch a webpage and convert it to Markdown using Cloudflare Browser Rendering
+ * Useful for extracting text content from websites for AI processing
+ */
+export async function fetchMarkdown(
+  params: FetchMarkdownParams
+): Promise<string> {
+  if (!CLOUDFLARE_ACCOUNT_ID || !BROWSER_API_TOKEN) {
+    throw new Error(
+      "Cloudflare Browser Rendering not configured. Set CLOUDFLARE_ACCOUNT_ID and BROWSER_API_TOKEN environment variables."
+    );
+  }
+
+  const response = await fetch(`${BASE_URL}/markdown`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${BROWSER_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url: params.url,
+      gotoOptions: params.gotoOptions ?? {
+        waitUntil: "networkidle2",
+        timeout: 30000,
+      },
+      rejectRequestPattern: params.rejectRequestPattern,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Cloudflare markdown fetch failed: ${response.status} ${errorText}`
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(`Cloudflare markdown fetch failed: ${JSON.stringify(data)}`);
+  }
+
+  return data.result;
+}
+
+/**
+ * Fetch markdown from a brand website, optimized for content extraction
+ * Excludes CSS and other non-content resources for faster processing
+ */
+export async function fetchBrandWebsiteMarkdown(url: string): Promise<string> {
+  return fetchMarkdown({
+    url,
+    gotoOptions: {
+      waitUntil: "networkidle0",
+      timeout: 45000,
+    },
+    // Exclude CSS and image files for faster processing
+    rejectRequestPattern: ["/^.*\\.(css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)/"],
+  });
+}

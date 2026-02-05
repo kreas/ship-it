@@ -77,6 +77,7 @@ export async function createBrand(input: CreateBrandInput): Promise<Brand> {
     name: input.name,
     tagline: input.tagline ?? null,
     description: input.description ?? null,
+    summary: input.summary ?? null,
     logoUrl: input.logoUrl ?? null,
     logoStorageKey,
     logoBackground,
@@ -89,7 +90,24 @@ export async function createBrand(input: CreateBrandInput): Promise<Brand> {
   };
 
   const result = await db.insert(brands).values(newBrand).returning();
-  return result[0];
+  const createdBrand = result[0];
+
+  // Trigger background summary generation if websiteUrl is provided
+  if (createdBrand.websiteUrl) {
+    await inngest.send({
+      name: "brand/summary.generate",
+      data: {
+        brandId: createdBrand.id,
+        brandName: createdBrand.name,
+        websiteUrl: createdBrand.websiteUrl,
+        industry: createdBrand.industry ?? undefined,
+        tagline: createdBrand.tagline ?? undefined,
+        description: createdBrand.description ?? undefined,
+      },
+    });
+  }
+
+  return createdBrand;
 }
 
 /**
@@ -122,6 +140,7 @@ export async function updateBrand(
   if (input.name !== undefined) updateData.name = input.name;
   if (input.tagline !== undefined) updateData.tagline = input.tagline;
   if (input.description !== undefined) updateData.description = input.description;
+  if (input.summary !== undefined) updateData.summary = input.summary;
   if (input.websiteUrl !== undefined) updateData.websiteUrl = input.websiteUrl;
   if (input.primaryColor !== undefined) updateData.primaryColor = input.primaryColor;
   if (input.secondaryColor !== undefined) updateData.secondaryColor = input.secondaryColor;

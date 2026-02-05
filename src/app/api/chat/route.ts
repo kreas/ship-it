@@ -4,9 +4,12 @@ import {
   createChatTools,
   loadSkillsForPurpose,
   loadSkillsForWorkspace,
+  buildContextualSystemPrompt,
   SUBTASK_INDEPENDENCE_GUIDELINES,
 } from "@/lib/chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
+import type { WorkspaceSoul, Brand } from "@/lib/types";
+import { loadWorkspaceContext } from "@/lib/brand-utils";
 
 export const maxDuration = 30;
 
@@ -93,6 +96,8 @@ Priority levels:
 
 function getSystemPrompt(
   purpose: WorkspacePurpose,
+  soul: WorkspaceSoul | null,
+  brand: Brand | null,
   subtasks?: SuggestedSubtaskContext[]
 ): string {
   const basePrompt = purpose === "marketing"
@@ -127,7 +132,7 @@ Example - if user says "remove the first subtask", call suggestSubtasks with sub
 Example - if user says "keep only subtask 2", call suggestSubtasks with just that one subtask.`;
   }
 
-  return prompt;
+  return buildContextualSystemPrompt(prompt, soul, brand);
 }
 
 interface SuggestedSubtaskContext {
@@ -147,6 +152,9 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
+  // Load workspace context (soul and brand) in parallel
+  const { soul, brand } = await loadWorkspaceContext(workspaceId);
+
   // Load skills - use workspace skills if workspaceId provided, otherwise just purpose-based
   const skills = workspaceId
     ? await loadSkillsForWorkspace(workspaceId, purpose)
@@ -156,7 +164,7 @@ export async function POST(req: Request) {
   const tools = createChatTools();
 
   return createChatResponse(messages, {
-    system: getSystemPrompt(purpose, suggestedSubtasks),
+    system: getSystemPrompt(purpose, soul, brand, suggestedSubtasks),
     tools,
     builtInTools: {
       webSearch: true,

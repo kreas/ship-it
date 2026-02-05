@@ -4,10 +4,11 @@ import {
   createPlanningTools,
   loadSkillsForPurpose,
   loadSkillsForWorkspace,
+  buildContextualSystemPrompt,
 } from "@/lib/chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
-import type { WorkspaceSoul } from "@/lib/types";
-import { buildSoulSystemPrompt, getWorkspaceSoul } from "@/lib/soul-utils";
+import type { WorkspaceSoul, Brand } from "@/lib/types";
+import { loadWorkspaceContext } from "@/lib/brand-utils";
 
 export const maxDuration = 30;
 
@@ -89,18 +90,16 @@ Task format:
 - Description: Include deliverables and success criteria as checkboxes
 - Priority: 1 (High) for launch-critical, 2 (Medium) for standard work, 3 (Low) for nice-to-haves`;
 
-function getSystemPrompt(purpose: WorkspacePurpose, soul: WorkspaceSoul | null): string {
+function getSystemPrompt(
+  purpose: WorkspacePurpose,
+  soul: WorkspaceSoul | null,
+  brand: Brand | null
+): string {
   const basePrompt = purpose === "marketing"
     ? MARKETING_SYSTEM_PROMPT
     : SOFTWARE_SYSTEM_PROMPT;
 
-  // If a soul/persona is configured, prepend it to the system prompt
-  if (soul && soul.name) {
-    const soulPrompt = buildSoulSystemPrompt(soul);
-    return `${soulPrompt}\n\n---\n\n${basePrompt}`;
-  }
-
-  return basePrompt;
+  return buildContextualSystemPrompt(basePrompt, soul, brand);
 }
 
 export async function POST(req: Request) {
@@ -112,8 +111,8 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
-  // Load workspace soul/persona
-  const soul = await getWorkspaceSoul(workspaceId);
+  // Load workspace context (soul and brand) in parallel
+  const { soul, brand } = await loadWorkspaceContext(workspaceId);
 
   // Load skills - use workspace skills if workspaceId provided, otherwise just purpose-based
   const skills = workspaceId
@@ -124,7 +123,7 @@ export async function POST(req: Request) {
   const tools = createPlanningTools();
 
   return createChatResponse(messages, {
-    system: getSystemPrompt(purpose, soul),
+    system: getSystemPrompt(purpose, soul, brand),
     tools,
     model: "claude-haiku-4-5-20251001",
     maxSteps: 10, // Allow AI to continue after creating issues

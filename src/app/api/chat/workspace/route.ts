@@ -1,14 +1,14 @@
 import { type UIMessage, tool } from "ai";
 import { z } from "zod";
-import { createChatResponse, loadSkillsForWorkspace } from "@/lib/chat";
+import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt } from "@/lib/chat";
 import {
   createChatAttachment,
   getChatAttachment,
   getChatAttachments,
 } from "@/lib/actions/workspace-chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
-import type { WorkspaceSoul } from "@/lib/types";
-import { buildSoulSystemPrompt, getWorkspaceSoul } from "@/lib/soul-utils";
+import type { WorkspaceSoul, Brand } from "@/lib/types";
+import { loadWorkspaceContext } from "@/lib/brand-utils";
 
 export const maxDuration = 30;
 
@@ -56,18 +56,16 @@ If the user asks you to read or review a file, first use listFiles to see what f
 
 Be conversational and helpful. Provide clear, actionable responses.`;
 
-function getSystemPrompt(purpose: WorkspacePurpose, soul: WorkspaceSoul | null): string {
+function getSystemPrompt(
+  purpose: WorkspacePurpose,
+  soul: WorkspaceSoul | null,
+  brand: Brand | null
+): string {
   const basePrompt = purpose === "marketing"
     ? MARKETING_SYSTEM_PROMPT
     : SOFTWARE_SYSTEM_PROMPT;
 
-  // If a soul/persona is configured, prepend it to the system prompt
-  if (soul && soul.name) {
-    const soulPrompt = buildSoulSystemPrompt(soul);
-    return `${soulPrompt}\n\n---\n\n${basePrompt}`;
-  }
-
-  return basePrompt;
+  return buildContextualSystemPrompt(basePrompt, soul, brand);
 }
 
 const createFileSchema = z.object({
@@ -199,8 +197,8 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
-  // Load workspace soul/persona
-  const soul = await getWorkspaceSoul(workspaceId);
+  // Load workspace context (soul and brand) in parallel
+  const { soul, brand } = await loadWorkspaceContext(workspaceId);
 
   // Load workspace skills and MCP tools
   const skills = workspaceId
@@ -211,7 +209,7 @@ export async function POST(req: Request) {
   const tools = chatId ? createWorkspaceChatTools(chatId) : {};
 
   return createChatResponse(messages, {
-    system: getSystemPrompt(purpose, soul),
+    system: getSystemPrompt(purpose, soul, brand),
     tools,
     builtInTools: {
       webSearch: true,

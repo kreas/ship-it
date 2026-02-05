@@ -205,6 +205,7 @@ export type CreateBrandInput = {
   name: string;
   tagline?: string;
   description?: string;
+  summary?: string;
   logoUrl?: string;
   websiteUrl?: string;
   primaryColor?: string;
