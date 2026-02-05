@@ -9,6 +9,7 @@ function createMockBrand(overrides: Partial<Brand> = {}): Brand {
     name: "Test Brand",
     tagline: "Test tagline",
     description: "Test description",
+    summary: null,
     logoUrl: "https://example.com/logo.png",
     logoStorageKey: null,
     logoBackground: null,

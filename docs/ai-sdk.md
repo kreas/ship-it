@@ -541,6 +541,217 @@ If messages should survive page refreshes:
 />
 ```
 
+## Loading Skills into `generateText`
+
+Skills can be used with `generateText` for non-streaming, background tasks like content generation. This is different from chat-based skills which are loaded via `createChatResponse`.
+
+### Why Use Skills with `generateText`?
+
+- **Agentic execution** - Allow the AI to make multiple tool calls
+- **Reusable prompts** - Keep complex instructions in separate files
+- **Background tasks** - Generate content without streaming UI
+
+### Creating a Skill Module
+
+For Vercel deployment, create a TypeScript module that exports the skill content:
+
+```
+src/skills/internal/
+└── my-skill/
+    ├── SKILL.md        # Source of truth (for reference)
+    └── index.ts        # Exported module
+```
+
+**`index.ts`:**
+
+```typescript
+/**
+ * My Skill
+ *
+ * Description of what this skill does.
+ *
+ * Source: ./SKILL.md
+ */
+
+export const MY_SKILL = `# Skill Title
+
+Instructions for the AI...
+
+## Process
+
+1. **Step One** - Do this first
+2. **Step Two** - Then do this
+3. **Step Three** - Finally, produce output
+
+## Output Format
+
+Describe the expected output...
+`;
+```
+
+> **Note:** We export from a `.ts` file because Vercel's serverless functions don't include raw `.md` files in the bundle. The TypeScript module is imported at build time.
+
+### Using Skills with `generateText`
+
+Import the skill and use it as the system prompt:
+
+```typescript
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, stepCountIs } from "ai";
+import { MY_SKILL } from "@/skills/internal/my-skill";
+
+const result = await generateText({
+  model: anthropic("claude-sonnet-4-5"),
+  system: MY_SKILL,
+  messages: [
+    {
+      role: "user",
+      content: `Analyze this: ${userInput}`,
+    },
+  ],
+  tools: {
+    web_fetch: anthropic.tools.webFetch_20250910({ maxUses: 5 }),
+  },
+  // Allow multiple steps for agentic execution
+  stopWhen: stepCountIs(6),
+});
+
+const output = result.text.trim();
+```
+
+### Key Patterns
+
+#### Using `messages` Instead of `prompt`
+
+For agentic skills, use the `messages` array with a user message:
+
+```typescript
+// ✅ Preferred for agentic skills
+messages: [
+  {
+    role: "user",
+    content: `Process this data: ${input}`,
+  },
+],
+
+// ❌ Simple prompt (no multi-turn support)
+prompt: `Process this data: ${input}`,
+```
+
+#### Multi-Step Execution with `stopWhen`
+
+By default, `generateText` stops after one step. Use `stopWhen` for agentic execution:
+
+```typescript
+import { stepCountIs } from "ai";
+
+// Allow up to 6 steps (5 tool calls + final response)
+stopWhen: stepCountIs(6),
+```
+
+#### Using Anthropic Built-in Tools
+
+Enable tools for the AI to gather information:
+
+```typescript
+tools: {
+  // Fetch web pages (for research, scraping)
+  web_fetch: anthropic.tools.webFetch_20250910({ maxUses: 5 }),
+
+  // Web search
+  web_search: anthropic.tools.webSearch_20250305({ maxUses: 3 }),
+
+  // Code execution (Python)
+  code_execution: anthropic.tools.codeExecution_20250825(),
+},
+```
+
+### Complete Example: Brand Summary Generator
+
+This example shows a skill that fetches multiple web pages and produces a summary:
+
+**`src/skills/internal/brand-analyzer/index.ts`:**
+
+```typescript
+export const BRAND_ANALYZER_SKILL = `# Brand Analyzer
+
+Analyze a website and produce a brand summary.
+
+## Process
+
+1. Fetch the homepage using \`web_fetch\`
+2. Fetch the About page
+3. Fetch the Product/Services page
+4. Analyze voice, tone, and positioning
+5. Write a 1-2 paragraph summary
+
+## Output Format
+
+Write in present tense, third person. Be specific and actionable.
+`;
+```
+
+**`src/app/api/brand/summary/route.ts`:**
+
+```typescript
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, stepCountIs } from "ai";
+import { BRAND_ANALYZER_SKILL } from "@/skills/internal/brand-analyzer";
+
+export const maxDuration = 60;
+
+export async function POST(request: Request) {
+  const { websiteUrl, brandName } = await request.json();
+
+  const result = await generateText({
+    model: anthropic("claude-sonnet-4-5"),
+    system: BRAND_ANALYZER_SKILL,
+    messages: [
+      {
+        role: "user",
+        content: `Analyze this brand:\n\nBrand: ${brandName}\nWebsite: ${websiteUrl}`,
+      },
+    ],
+    tools: {
+      web_fetch: anthropic.tools.webFetch_20250910({ maxUses: 5 }),
+    },
+    stopWhen: stepCountIs(6),
+  });
+
+  return Response.json({ summary: result.text.trim() });
+}
+```
+
+### Skills Directory Structure
+
+```
+src/skills/
+└── internal/                    # Internal skills (not user-facing)
+    ├── brand-analyzer/
+    │   ├── SKILL.md             # Documentation/reference
+    │   └── index.ts             # Exported constant
+    └── content-generator/
+        ├── SKILL.md
+        └── index.ts
+
+skills/                          # Chat-based skills (user-invocable)
+├── attach-content/
+│   └── SKILL.md
+└── aio-geo-optimizer/
+    └── SKILL.md
+```
+
+- **`src/skills/internal/`** - For `generateText` (background tasks, API routes)
+- **`skills/`** - For chat-based skills loaded via `createChatResponse`
+
+### Best Practices
+
+1. **Keep the `.md` file** - Maintain `SKILL.md` as documentation even when exporting from `.ts`
+2. **Use descriptive constants** - Name exports clearly (e.g., `BRAND_ANALYZER_SKILL`)
+3. **Set appropriate `maxDuration`** - Multi-step execution needs longer timeouts (30-60s)
+4. **Limit tool uses** - Set `maxUses` to prevent runaway execution
+5. **Use Sonnet for quality** - Complex analysis benefits from more capable models
+
 ## Related Documentation
 
 - [Skills System](./skills.md) - Creating reusable AI instruction sets

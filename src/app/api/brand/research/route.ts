@@ -65,6 +65,7 @@ Extract as much as you can:
 - Brand name (required - look for company name, site title, or og:site_name)
 - Tagline/slogan
 - Description/about text
+- Summary (1-3 sentences summarizing what the brand does, their target audience, and value proposition - this will be used as context for AI agents)
 - Logo URL (look for og:image, apple-touch-icon, or logo images in the page)
 - Primary brand color - look in CSS, meta tags, or search for brand guidelines
 - Secondary brand color (accent color)
@@ -96,6 +97,7 @@ Extract:
 - Brand name (required)
 - Tagline/slogan
 - Description/about text
+- Summary (1-3 sentences summarizing what the brand does, their target audience, and value proposition - this will be used as context for AI agents)
 - Logo URL (from og:image or page content)
 - Primary brand color (the MAIN brand color from the screenshot - NOT black/white)
 - Secondary brand color (the ACCENT color - if the site uses any color besides the primary, include it here. Look for hover states, CTAs, highlights)
@@ -142,6 +144,7 @@ const reportBrandSchema = z.object({
   name: z.string().describe("Brand name"),
   tagline: z.string().optional().describe("Brand tagline or slogan"),
   description: z.string().optional().describe("Description of the brand"),
+  summary: z.string().optional().describe("A 1-3 sentence summary of what the brand does, suitable for AI agent context. Focus on core business, target audience, and value proposition."),
   logoUrl: z.string().optional().describe("URL to the brand logo"),
   websiteUrl: z.string().optional().describe("Official website URL"),
   primaryColor: z.string().optional().describe("Primary brand color as hex (e.g., #ff0000). Only include if you found actual brand colors - do NOT default to black/white"),

@@ -31,9 +31,15 @@ const GuidelinesPreview = dynamic(
   { ssr: false }
 );
 
+const BrandSummaryField = dynamic(
+  () => import("./_components/BrandSummaryField").then((mod) => mod.BrandSummaryField),
+  { ssr: false }
+);
+
 import {
   getWorkspaceBrand,
   createBrand,
+  updateBrand,
   setWorkspaceBrand as linkWorkspaceBrand,
   unlinkWorkspaceBrand,
   updateBrandGuidelines,
@@ -71,6 +77,8 @@ export default function BrandSettingsPage() {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [editedGuidelines, setEditedGuidelines] = useState<BrandGuidelines | null>(null);
   const [isSavingGuidelines, setIsSavingGuidelines] = useState(false);
+  const [editedSummary, setEditedSummary] = useState<string>("");
+  const [isSavingSummary, setIsSavingSummary] = useState(false);
 
   // Parse guidelines from brand
   const parseGuidelines = useCallback((brand: BrandWithLogoUrl): BrandGuidelines | null => {
@@ -100,6 +108,13 @@ export default function BrandSettingsPage() {
 
     loadData();
   }, [currentUserId, workspace?.id]);
+
+  // Initialize editedSummary when brand changes or tab switches to overview
+  useEffect(() => {
+    if (activeTab === "overview" && workspaceBrand) {
+      setEditedSummary(workspaceBrand.summary ?? "");
+    }
+  }, [activeTab, workspaceBrand]);
 
   // Initialize editedGuidelines when guidelines change or tab switches
   useEffect(() => {
@@ -147,6 +162,35 @@ export default function BrandSettingsPage() {
 
     return () => clearInterval(pollInterval);
   }, [activeTab, workspace?.id, workspaceBrand]);
+
+  // Poll for summary generation when on overview tab and summary is null but websiteUrl exists
+  const isSummaryGenerating = workspaceBrand?.websiteUrl && !workspaceBrand?.summary;
+
+  useEffect(() => {
+    if (activeTab !== "overview" || !workspace?.id || !workspaceBrand) return;
+
+    // Only poll if we have a websiteUrl but no summary yet
+    if (!isSummaryGenerating) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const updatedBrand = await getWorkspaceBrand(workspace.id);
+        if (updatedBrand) {
+          setWorkspaceBrandState(updatedBrand);
+          setEditedSummary(updatedBrand.summary ?? "");
+
+          // Stop polling once we have a summary
+          if (updatedBrand.summary) {
+            clearInterval(pollInterval);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to poll brand summary:", err);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [activeTab, workspace?.id, workspaceBrand, isSummaryGenerating]);
 
   // Handle disambiguation selection (defined first since handleSearch uses it)
   const handleDisambiguationSelect = useCallback(
@@ -290,6 +334,34 @@ export default function BrandSettingsPage() {
     }
   }, [workspaceBrand]);
 
+  // Handle save summary (value param used when saving directly from generation)
+  const handleSaveSummary = useCallback(async (value?: string) => {
+    if (!workspaceBrand) return;
+
+    const summaryToSave = value ?? editedSummary;
+
+    // Only save if summary actually changed
+    if (summaryToSave === (workspaceBrand.summary ?? "")) return;
+
+    setIsSavingSummary(true);
+    setError(null);
+
+    try {
+      await updateBrand(workspaceBrand.id, { summary: summaryToSave });
+
+      // Reload the brand to get updated data
+      if (workspace?.id) {
+        const updatedBrand = await getWorkspaceBrand(workspace.id);
+        setWorkspaceBrandState(updatedBrand);
+      }
+    } catch (err) {
+      console.error("Save summary error:", err);
+      setError("Failed to save summary. Please try again.");
+    } finally {
+      setIsSavingSummary(false);
+    }
+  }, [workspaceBrand, editedSummary, workspace?.id]);
+
   // Handle save guidelines
   const handleSaveGuidelines = useCallback(async () => {
     if (!workspaceBrand || !editedGuidelines) return;
@@ -418,7 +490,7 @@ export default function BrandSettingsPage() {
 
             <TabsContent value="overview">
               <Card>
-                <CardContent className="pt-6">
+                <CardContent className="pt-6 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* Website */}
                     {workspaceBrand.websiteUrl && (
@@ -484,6 +556,16 @@ export default function BrandSettingsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Summary */}
+                  <BrandSummaryField
+                    brandId={workspaceBrand.id}
+                    value={editedSummary}
+                    onChange={setEditedSummary}
+                    onSave={handleSaveSummary}
+                    isSaving={isSavingSummary}
+                    isBackgroundGenerating={!!isSummaryGenerating}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

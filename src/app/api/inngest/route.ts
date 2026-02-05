@@ -6,6 +6,7 @@ import {
   trackFunctionFinished,
   trackFunctionFailed,
   researchBrandGuidelines,
+  generateBrandSummary,
   executeAITask,
   generateAudienceMembers,
 } from "@/lib/inngest/functions";
@@ -18,6 +19,7 @@ export const { GET, POST, PUT } = serve({
     trackFunctionFinished,
     trackFunctionFailed,
     researchBrandGuidelines,
+    generateBrandSummary,
     executeAITask,
     generateAudienceMembers,
   ],
