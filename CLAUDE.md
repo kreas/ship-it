@@ -208,6 +208,14 @@ When executing a plan that involves code changes:
    - Run `git checkout -b <branch-name>` from the main branch
    - If already on a feature branch for this task, continue on that branch
 
+### During Development
+
+1. **Run code review frequently** by invoking `/code-review` to:
+   - Catch DRY violations early (extract utilities and components)
+   - Detect prop drilling (use Context and hooks instead)
+   - Ensure proper hooks/context patterns
+   - **Verify tests exist for all changes** (this is critical!)
+
 ### After Completing the Plan
 
 1. **Update documentation** by invoking `/update-docs` to:
@@ -217,9 +225,7 @@ When executing a plan that involves code changes:
 
 2. **Run the PR readiness check** by invoking `/pr-ready` to:
    - Remove any debug statements (console.log, debugger)
-   - Identify and fix DRY violations
-   - Check React component structure
-   - Detect prop drilling issues
    - Clean up unused imports and dead code
+   - Final check for any remaining issues
 
 3. **Address any critical issues** found by the checks before considering the task complete
