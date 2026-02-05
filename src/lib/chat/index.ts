@@ -25,6 +25,9 @@ export {
 } from "./skills";
 export type { ParsedSkill, SkillManifest } from "./skills";
 
+// Re-export context prompt utilities
+export { buildContextualSystemPrompt } from "./context-prompt";
+
 // Re-export tools
 export {
   createIssueTools,

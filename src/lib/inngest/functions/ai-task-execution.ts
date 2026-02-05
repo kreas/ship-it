@@ -1,12 +1,13 @@
 import { inngest } from "../client";
 import { db } from "@/lib/db";
-import { issues, workspaces, attachments, activities, columns, backgroundJobs } from "@/lib/db/schema";
+import { issues, workspaces, brands, attachments, activities, columns, backgroundJobs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import { recordTokenUsage } from "@/lib/token-usage";
 import { generateStorageKey, uploadContent, generateDownloadUrl } from "@/lib/storage/r2-client";
-import type { WorkspaceSoul, AttachmentWithUrl } from "@/lib/types";
+import type { WorkspaceSoul, Brand, AttachmentWithUrl } from "@/lib/types";
+import { buildBrandSystemPrompt, type BrandPromptInput } from "@/lib/brand-formatters";
 
 // Use Haiku for fast, cost-effective execution
 const EXECUTION_MODEL = "claude-haiku-4-5-20251001";
@@ -117,7 +118,8 @@ function buildSystemPrompt(
   subtaskTitle: string,
   subtaskDescription: string | null,
   aiInstructions: string | null,
-  soul?: WorkspaceSoul | null
+  soul?: WorkspaceSoul | null,
+  brand?: BrandPromptInput | null
 ): { staticPart: string; dynamicPart: string } {
   // Static part - same across all tasks in a workspace (cacheable)
   const staticParts: string[] = [];
@@ -127,6 +129,11 @@ function buildSystemPrompt(
 
 Tone: ${soul.tone}
 Response Length: ${soul.responseLength}`);
+  }
+
+  // Add brand context if available (static, cacheable across tasks)
+  if (brand?.summary) {
+    staticParts.push(buildBrandSystemPrompt(brand));
   }
 
   staticParts.push(`You are completing a subtask as part of a larger project. Use the tools available to research if needed.
@@ -224,6 +231,16 @@ export const executeAITask = inngest.createFunction(
         .where(eq(workspaces.id, workspaceId))
         .get();
 
+      // Fetch brand if workspace has one linked
+      let brand: Brand | null = null;
+      if (workspace?.brandId) {
+        brand = await db
+          .select()
+          .from(brands)
+          .where(eq(brands.id, workspace.brandId))
+          .get() ?? null;
+      }
+
       // Create job record for tracking
       await db.insert(backgroundJobs).values({
         id: crypto.randomUUID(),
@@ -251,19 +268,20 @@ export const executeAITask = inngest.createFunction(
 
       const soul = workspace?.soul ? (JSON.parse(workspace.soul) as WorkspaceSoul) : null;
 
-      return { subtask, parentIssue: parentIssue ?? null, soul };
+      return { subtask, parentIssue: parentIssue ?? null, soul, brand };
     });
 
     // Step 2: Execute AI with web tools and prompt caching
     const executionResult = await step.run("execute-ai", async () => {
-      const { subtask, parentIssue, soul } = context;
+      const { subtask, parentIssue, soul, brand } = context;
 
       const { staticPart, dynamicPart } = buildSystemPrompt(
         parentIssue,
         subtask.title,
         subtask.description,
         subtask.aiInstructions,
-        soul
+        soul,
+        brand
       );
 
       // Combine system prompt parts - static part first for better cache hits

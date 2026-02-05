@@ -5,11 +5,12 @@ import {
   loadSkillsForPurpose,
   loadSkillsForWorkspace,
   getPriorityLabel,
+  buildContextualSystemPrompt,
   SUBTASK_INDEPENDENCE_GUIDELINES,
 } from "@/lib/chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
-import type { WorkspaceSoul } from "@/lib/types";
-import { buildSoulSystemPrompt, getWorkspaceSoul } from "@/lib/soul-utils";
+import type { WorkspaceSoul, Brand } from "@/lib/types";
+import { loadWorkspaceContext } from "@/lib/brand-utils";
 
 export const maxDuration = 30;
 
@@ -36,7 +37,8 @@ interface IssueContext {
 function buildSystemPrompt(
   issueContext: IssueContext,
   purpose: WorkspacePurpose,
-  soul: WorkspaceSoul | null
+  soul: WorkspaceSoul | null,
+  brand: Brand | null
 ): string {
   const commentsText =
     issueContext.comments.length > 0
@@ -127,13 +129,7 @@ ${issueContext.description ? `This issue already has a description. **Ask the us
 
 Be conversational and helpful. Ask clarifying questions when needed.`;
 
-  // If a soul/persona is configured, prepend it to the system prompt
-  if (soul && soul.name) {
-    const soulPrompt = buildSoulSystemPrompt(soul);
-    return `${soulPrompt}\n\n---\n\n${basePrompt}`;
-  }
-
-  return basePrompt;
+  return buildContextualSystemPrompt(basePrompt, soul, brand);
 }
 
 export async function POST(req: Request) {
@@ -147,8 +143,8 @@ export async function POST(req: Request) {
 
   const purpose = workspacePurpose ?? "software";
 
-  // Load workspace soul/persona
-  const soul = await getWorkspaceSoul(workspaceId);
+  // Load workspace context (soul and brand) in parallel
+  const { soul, brand } = await loadWorkspaceContext(workspaceId);
 
   // Load skills - use workspace skills if workspaceId provided, otherwise just purpose-based
   const skills = workspaceId
@@ -159,7 +155,7 @@ export async function POST(req: Request) {
   const tools = createIssueTools({ issueId: issueContext.id });
 
   return createChatResponse(messages, {
-    system: buildSystemPrompt(issueContext, purpose, soul),
+    system: buildSystemPrompt(issueContext, purpose, soul, brand),
     tools,
     builtInTools: {
       webSearch: true,
