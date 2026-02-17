@@ -219,18 +219,6 @@ export async function createWorkspace(
     });
   }
 
-  // Create root knowledge base folder
-  await db.insert(knowledgeFolders).values({
-    id: crypto.randomUUID(),
-    workspaceId,
-    parentFolderId: null,
-    name: "Knowledge Base",
-    path: "knowledge-base",
-    createdBy: user.id,
-    createdAt: now,
-    updatedAt: now,
-  });
-
   revalidatePath("/");
 
   return newWorkspace;

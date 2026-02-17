@@ -5,6 +5,7 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   createKnowledgeDocument,
   createKnowledgeFolder,
+  deleteKnowledgeFolder,
   deleteKnowledgeDocument,
   getIssueKnowledgeDocuments,
   getKnowledgeDocument,
@@ -124,6 +125,18 @@ export function useDeleteKnowledgeDocument(workspaceId: string) {
   return useMutation({
     mutationFn: (documentId: string) => deleteKnowledgeDocument(documentId),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.documents(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.tags(workspaceId) });
+    },
+  });
+}
+
+export function useDeleteKnowledgeFolder(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (folderId: string) => deleteKnowledgeFolder(folderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.folders(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.documents(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.tags(workspaceId) });
     },

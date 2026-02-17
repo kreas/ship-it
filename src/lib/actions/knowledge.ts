@@ -82,6 +82,41 @@ async function getFolderPath(folderId: string | null): Promise<string | null> {
   return folder?.path ?? null;
 }
 
+function collectFolderIdsForDelete(
+  folders: Array<{ id: string; parentFolderId: string | null }>,
+  rootFolderId: string
+): string[] {
+  const folderIds = new Set<string>([rootFolderId]);
+  const queue = [rootFolderId];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+
+    for (const folder of folders) {
+      if (folder.parentFolderId !== current || folderIds.has(folder.id)) continue;
+      folderIds.add(folder.id);
+      queue.push(folder.id);
+    }
+  }
+
+  return [...folderIds];
+}
+
+async function deleteStorageKeys(storageKeys: string[]): Promise<void> {
+  if (storageKeys.length === 0) return;
+
+  const uniqueStorageKeys = [...new Set(storageKeys)];
+  const results = await Promise.allSettled(
+    uniqueStorageKeys.map((storageKey) => deleteObject(storageKey))
+  );
+
+  const failedCount = results.filter((result) => result.status === "rejected").length;
+  if (failedCount > 0) {
+    console.error(`Failed to delete ${failedCount} knowledge objects from R2`);
+  }
+}
+
 async function syncDocumentTagsAndLinks(
   workspaceId: string,
   documentId: string,
@@ -154,7 +189,7 @@ export async function ensureKnowledgeRootFolder(
 ): Promise<KnowledgeFolder> {
   const { user } = await requireWorkspaceAccess(workspaceId, "member");
 
-  const existing = await db
+  const existingRoots = await db
     .select()
     .from(knowledgeFolders)
     .where(
@@ -164,9 +199,32 @@ export async function ensureKnowledgeRootFolder(
         eq(knowledgeFolders.name, ROOT_FOLDER_NAME)
       )
     )
-    .get();
+    .orderBy(knowledgeFolders.createdAt);
 
-  if (existing) return existing;
+  if (existingRoots.length > 0) {
+    const primaryRoot = existingRoots[0];
+
+    // Repair legacy duplication bug by merging extra root folders.
+    if (existingRoots.length > 1) {
+      const duplicateIds = existingRoots.slice(1).map((folder) => folder.id);
+
+      await db
+        .update(knowledgeFolders)
+        .set({ parentFolderId: primaryRoot.id, updatedAt: new Date() })
+        .where(inArray(knowledgeFolders.parentFolderId, duplicateIds));
+
+      await db
+        .update(knowledgeDocuments)
+        .set({ folderId: primaryRoot.id, updatedAt: new Date() })
+        .where(inArray(knowledgeDocuments.folderId, duplicateIds));
+
+      await db
+        .delete(knowledgeFolders)
+        .where(inArray(knowledgeFolders.id, duplicateIds));
+    }
+
+    return primaryRoot;
+  }
 
   const now = new Date();
   const root: KnowledgeFolder = {
@@ -490,15 +548,74 @@ export async function deleteKnowledgeDocument(documentId: string): Promise<void>
 
   await requireWorkspaceAccess(existing.workspaceId, "member");
 
+  const assetRows = await db
+    .select({ storageKey: knowledgeAssets.storageKey })
+    .from(knowledgeAssets)
+    .where(eq(knowledgeAssets.documentId, documentId));
+
   await db.delete(knowledgeDocuments).where(eq(knowledgeDocuments.id, documentId));
 
-  try {
-    await deleteObject(existing.storageKey);
-  } catch (error) {
-    console.error("Failed to delete knowledge document from R2:", error);
-  }
+  await deleteStorageKeys([existing.storageKey, ...assetRows.map((asset) => asset.storageKey)]);
 
   const workspaceSlug = await getWorkspaceSlug(existing.workspaceId);
+  revalidatePath(workspaceSlug ? `/w/${workspaceSlug}/knowledge` : "/");
+}
+
+export async function deleteKnowledgeFolder(folderId: string): Promise<void> {
+  const folder = await db
+    .select()
+    .from(knowledgeFolders)
+    .where(eq(knowledgeFolders.id, folderId))
+    .get();
+
+  if (!folder) return;
+
+  await requireWorkspaceAccess(folder.workspaceId, "member");
+
+  if (folder.parentFolderId === null) {
+    throw new Error("Root folder cannot be deleted");
+  }
+
+  const workspaceFolders = await db
+    .select({ id: knowledgeFolders.id, parentFolderId: knowledgeFolders.parentFolderId })
+    .from(knowledgeFolders)
+    .where(eq(knowledgeFolders.workspaceId, folder.workspaceId));
+
+  const folderIdsToDelete = collectFolderIdsForDelete(workspaceFolders, folder.id);
+  const docs = await db
+    .select({ id: knowledgeDocuments.id, storageKey: knowledgeDocuments.storageKey })
+    .from(knowledgeDocuments)
+    .where(
+      and(
+        eq(knowledgeDocuments.workspaceId, folder.workspaceId),
+        inArray(knowledgeDocuments.folderId, folderIdsToDelete)
+      )
+    );
+
+  const documentIds = docs.map((doc) => doc.id);
+  let assetRows: Array<{ storageKey: string }> = [];
+  if (documentIds.length > 0) {
+    assetRows = await db
+      .select({ storageKey: knowledgeAssets.storageKey })
+      .from(knowledgeAssets)
+      .where(
+        and(
+          eq(knowledgeAssets.workspaceId, folder.workspaceId),
+          inArray(knowledgeAssets.documentId, documentIds)
+        )
+      );
+
+    await db.delete(knowledgeDocuments).where(inArray(knowledgeDocuments.id, documentIds));
+  }
+
+  await db.delete(knowledgeFolders).where(inArray(knowledgeFolders.id, folderIdsToDelete));
+
+  await deleteStorageKeys([
+    ...docs.map((doc) => doc.storageKey),
+    ...assetRows.map((asset) => asset.storageKey),
+  ]);
+
+  const workspaceSlug = await getWorkspaceSlug(folder.workspaceId);
   revalidatePath(workspaceSlug ? `/w/${workspaceSlug}/knowledge` : "/");
 }
 

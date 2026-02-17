@@ -116,6 +116,7 @@ export {
   useCreateKnowledgeDocument,
   useUpdateKnowledgeDocument,
   useDeleteKnowledgeDocument,
+  useDeleteKnowledgeFolder,
   useIssueKnowledgeLinks,
   useLinkKnowledgeToIssue,
   useUnlinkKnowledgeFromIssue,
