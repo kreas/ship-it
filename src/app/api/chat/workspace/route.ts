@@ -1,6 +1,6 @@
 import { type UIMessage, tool } from "ai";
 import { z } from "zod";
-import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt, createMemoryTools } from "@/lib/chat";
+import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt, createMemoryTools, WORKSPACE_SKILL_MANIFEST, AD_TOOLS_PROMPT } from "@/lib/chat";
 import {
   createChatAttachment,
   getChatAttachment,
@@ -11,6 +11,7 @@ import type { WorkspaceSoul, Brand, WorkspaceMemory } from "@/lib/types";
 import { loadWorkspaceContext } from "@/lib/brand-utils";
 import { createSkillTools } from "@/lib/chat/tools/skill-creator-tool";
 import { getLastUserMessageText } from "@/lib/memory-utils";
+import { createAdTools } from "@/lib/chat/tools/ad-tools";
 
 export const maxDuration = 30;
 
@@ -21,6 +22,7 @@ const SOFTWARE_SYSTEM_PROMPT = `You are a helpful AI assistant for a software de
 3. **Problem Solving**: Debug issues, brainstorm solutions, and analyze technical approaches
 4. **Code Generation**: Generate code snippets, configurations, and examples
 5. **Documentation**: Help write technical documentation and specifications
+6. **Ad Creation**: Generate professional ad mockups for multiple platforms
 
 **Available tools:**
 - Web search: Research technologies, APIs, documentation, and best practices
@@ -40,7 +42,8 @@ When the user wants to save a repeatable workflow, instruction set, or specializ
 
 When updating a skill, ALWAYS warn the user first that the change will affect all users in the workspace and get their explicit confirmation before proceeding.
 
-Be conversational and helpful. Provide clear, actionable responses.`;
+Be conversational and helpful. Provide clear, actionable responses.
+${AD_TOOLS_PROMPT}`;
 
 const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing workspace. You can help with:
 
@@ -49,6 +52,7 @@ const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing 
 3. **Content Ideas**: Brainstorm content topics, headlines, and creative concepts
 4. **Analysis**: Review marketing data, calculate ROI, and analyze performance metrics
 5. **Copywriting**: Help draft marketing copy, emails, and social media content
+6. **Ad Creation**: Generate professional ad mockups for multiple platforms
 
 **Available tools:**
 - Web search: Research trends, competitors, audience insights, and best practices
@@ -68,7 +72,8 @@ When the user wants to save a repeatable workflow, instruction set, or specializ
 
 When updating a skill, ALWAYS warn the user first that the change will affect all users in the workspace and get their explicit confirmation before proceeding.
 
-Be conversational and helpful. Provide clear, actionable responses.`;
+Be conversational and helpful. Provide clear, actionable responses.
+${AD_TOOLS_PROMPT}`;
 
 function getSystemPrompt(
   purpose: WorkspacePurpose,
@@ -220,14 +225,17 @@ export async function POST(req: Request) {
 
   // Load workspace skills and MCP tools
   const skills = workspaceId
-    ? await loadSkillsForWorkspace(workspaceId, purpose)
+    ? await loadSkillsForWorkspace(workspaceId, purpose, WORKSPACE_SKILL_MANIFEST)
     : [];
 
   // Create tools - attachment tools if chatId, memory tools and skill tools if workspaceId
   const attachmentTools = chatId ? createWorkspaceChatTools(chatId) : {};
   const memoryTools = workspaceId ? createMemoryTools({ workspaceId }) : {};
   const skillTools = createSkillTools(workspaceId);
-  const tools = { ...attachmentTools, ...memoryTools, ...skillTools };
+  const adTools = (chatId && workspaceId)
+    ? createAdTools({ workspaceId, chatId, brandId: brand?.id })
+    : {};
+  const tools = { ...attachmentTools, ...memoryTools, ...skillTools, ...adTools };
 
   return createChatResponse(messages, {
     system: getSystemPrompt(purpose, soul, brand, memories),

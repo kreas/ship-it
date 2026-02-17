@@ -15,6 +15,13 @@
       "when": 1770312554322,
       "tag": "0001_harsh_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771334502102,
+      "tag": "0002_chief_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

@@ -346,6 +346,25 @@ export const workspaceMemories = sqliteTable("workspace_memories", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
+// Ad Artifacts - AI-generated ad content for marketing workspaces
+export const adArtifacts = sqliteTable("ad_artifacts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  chatId: text("chat_id")
+    .references(() => workspaceChats.id, { onDelete: "set null" }),
+  messageId: text("message_id"),
+  platform: text("platform").notNull(), // "instagram" | "tiktok" | "linkedin" | "google" | "facebook"
+  templateType: text("template_type").notNull(), // "feed-post" | "carousel" | "story" | "reel" | etc.
+  name: text("name").notNull(),
+  content: text("content").notNull(), // JSON string of template-specific content
+  mediaAssets: text("media_assets"), // JSON array of ArtifactMediaUrls
+  brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // AI Suggestions - ghost subtasks suggested by AI for issues
 export const aiSuggestions = sqliteTable("ai_suggestions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),

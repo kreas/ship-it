@@ -3,11 +3,17 @@
 import { useState, useCallback } from "react";
 import { X, Copy, Check, Download, FileText } from "lucide-react";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
+import { AdArtifactFullView } from "@/components/ads/AdArtifactFullView";
 import { useChatContext } from "./ChatContext";
 import { cn } from "@/lib/utils";
 
 export function AttachmentPreviewPanel() {
-  const { selectedAttachment, closeAttachment } = useChatContext();
+  const { selectedAttachment, closeAttachment, selectedArtifactId, closeArtifact } = useChatContext();
+
+  // If an ad artifact is selected, render the full ad view
+  if (selectedArtifactId) {
+    return <AdArtifactFullView artifactId={selectedArtifactId} onClose={closeArtifact} />;
+  }
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {

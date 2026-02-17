@@ -38,6 +38,11 @@ interface ChatContextValue {
   viewAttachment: (attachmentId: string) => Promise<void>;
   closeAttachment: () => void;
   isPreviewOpen: boolean;
+
+  // Ad artifact preview
+  selectedArtifactId: string | null;
+  viewArtifact: (artifactId: string) => void;
+  closeArtifact: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -73,6 +78,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [selectedAttachment, setSelectedAttachment] = useState<WorkspaceChatAttachment | null>(null);
   const [isLoadingAttachment, setIsLoadingAttachment] = useState(false);
   const hasLoadedAttachmentFromUrl = useRef(false);
+
+  // Ad artifact preview state
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 
   // Load workspace data and soul on mount
   useEffect(() => {
@@ -213,6 +221,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
     updateUrl(selectedChatId, null);
   }, [selectedChatId, updateUrl]);
 
+  const viewArtifact = useCallback(
+    (artifactId: string) => {
+      setSelectedArtifactId(artifactId);
+      setSelectedAttachment(null); // Close any open attachment
+    },
+    []
+  );
+
+  const closeArtifact = useCallback(() => {
+    setSelectedArtifactId(null);
+  }, []);
+
   // Computed values
   const validatedChatId =
     selectedChatId && chats.some((c) => c.id === selectedChatId) ? selectedChatId : null;
@@ -220,7 +240,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const workspacePurpose: WorkspacePurpose =
     workspace?.purpose === "marketing" ? "marketing" : "software";
 
-  const isPreviewOpen = !!(selectedAttachment || isLoadingAttachment);
+  const isPreviewOpen = !!(selectedAttachment || isLoadingAttachment || selectedArtifactId);
 
   const value: ChatContextValue = {
     workspace,
@@ -238,6 +258,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
     viewAttachment,
     closeAttachment,
     isPreviewOpen,
+    selectedArtifactId,
+    viewArtifact,
+    closeArtifact,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -1,0 +1,69 @@
+"use client";
+
+import React from 'react';
+import { useArtifact } from '@/components/ads/hooks/useArtifact';
+import { useArtifactMedia } from '@/components/ads/hooks/useArtifactMedia';
+import { Button } from '@/components/ui/button';
+import { Video } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const ArtifactControlsImageToVideoComponent = ({
+  mediaIndex = 0,
+  type = 'button',
+}: {
+  mediaIndex?: number;
+  type?: 'button' | 'dropdown';
+}) => {
+  const { imageToVideo, isGeneratingVideo, imageUrls, showVideo, currentIndex, currentImageUrl } =
+    useArtifactMedia(mediaIndex);
+
+  if (type === 'button') {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={imageToVideo}
+        disabled={isGeneratingVideo}
+        title="Convert Image to Video"
+      >
+        <Video className="w-4 h-4" />
+      </Button>
+    );
+  }
+  const image = showVideo ? currentImageUrl : imageUrls?.[currentIndex] ?? null;
+  return (
+    <DropdownMenuItem onClick={imageToVideo} disabled={isGeneratingVideo}>
+      {image && <img src={image} alt="Image" className="w-8 h-8 rounded" />}
+      <span className="text-sm truncate font-medium">Slide #{mediaIndex + 1}</span>
+    </DropdownMenuItem>
+  );
+};
+
+export const ArtifactControlsImageToVideo = () => {
+  const { mediaCount } = useArtifact();
+
+  if (mediaCount === 1) return <ArtifactControlsImageToVideoComponent />;
+  if (mediaCount > 1) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" title="Convert Image to Video">
+            <Video className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="start">
+          {Array.from({ length: mediaCount }).map((_, mediaIndex) => (
+            <ArtifactControlsImageToVideoComponent mediaIndex={mediaIndex} type="dropdown" key={mediaIndex} />
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  return null;
+};

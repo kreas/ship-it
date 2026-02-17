@@ -11,6 +11,7 @@ import {
   UserFileAttachment,
   type UserFilePart,
 } from "@/components/ai-elements/UserFileAttachment";
+import { AdArtifactInline } from "@/components/ads/AdArtifactInline";
 import { useChatContext } from "./ChatContext";
 import { formatFileSize } from "./chat-utils";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,15 @@ interface CreateFileResult {
   filename?: string;
   size?: number;
   error?: string;
+}
+
+interface CreateAdResult {
+  success: boolean;
+  artifactId: string;
+  name: string;
+  platform: string;
+  templateType: string;
+  type: string;
 }
 
 interface ChatMessageProps {
@@ -80,7 +90,7 @@ function FileAttachmentCard({
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
-  const { viewAttachment } = useChatContext();
+  const { workspace, viewAttachment, viewArtifact } = useChatContext();
   const isUser = message.role === "user";
 
   return (
@@ -106,6 +116,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
         >
           {message.parts.map((part, index) => {
+            console.log("part", part.type, part);
             if (part.type === "text") {
               // Check if this is a persisted file attachment (has __attachment metadata)
               const attachmentMeta = (part as unknown as { __attachment?: { id: string; filename: string; size?: number } }).__attachment;
@@ -149,10 +160,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
               return <UserFileAttachment key={index} part={filePart} />;
             }
 
-            const partType = part.type as string;
-
             // Handle tool parts - type is "tool-{toolName}"
-            if (partType.startsWith("tool-")) {
+            if (part.type.startsWith("tool-")) {
               const toolPart = part as unknown as {
                 type: string;
                 toolCallId: string;
@@ -162,11 +171,30 @@ export function ChatMessage({ message }: ChatMessageProps) {
               };
 
               // Extract tool name from type (e.g., "tool-createFile" -> "createFile")
-              const toolName = partType.replace("tool-", "");
+              const toolName = part.type.replace("tool-", "");
 
               // Only show results when output is available
               if (toolPart.state !== "output-available") {
                 return null;
+              }
+
+              // Handle ad creation tools
+              console.log("toolPart", toolName, toolPart.output);
+              if (toolName.startsWith("create_ad_") && toolPart.output) {
+                const result = toolPart.output as CreateAdResult;
+                if (result.success) {
+                  return (
+                    <AdArtifactInline
+                      key={index}
+                      artifactId={result.artifactId}
+                      name={result.name}
+                      platform={result.platform}
+                      templateType={result.templateType}
+                      workspaceId={workspace?.id ?? ""}
+                      onExpand={() => viewArtifact(result.artifactId)}
+                    />
+                  );
+                }
               }
 
               // Handle createFile tool specially

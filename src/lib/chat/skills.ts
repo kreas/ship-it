@@ -45,6 +45,15 @@ const DEFAULT_SKILL_MANIFEST: SkillManifest = {
 };
 
 /**
+ * Skill manifest for workspace chat — includes ad-campaign because
+ * workspace chat is the only route that has ad creation tools.
+ */
+export const WORKSPACE_SKILL_MANIFEST: SkillManifest = {
+  ...DEFAULT_SKILL_MANIFEST,
+  common: [...DEFAULT_SKILL_MANIFEST.common, "ad-campaign"],
+};
+
+/**
  * Load and parse a single skill from the skills directory
  */
 export async function loadSkill(

@@ -5,6 +5,7 @@ import { Sparkles, Trash2, Paperclip } from "lucide-react";
 import { useChatCore } from "@/lib/hooks";
 import { ChatContainer } from "@/components/ai-elements/ChatContainer";
 import { ToolResultDisplay } from "@/components/ai-elements/ToolResultDisplay";
+import { AdArtifactInline } from "@/components/ads/AdArtifactInline";
 import {
   useIssueChatMessages,
   useSaveChatMessage,
@@ -210,6 +211,28 @@ export function IssueChatPanel({
               <span>{resultStr || "Subtask deleted"}</span>
             </div>
           );
+        }
+        // Handle ad creation tools
+        if (toolName.startsWith("create_ad_") && result) {
+          const adResult = result as {
+            success: boolean;
+            artifactId: string;
+            name: string;
+            platform: string;
+            templateType: string;
+          };
+          if (adResult.success) {
+            return (
+              <AdArtifactInline
+                key={index}
+                artifactId={adResult.artifactId}
+                name={adResult.name}
+                platform={adResult.platform}
+                templateType={adResult.templateType}
+                workspaceId={workspaceId ?? ""}
+              />
+            );
+          }
         }
         // Handle built-in tools
         return <ToolResultDisplay key={index} toolName={toolName} result={result} />;
