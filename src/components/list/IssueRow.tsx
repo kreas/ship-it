@@ -5,10 +5,9 @@ import { StatusDot } from "@/components/issues/StatusDot";
 import { PriorityIcon } from "@/components/issues/PriorityIcon";
 import { QuickActions } from "@/components/issues/QuickActions";
 import { EpicBadge } from "@/components/issues/EpicBadge";
-import { useBoardContext } from "@/components/board/context/BoardProvider";
 import { Calendar, Check } from "lucide-react";
 import { format, isPast, isToday } from "date-fns";
-import { useMemo } from "react";
+import { useEpicTitle } from "@/lib/hooks";
 import type { IssueWithLabels, Label } from "@/lib/types";
 import type { Status, Priority } from "@/lib/design-tokens";
 
@@ -64,11 +63,7 @@ export function IssueRow({
   onClick,
   onSendToAI,
 }: IssueRowProps) {
-  const { epics } = useBoardContext();
-  const epicTitle = useMemo(() => {
-    if (!issue.epicId) return null;
-    return epics.find((e) => e.id === issue.epicId)?.title ?? null;
-  }, [issue.epicId, epics]);
+  const epicTitle = useEpicTitle(issue.epicId);
 
   return (
     <div

@@ -12,10 +12,10 @@ import { SubtaskProgress } from "./SubtaskProgress";
 import { EpicBadge } from "./EpicBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useOptionalWorkspaceContext } from "@/components/workspace/context/WorkspaceProvider";
-import { useBoardContext } from "@/components/board/context/BoardProvider";
+
 import { Calendar } from "lucide-react";
 import { format, isPast, isToday } from "date-fns";
-import { useSubtaskCount, useMounted } from "@/lib/hooks";
+import { useSubtaskCount, useMounted, useEpicTitle } from "@/lib/hooks";
 import type { IssueWithLabels, Label, WorkspaceMemberWithUser } from "@/lib/types";
 import type { Priority, Status } from "@/lib/design-tokens";
 
@@ -88,14 +88,6 @@ function useAssignee(assigneeId: string | null) {
   }, [assigneeId, members]);
 }
 
-// Hook to get epic title from board context
-function useEpicTitle(epicId: string | null): string | null {
-  const { epics } = useBoardContext();
-  return useMemo(() => {
-    if (!epicId) return null;
-    return epics.find((e) => e.id === epicId)?.title ?? null;
-  }, [epicId, epics]);
-}
 
 export function IssueCard({
   issue,
