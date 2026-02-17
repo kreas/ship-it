@@ -106,3 +106,17 @@ export {
 export { useMounted } from "./use-mounted";
 
 export { useEpicTitle } from "./use-epic-title";
+
+export {
+  useKnowledgeFolders,
+  useKnowledgeDocuments,
+  useKnowledgeDocument,
+  useKnowledgeTags,
+  useCreateKnowledgeFolder,
+  useCreateKnowledgeDocument,
+  useUpdateKnowledgeDocument,
+  useDeleteKnowledgeDocument,
+  useIssueKnowledgeLinks,
+  useLinkKnowledgeToIssue,
+  useUnlinkKnowledgeFromIssue,
+} from "./use-knowledge";
