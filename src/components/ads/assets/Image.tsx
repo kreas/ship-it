@@ -12,6 +12,7 @@ interface GeneratedImageProps {
   className?: string;
   'data-image-type'?: string;
   artifactId?: string;
+  mediaIndex?: number;
   imageUrl?: string;
   loading?: boolean;
   enableGenerate?: boolean;
@@ -28,6 +29,7 @@ export default function GeneratedImage({
   className,
   'data-image-type': dataImageType,
   artifactId,
+  mediaIndex = 0,
   onImageGenerated,
   imageUrl,
   loading = false,
@@ -92,7 +94,13 @@ export default function GeneratedImage({
           const response = await fetch('/api/ads/generate-image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, size, aspectRatio, style }),
+            body: JSON.stringify({
+              prompt,
+              size,
+              aspectRatio,
+              style,
+              ...(artifactId && { artifactId, mediaIndex }),
+            }),
           });
 
           if (!response.ok) {

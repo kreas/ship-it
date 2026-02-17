@@ -39,6 +39,14 @@ export function AdArtifactInline({
     type: string;
     workspaceId: string;
     resolvedMediaUrls: string[];
+    resolvedMediaBySlot: Array<{
+      imageUrls: string[];
+      videoUrls: string[];
+      currentIndex: number;
+      currentImageUrl: string | null;
+      generatedAt: Date;
+      showVideo: boolean;
+    }>;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +90,7 @@ export function AdArtifactInline({
             type: templateTypeKey,
             workspaceId: result.workspaceId,
             resolvedMediaUrls: result.resolvedMediaUrls,
+            resolvedMediaBySlot: result.resolvedMediaBySlot ?? [],
           });
 
           if (entry) {
@@ -143,6 +152,7 @@ export function AdArtifactInline({
         name={artifact.data.name}
         artifactId={artifact.data.id}
         workspaceId={workspaceId}
+        mediaUrls={artifact.resolvedMediaBySlot}
         enableGenerate={false}
         onRegenerate={() => {}}
         onSave={() => {}}

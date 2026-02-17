@@ -61,6 +61,7 @@ export const ArtifactMedia = ({
           data-image-type="ad-image"
           enableGenerate={true}
           artifactId={artifact.id}
+          mediaIndex={mediaIndex}
           aspectRatio={aspectRatio}
           size={size}
           imageUrl={currentImageUrl ?? undefined}

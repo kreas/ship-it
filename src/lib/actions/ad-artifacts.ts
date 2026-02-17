@@ -46,12 +46,25 @@ export async function createAdArtifact(input: {
   }
 }
 
+/** Shape compatible with ArtifactMediaUrls for initial media in ArtifactProvider */
+export type ResolvedMediaBySlot = Array<{
+  imageUrls: string[];
+  videoUrls: string[];
+  currentIndex: number;
+  currentImageUrl: string | null;
+  generatedAt: Date;
+  showVideo: boolean;
+}>;
+
 /**
- * Get a single ad artifact with fresh signed URLs for media
+ * Get a single ad artifact with fresh signed URLs for media.
+ * resolvedMediaBySlot can be passed as initialMediaUrls to ArtifactProvider so generated images show on reload.
  */
 export async function getAdArtifact(
   artifactId: string
-): Promise<(AdArtifact & { resolvedMediaUrls: string[] }) | null> {
+): Promise<
+  (AdArtifact & { resolvedMediaUrls: string[]; resolvedMediaBySlot: ResolvedMediaBySlot }) | null
+> {
   const artifact = await db
     .select()
     .from(adArtifacts)
@@ -60,8 +73,9 @@ export async function getAdArtifact(
 
   if (!artifact) return null;
 
-  // Resolve storage keys to signed download URLs
   const resolvedMediaUrls: string[] = [];
+  const resolvedMediaBySlot: ResolvedMediaBySlot = [];
+
   if (artifact.mediaAssets) {
     try {
       const assets = JSON.parse(artifact.mediaAssets) as Array<{
@@ -69,21 +83,31 @@ export async function getAdArtifact(
         imageUrls?: string[];
       }>;
       for (const asset of assets) {
+        const imageUrls: string[] = [];
         if (asset.storageKey) {
           const url = await generateDownloadUrl(asset.storageKey);
+          imageUrls.push(url);
           resolvedMediaUrls.push(url);
         }
-        // Also handle ArtifactMediaUrls format with imageUrls array
         if (asset.imageUrls) {
+          imageUrls.push(...asset.imageUrls);
           resolvedMediaUrls.push(...asset.imageUrls);
         }
+        resolvedMediaBySlot.push({
+          imageUrls,
+          videoUrls: [],
+          currentIndex: 0,
+          currentImageUrl: imageUrls[0] ?? null,
+          generatedAt: new Date(),
+          showVideo: false,
+        });
       }
     } catch {
       // Ignore parse errors
     }
   }
 
-  return { ...artifact, resolvedMediaUrls };
+  return { ...artifact, resolvedMediaUrls, resolvedMediaBySlot };
 }
 
 /**
