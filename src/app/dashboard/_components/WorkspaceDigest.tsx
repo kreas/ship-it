@@ -260,7 +260,7 @@ export function WorkspaceDigest({
           <div className="flex items-center gap-3">
             <Link
               href={`/w/${data.workspace.slug}`}
-              className="text-base font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+              className="group text-base font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
             >
               {data.workspace.name}
               <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" />
