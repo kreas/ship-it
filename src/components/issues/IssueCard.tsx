@@ -9,8 +9,10 @@ import { PriorityIcon } from "./PriorityIcon";
 import { StatusDot } from "./StatusDot";
 import { QuickActions } from "./QuickActions";
 import { SubtaskProgress } from "./SubtaskProgress";
+import { EpicBadge } from "./EpicBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useOptionalWorkspaceContext } from "@/components/workspace/context/WorkspaceProvider";
+import { useBoardContext } from "@/components/board/context/BoardProvider";
 import { Calendar } from "lucide-react";
 import { format, isPast, isToday } from "date-fns";
 import { useSubtaskCount, useMounted } from "@/lib/hooks";
@@ -86,6 +88,15 @@ function useAssignee(assigneeId: string | null) {
   }, [assigneeId, members]);
 }
 
+// Hook to get epic title from board context
+function useEpicTitle(epicId: string | null): string | null {
+  const { epics } = useBoardContext();
+  return useMemo(() => {
+    if (!epicId) return null;
+    return epics.find((e) => e.id === epicId)?.title ?? null;
+  }, [epicId, epics]);
+}
+
 export function IssueCard({
   issue,
   onClick,
@@ -117,6 +128,7 @@ export function IssueCard({
 
   // Get assignee from workspace members
   const assignee = useAssignee(issue.assigneeId);
+  const epicTitle = useEpicTitle(issue.epicId);
 
   const style = mounted
     ? {
@@ -170,6 +182,9 @@ export function IssueCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <StatusDot status={issue.status as Status} size="sm" />
+
+          {/* Epic */}
+          {epicTitle && <EpicBadge title={epicTitle} />}
 
           {/* Subtask progress */}
           {subtaskCount && subtaskCount.total > 0 && (
@@ -228,6 +243,7 @@ export function IssueCardCompact({
 }) {
   // Get assignee from workspace members
   const assignee = useAssignee(issue.assigneeId);
+  const epicTitle = useEpicTitle(issue.epicId);
 
   return (
     <div
@@ -240,6 +256,7 @@ export function IssueCardCompact({
       </span>
       <PriorityIcon priority={issue.priority as Priority} size="sm" />
       <span className="text-sm truncate flex-1">{issue.title}</span>
+      {epicTitle && <EpicBadge title={epicTitle} />}
       {issue.labels.length > 0 && (
         <div className="flex items-center gap-1">
           {issue.labels.slice(0, 2).map((label) => (

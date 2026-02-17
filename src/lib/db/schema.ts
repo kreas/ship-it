@@ -100,6 +100,7 @@ export const epics = sqliteTable("epics", {
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"), // active, completed, canceled
+  dueDate: integer("due_date", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

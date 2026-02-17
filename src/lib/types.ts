@@ -41,7 +41,7 @@ export type WorkspaceChatAttachment = typeof workspaceChatAttachments.$inferSele
 export type Brand = typeof brands.$inferSelect;
 export type Epic = typeof epics.$inferSelect;
 export type EpicStatus = "active" | "completed" | "canceled";
-export type CreateEpicInput = { title: string; description?: string };
+export type CreateEpicInput = { title: string; description?: string; dueDate?: Date };
 
 // Attachment with signed URL for display
 export type AttachmentWithUrl = Attachment & { url: string };
@@ -81,6 +81,7 @@ export type WorkspaceWithColumnsAndIssues = Workspace & {
   columns: ColumnWithIssues[];
   labels: Label[];
   cycles: Cycle[];
+  epics: Epic[];
 };
 
 // Legacy alias for backward compatibility
