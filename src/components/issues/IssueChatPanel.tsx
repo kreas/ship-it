@@ -6,6 +6,7 @@ import { useChatCore } from "@/lib/hooks";
 import { ChatContainer } from "@/components/ai-elements/ChatContainer";
 import { ToolResultDisplay } from "@/components/ai-elements/ToolResultDisplay";
 import { AdArtifactInline } from "@/components/ads/AdArtifactInline";
+import { attachAdArtifactToIssue } from "@/lib/actions/ad-artifacts";
 import {
   useIssueChatMessages,
   useSaveChatMessage,
@@ -43,12 +44,14 @@ interface IssueChatPanelProps {
   issue: IssueWithLabels;
   comments: Comment[];
   onUpdateDescription: (description: string) => void;
+  onViewArtifact?: (artifactId: string) => void;
 }
 
 export function IssueChatPanel({
   issue,
   comments,
   onUpdateDescription,
+  onViewArtifact,
 }: IssueChatPanelProps) {
   const { workspaceId, workspacePurpose } = useBoardContext();
 
@@ -230,6 +233,11 @@ export function IssueChatPanel({
                 platform={adResult.platform}
                 templateType={adResult.templateType}
                 workspaceId={workspaceId ?? ""}
+                onExpand={() => onViewArtifact?.(adResult.artifactId)}
+                onAttach={async () => {
+                  await attachAdArtifactToIssue(adResult.artifactId, issue.id);
+                  invalidateAttachments();
+                }}
               />
             );
           }

@@ -92,8 +92,9 @@ When the user asks you to do something (research, write content, analyze, create
 2. **Instead, use suggestAITasks** to create subtasks that can be executed later
 3. Each subtask should be a single, focused, actionable piece of work
 4. Only perform work yourself if the user EXPLICITLY says "do it now", "execute this", "run it", or similar
-5. **EXCEPTION: Ad creation tools** — when the user asks to create an ad or ad mockup, use the \`create_ad_*\` tools directly. These generate visual previews inline and should NOT be deferred to subtasks.
+${purpose === "marketing" ? `5. **EXCEPTION: Ad creation tools** — when the user asks to create an ad or ad mockup, use the \`create_ad_*\` tools directly. These generate visual previews inline and should NOT be deferred to subtasks.
 
+` : ""}
 Example - User says "Help me with SEO for this blog post":
 - WRONG: Immediately searching the web and writing SEO recommendations
 - RIGHT: Call suggestAITasks with subtasks like:
@@ -136,7 +137,7 @@ ${issueContext.description ? `This issue already has a description. **Ask the us
 - **create_skill**: Save a repeatable workflow or instruction set as a reusable skill for this workspace
 - **update_skill**: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
 - Web search, code execution, web fetch: Only use when user explicitly asks you to execute immediately
-${AD_TOOLS_PROMPT}
+${purpose === "marketing" ? AD_TOOLS_PROMPT : ""}
 
 Be conversational and helpful. Ask clarifying questions when needed.`;
 
@@ -169,10 +170,11 @@ export async function POST(req: Request) {
   const issueTools = createIssueTools({ issueId: issueContext.id });
   const memoryTools = workspaceId ? createMemoryTools({ workspaceId }) : {};
   const skillTools = createSkillTools(workspaceId);
-  // Omit chatId: ad_artifacts.chat_id references workspace_chats.id; issue chat uses issue id, not workspace chat id
-  const adTools = workspaceId
-    ? createAdTools({ workspaceId, brandId: brand?.id })
-    : {};
+  // Ad tools only for marketing workspaces. Omit chatId: issue chat uses issue id.
+  const adTools =
+    purpose === "marketing" && workspaceId
+      ? createAdTools({ workspaceId, brandId: brand?.id })
+      : {};
   const tools = { ...issueTools, ...memoryTools, ...skillTools, ...adTools };
 
   return createChatResponse(messages, {

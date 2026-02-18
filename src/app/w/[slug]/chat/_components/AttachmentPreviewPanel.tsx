@@ -1,18 +1,60 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { X, Copy, Check, Download, FileText } from "lucide-react";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
 import { AdArtifactFullView } from "@/components/ads/AdArtifactFullView";
 import { useChatContext } from "./ChatContext";
 import { cn } from "@/lib/utils";
 
-export function AttachmentPreviewPanel() {
-  const { selectedAttachment, closeAttachment, selectedArtifactId, closeArtifact } = useChatContext();
+/** Detect if attachment content is an artifact export (from "Save as attachment") */
+function parseArtifactExportAttachment(
+  content: string,
+  mimeType: string
+): { id: string } | null {
+  if (mimeType !== "application/json") return null;
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "id" in parsed &&
+      typeof (parsed as { id: unknown }).id === "string" &&
+      "platform" in parsed &&
+      "templateType" in parsed &&
+      "content" in parsed
+    ) {
+      return { id: (parsed as { id: string }).id };
+    }
+  } catch {
+    // not valid JSON or wrong shape
+  }
+  return null;
+}
 
-  // If an ad artifact is selected, render the full ad view
+export function AttachmentPreviewPanel() {
+  const { selectedAttachment, closeAttachment, selectedArtifactId, closeArtifact, collapseArtifactToInline } = useChatContext();
+
+  const attachmentArtifactId = useMemo(() => {
+    if (!selectedAttachment) return null;
+    return parseArtifactExportAttachment(
+      selectedAttachment.content,
+      selectedAttachment.mimeType
+    )?.id ?? null;
+  }, [selectedAttachment]);
+
+  // If an ad artifact is selected (by id), render the full ad view
   if (selectedArtifactId) {
-    return <AdArtifactFullView artifactId={selectedArtifactId} onClose={closeArtifact} />;
+    return <AdArtifactFullView artifactId={selectedArtifactId} onClose={closeArtifact} onCollapseToInline={collapseArtifactToInline} />;
+  }
+  // If the open attachment is an artifact export, show the artifact view so the ad renders
+  if (selectedAttachment && attachmentArtifactId) {
+    return (
+      <AdArtifactFullView
+        artifactId={attachmentArtifactId}
+        onClose={closeAttachment}
+      />
+    );
   }
   const [copied, setCopied] = useState(false);
 

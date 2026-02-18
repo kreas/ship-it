@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, Suspense, lazy, type ComponentType } from "react";
-import { Loader2, Expand, Instagram, Video, Linkedin, Search, Facebook } from "lucide-react";
+import { useEffect, useState, Suspense, type ComponentType } from "react";
+import { Loader2, Maximize2, Paperclip, Check, Instagram, Video, Linkedin, Search, Facebook } from "lucide-react";
 import { ArtifactProvider } from "@/components/ads/context/ArtifactProvider";
 import { getTemplateEntry } from "@/components/ads/schemas";
 import { getAdArtifact } from "@/lib/actions/ad-artifacts";
 import { AdArtifactPreview } from "@/components/ads/AdArtifactPreview";
-import { cn } from "@/lib/utils";
 import type { Artifact } from "@/components/ads/types/ArtifactData";
 
 const PLATFORM_ICONS: Record<string, typeof Instagram> = {
@@ -24,6 +23,7 @@ interface AdArtifactInlineProps {
   templateType: string;
   workspaceId: string;
   onExpand?: () => void;
+  onAttach?: () => Promise<void>;
 }
 
 export function AdArtifactInline({
@@ -33,7 +33,22 @@ export function AdArtifactInline({
   templateType,
   workspaceId,
   onExpand,
+  onAttach,
 }: AdArtifactInlineProps) {
+  const [isAttaching, setIsAttaching] = useState(false);
+  const [attachSuccess, setAttachSuccess] = useState(false);
+
+  const handleAttach = async () => {
+    if (!onAttach || isAttaching) return;
+    setIsAttaching(true);
+    try {
+      await onAttach();
+      setAttachSuccess(true);
+      setTimeout(() => setAttachSuccess(false), 2000);
+    } finally {
+      setIsAttaching(false);
+    }
+  };
   const [artifact, setArtifact] = useState<{
     data: Artifact;
     type: string;
@@ -146,7 +161,7 @@ export function AdArtifactInline({
   }
 
   return (
-    <div className="mt-3 max-w-sm">
+    <div className="mt-3 mb-3 max-w-sm">
       <ArtifactProvider
         artifact={artifact.data}
         name={artifact.data.name}
@@ -158,21 +173,38 @@ export function AdArtifactInline({
         onSave={() => {}}
       >
         <div className="w-full bg-background/50 border border-border/50 rounded-lg overflow-hidden">
-          {/* Compact toolbar */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
             <div className="flex items-center gap-2 min-w-0">
               <PlatformIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               <span className="text-xs font-medium truncate">{artifact.data.name}</span>
             </div>
-            {onExpand && (
-              <button
-                onClick={onExpand}
-                className="p-1 rounded-md hover:bg-muted transition-colors shrink-0"
-                title="Expand"
-              >
-                <Expand className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
-            )}
+            <div className="flex items-center gap-0.5">
+              {onAttach && (
+                <button
+                  onClick={handleAttach}
+                  disabled={isAttaching || attachSuccess}
+                  className="p-1 rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+                  title={attachSuccess ? "Attached!" : "Attach to issue"}
+                >
+                  {isAttaching ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                  ) : attachSuccess ? (
+                    <Check className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </button>
+              )}
+              {onExpand && (
+                <button
+                  onClick={onExpand}
+                  className="p-1 rounded-md hover:bg-muted transition-colors"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Template preview */}

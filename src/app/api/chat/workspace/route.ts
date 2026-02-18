@@ -1,6 +1,6 @@
 import { type UIMessage, tool } from "ai";
 import { z } from "zod";
-import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt, createMemoryTools, WORKSPACE_SKILL_MANIFEST, AD_TOOLS_PROMPT } from "@/lib/chat";
+import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt, createMemoryTools, WORKSPACE_SKILL_MANIFEST } from "@/lib/chat";
 import {
   createChatAttachment,
   getChatAttachment,
@@ -22,7 +22,6 @@ const SOFTWARE_SYSTEM_PROMPT = `You are a helpful AI assistant for a software de
 3. **Problem Solving**: Debug issues, brainstorm solutions, and analyze technical approaches
 4. **Code Generation**: Generate code snippets, configurations, and examples
 5. **Documentation**: Help write technical documentation and specifications
-6. **Ad Creation**: Generate professional ad mockups for multiple platforms
 
 **Available tools:**
 - Web search: Research technologies, APIs, documentation, and best practices
@@ -42,8 +41,28 @@ When the user wants to save a repeatable workflow, instruction set, or specializ
 
 When updating a skill, ALWAYS warn the user first that the change will affect all users in the workspace and get their explicit confirmation before proceeding.
 
-Be conversational and helpful. Provide clear, actionable responses.
-${AD_TOOLS_PROMPT}`;
+Be conversational and helpful. Provide clear, actionable responses.`;
+
+const AD_TOOLS_SECTION = `
+**Ad creation tools** (use these when the user asks to create ads or ad mockups):
+- \`create_ad_instagram_feed_post\` — Instagram feed post (1:1, 4:5, or 16:9 image with caption, CTA, and profile)
+- \`create_ad_instagram_carousel\` — Instagram carousel (3-10 images with captions and CTA)
+- \`create_ad_instagram_story\` — Instagram story (9:16 vertical with profile overlay and CTA)
+- \`create_ad_instagram_reel\` — Instagram reel (9:16 vertical with caption, profile, and CTA)
+- \`create_ad_tiktok_story\` — TikTok story ad (9:16 vertical with profile, caption, sound, and CTA)
+- \`create_ad_tiktok_cta\` — TikTok CTA ad (9:16 vertical with prominent CTA image)
+- \`create_ad_linkedin_single_image\` — LinkedIn single image ad (company header, ad copy, image, headline, CTA)
+- \`create_ad_linkedin_carousel\` — LinkedIn carousel ad (2-10 cards with images and headlines)
+- \`create_ad_google_search_ad\` — Google search ad (SERP-style with title, description, suggested searches)
+- \`create_ad_facebook_in_stream_video\` — Facebook in-stream video ad (primary + secondary ad)
+
+**Ad creation guidelines:**
+- **IMPORTANT: Before creating any ads, always call \`load_skill\` with skillName "ad-campaign" to get the full campaign workflow and platform-specific guidelines.**
+- When the user has a brand configured, use the brand's company name, tone, and style in the ad content
+- For image prompts, write descriptive scenes focusing on mood, composition, and lighting — avoid text in images
+- Use one strong, clear image per ad slot unless the user specifically asks for multiple
+- Match the ad copy length to the platform's conventions (e.g., short for Instagram, detailed for LinkedIn)
+- Always provide meaningful CTA text that matches the campaign goal`;
 
 const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing workspace. You can help with:
 
@@ -73,7 +92,7 @@ When the user wants to save a repeatable workflow, instruction set, or specializ
 When updating a skill, ALWAYS warn the user first that the change will affect all users in the workspace and get their explicit confirmation before proceeding.
 
 Be conversational and helpful. Provide clear, actionable responses.
-${AD_TOOLS_PROMPT}`;
+${AD_TOOLS_SECTION}`;
 
 function getSystemPrompt(
   purpose: WorkspacePurpose,
@@ -232,9 +251,10 @@ export async function POST(req: Request) {
   const attachmentTools = chatId ? createWorkspaceChatTools(chatId) : {};
   const memoryTools = workspaceId ? createMemoryTools({ workspaceId }) : {};
   const skillTools = createSkillTools(workspaceId);
-  const adTools = (chatId && workspaceId)
-    ? createAdTools({ workspaceId, chatId, brandId: brand?.id })
-    : {};
+  const adTools =
+    purpose === "marketing" && chatId && workspaceId
+      ? createAdTools({ workspaceId, chatId, brandId: brand?.id })
+      : {};
   const tools = { ...attachmentTools, ...memoryTools, ...skillTools, ...adTools };
 
   return createChatResponse(messages, {

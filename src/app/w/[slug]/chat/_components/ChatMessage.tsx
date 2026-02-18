@@ -116,7 +116,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
         >
           {message.parts.map((part, index) => {
-            console.log("part", part.type, part);
             if (part.type === "text") {
               // Check if this is a persisted file attachment (has __attachment metadata)
               const attachmentMeta = (part as unknown as { __attachment?: { id: string; filename: string; size?: number } }).__attachment;
@@ -179,7 +178,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
               }
 
               // Handle ad creation tools
-              console.log("toolPart", toolName, toolPart.output);
               if (toolName.startsWith("create_ad_") && toolPart.output) {
                 const result = toolPart.output as CreateAdResult;
                 if (result.success) {

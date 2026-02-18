@@ -43,9 +43,13 @@ interface ChatContextValue {
   selectedArtifactId: string | null;
   viewArtifact: (artifactId: string) => void;
   closeArtifact: () => void;
+
+  // Inline expanded artifact (collapsed from panel back to inline)
+  expandedInlineArtifactId: string | null;
+  collapseArtifactToInline: () => void;
 }
 
-const ChatContext = createContext<ChatContextValue | null>(null);
+export const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function useChatContext() {
   const context = useContext(ChatContext);
@@ -81,6 +85,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   // Ad artifact preview state
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [expandedInlineArtifactId, setExpandedInlineArtifactId] = useState<string | null>(null);
 
   // Load workspace data and soul on mount
   useEffect(() => {
@@ -224,6 +229,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const viewArtifact = useCallback(
     (artifactId: string) => {
       setSelectedArtifactId(artifactId);
+      setExpandedInlineArtifactId(null);
       setSelectedAttachment(null); // Close any open attachment
     },
     []
@@ -232,6 +238,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const closeArtifact = useCallback(() => {
     setSelectedArtifactId(null);
   }, []);
+
+  const collapseArtifactToInline = useCallback(() => {
+    // Move the artifact from panel to expanded inline
+    setExpandedInlineArtifactId(selectedArtifactId);
+    setSelectedArtifactId(null);
+  }, [selectedArtifactId]);
 
   // Computed values
   const validatedChatId =
@@ -261,6 +273,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
     selectedArtifactId,
     viewArtifact,
     closeArtifact,
+    expandedInlineArtifactId,
+    collapseArtifactToInline,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

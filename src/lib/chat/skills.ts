@@ -45,12 +45,12 @@ const DEFAULT_SKILL_MANIFEST: SkillManifest = {
 };
 
 /**
- * Skill manifest for workspace chat — includes ad-campaign because
- * workspace chat is the only route that has ad creation tools.
+ * Skill manifest for workspace chat. ad-campaign is marketing-only;
+ * workspace and issue chat only expose ad tools for marketing workspaces.
  */
 export const WORKSPACE_SKILL_MANIFEST: SkillManifest = {
   ...DEFAULT_SKILL_MANIFEST,
-  common: [...DEFAULT_SKILL_MANIFEST.common, "ad-campaign"],
+  marketing: [...DEFAULT_SKILL_MANIFEST.marketing, "ad-campaign"],
 };
 
 /**

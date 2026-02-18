@@ -56,7 +56,6 @@ function createAdTool(
   schema: { description: string; inputSchema: z.ZodType },
   context: AdToolsContext,
 ) {
-  console.log("creating ad tool", schema.description);
   return tool({
     description: schema.description,
     inputSchema: jsonSchema<{ name: string; type: string; content: unknown }>(
@@ -79,7 +78,6 @@ function createAdTool(
     ),
     execute: async (input: { name: string; type: string; content: unknown }) => {
       const { platform, templateType } = parseTemplateType(input.type);
-      console.log("ad tool called", templateType, platform, input.content);
 
       try {
         const artifact = await createAdArtifact({
@@ -116,7 +114,6 @@ function createAdTool(
  * One tool per template type, each persisting the artifact to the database.
  */
 export function createAdTools(context: AdToolsContext) {
-  console.log("creating ad tools");
   return {
     create_ad_instagram_feed_post: createAdTool(InstagramFeedPostSchema, context),
     create_ad_instagram_carousel: createAdTool(InstagramCarouselSchema, context),

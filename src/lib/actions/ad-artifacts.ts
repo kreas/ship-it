@@ -4,6 +4,8 @@ import { db } from "../db";
 import { adArtifacts } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { generateDownloadUrl, deleteObject } from "../storage/r2-client";
+import { renderAdToHtml } from "../ad-html-templates";
+import { attachContentToIssue } from "./attachments";
 import type { AdArtifact } from "../types";
 
 /**
@@ -35,8 +37,6 @@ export async function createAdArtifact(input: {
         brandId: input.brandId ?? null,
       })
       .returning();
-
-    console.log("created ad artifact", artifact);
 
     return artifact;
   } catch (error) {
@@ -153,6 +153,72 @@ export async function updateAdArtifactMedia(
     .returning();
 
   return updated ?? null;
+}
+
+/**
+ * Attach an ad artifact's HTML preview to an issue (on-demand).
+ */
+export async function attachAdArtifactToIssue(
+  artifactId: string,
+  issueId: string
+): Promise<{ success: true; attachmentId: string } | { success: false; error: string }> {
+  try {
+    const artifact = await db
+      .select()
+      .from(adArtifacts)
+      .where(eq(adArtifacts.id, artifactId))
+      .get();
+
+    if (!artifact) {
+      return { success: false, error: "Artifact not found" };
+    }
+
+    let parsedContent: unknown;
+    try {
+      parsedContent = JSON.parse(artifact.content);
+    } catch {
+      parsedContent = artifact.content;
+    }
+
+    // Resolve media URLs from R2 storage so the HTML includes actual images
+    const resolvedMediaUrls: string[] = [];
+    if (artifact.mediaAssets) {
+      try {
+        const assets = JSON.parse(artifact.mediaAssets) as Array<{
+          storageKey?: string;
+          imageUrls?: string[];
+        }>;
+        for (const asset of assets) {
+          if (asset.storageKey) {
+            const url = await generateDownloadUrl(asset.storageKey);
+            resolvedMediaUrls.push(url);
+          }
+          if (asset.imageUrls) {
+            resolvedMediaUrls.push(...asset.imageUrls);
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    const html = renderAdToHtml(artifact.platform, artifact.templateType, parsedContent, resolvedMediaUrls);
+    if (!html) {
+      return { success: false, error: "Failed to render ad HTML" };
+    }
+
+    const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9-_ ]/g, "").trim();
+    const filename = `${sanitize(artifact.name)} - ${sanitize(artifact.platform)} ${sanitize(artifact.templateType)}.html`;
+    const attachment = await attachContentToIssue(issueId, html, filename, "text/html");
+
+    return { success: true, attachmentId: attachment.id };
+  } catch (error) {
+    console.error("Failed to attach ad artifact to issue:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
 
 /**
