@@ -1,6 +1,7 @@
 import React from 'react';
 import type { InstagramAdProfile } from '../types';
 import { instagramBranding, instagramColors, instagramFonts, instagramLayout } from '../config';
+import { RetryImage } from '@/components/ads/components/RetryImage';
 
 interface InstagramAdProfileProps extends InstagramAdProfile {
   image: string;
@@ -18,7 +19,7 @@ export function InstagramAdProfile({ image, username, metadataText = 'Sponsored'
         ...style,
       }}
     >
-      <img
+      <RetryImage
         src={image}
         alt={username}
         className="w-8 h-8 rounded-full object-cover object-center "

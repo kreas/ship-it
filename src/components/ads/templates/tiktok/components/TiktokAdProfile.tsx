@@ -1,5 +1,6 @@
 import React from 'react';
 import { tiktokAdLayout, tiktokColors } from '../config';
+import { RetryImage } from '@/components/ads/components/RetryImage';
 
 export interface TiktokAdProfileProps {
   image: string;
@@ -16,7 +17,7 @@ export const TiktokAdProfile = ({ image }: TiktokAdProfileProps) => {
         backgroundColor: tiktokColors.backgroundGray,
       }}
     >
-      <img src={image} alt="profile" className="w-full h-full rounded-full object-cover object-center" />
+      <RetryImage src={image} alt="profile" className="w-full h-full rounded-full object-cover object-center" />
     </div>
   );
 };

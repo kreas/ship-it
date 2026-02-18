@@ -1,6 +1,7 @@
 import React from 'react';
 import { linkedInBranding, linkedInColors, linkedInFonts, linkedInLayout } from '../config';
 import { MoreHorizontal } from 'lucide-react';
+import { RetryImage } from '@/components/ads/components/RetryImage';
 
 interface AdHeaderProps {
   profileImageUrl?: string;
@@ -20,7 +21,7 @@ export default function AdHeader({ profileImageUrl, title, sponsoredText = 'Spon
         marginRight: linkedInLayout.spacingSmall,
         overflow: 'hidden',
       }}>
-        <img
+        <RetryImage
           src={profileImageUrl || linkedInBranding.profilePlaceholder}
           alt={`${title} logo`}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}

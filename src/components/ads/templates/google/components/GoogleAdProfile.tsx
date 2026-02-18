@@ -4,6 +4,7 @@ import { companySchema } from '../schema';
 import { cn } from '@/lib/utils';
 import { MoreVertical } from 'lucide-react';
 import { googleAdBranding, googleAdColors, googleAdFonts, googleAdLayout } from '../config';
+import { RetryImage } from '@/components/ads/components/RetryImage';
 
 interface GoogleAdProfileProps extends z.infer<typeof companySchema> {
   className?: string;
@@ -13,17 +14,15 @@ interface GoogleAdProfileProps extends z.infer<typeof companySchema> {
 export default function GoogleAdProfile({ logo, name, url, className, style }: GoogleAdProfileProps) {
   return (
     <div className={cn('flex items-center gap-2', className)} style={style}>
-      <img
+      <RetryImage
         src={logo}
         alt={name}
+        fallbackSrc={googleAdBranding.logoPlaceholder}
         className="rounded-full border object-contain object-center"
         style={{
           width: googleAdLayout.profile.width,
           height: googleAdLayout.profile.height,
           borderColor: googleAdColors.border,
-        }}
-        onError={(e) => {
-          e.currentTarget.src = googleAdBranding.logoPlaceholder;
         }}
       />
       <div>
