@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useRef, useState, useCallback, Suspense, type ComponentType } from "react";
-import { X, Loader2, Paperclip, Minimize2 } from "lucide-react";
+import { X, Loader2, Minimize2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArtifactProvider } from "@/components/ads/context/ArtifactProvider";
 import ArtifactControlsBar from "@/components/ads/components/ArtifactControlsBar";
@@ -217,56 +217,54 @@ export function AdArtifactFullView({ artifactId, onClose, onCollapseToInline, is
 
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border shrink-0">
-        <span className="text-sm font-medium truncate min-w-0">{artifact.data.name}</span>
-        <div className="flex items-center gap-1 shrink-0">
-          {onCollapseToInline && (
-            <button
-              type="button"
-              onClick={onCollapseToInline}
-              className="p-1.5 rounded-md hover:bg-muted transition-colors"
-              title="Collapse to inline"
-            >
+      <ArtifactProvider
+        artifact={artifact.data}
+        name={artifact.data.name}
+        artifactId={artifact.data.id}
+        workspaceId={artifact.workspaceId}
+        mediaUrls={artifact.resolvedMediaBySlot}
+        enableGenerate={true}
+        onRegenerate={() => {}}
+        onSave={() => {}}
+      >
+        {/* Header: title, media count, regenerate, video, versioning + close actions */}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-sm font-medium truncate min-w-0" title={artifact.data.name}>{artifact.data.name}</span>
+            <ArtifactControlsBar
+              variant="header"
+              showTitle={false}
+              showMediaCount={true}
+              onSaveAsAttachment={handleSaveAsAttachment}
+              isSavingAsAttachment={isSavingAsAttachment}
+              saveAttachmentDisabled={!selectedChatId && !issueId}
+              saveAttachmentTitle={issueId ? "Attach to issue" : selectedChatId ? "Save as attachment" : "Select a chat to save as attachment"}
+            />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {onCollapseToInline && (
+              <button
+                type="button"
+                onClick={onCollapseToInline}
+                className="p-1.5 rounded-md hover:bg-muted transition-colors"
+                title="Collapse to inline"
+              >
+                <Minimize2 className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted transition-colors" title="Close">
               <Minimize2 className="w-4 h-4 text-muted-foreground" />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleSaveAsAttachment}
-            disabled={(!selectedChatId && !issueId) || isSavingAsAttachment}
-            className="p-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none"
-            title={issueId ? "Attach to issue" : selectedChatId ? "Save as attachment" : "Select a chat to save as attachment"}
-          >
-            {isSavingAsAttachment ? (
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            ) : (
-              <Paperclip className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+          </div>
         </div>
-      </div>
-      {saveError && (
-        <div className="px-4 py-2 text-xs text-red-500 bg-red-500/10 border-b border-border">
-          {saveError}
-        </div>
-      )}
+        {saveError && (
+          <div className="px-4 py-2 text-xs text-red-500 bg-red-500/10 border-b border-border">
+            {saveError}
+          </div>
+        )}
 
-      {/* Content */}
-      <div ref={containerRef} className="flex-1 overflow-hidden p-4 flex items-start justify-center">
-        <ArtifactProvider
-          artifact={artifact.data}
-          name={artifact.data.name}
-          artifactId={artifact.data.id}
-          workspaceId={artifact.workspaceId}
-          mediaUrls={artifact.resolvedMediaBySlot}
-          enableGenerate={true}
-          onRegenerate={() => {}}
-          onSave={() => {}}
-        >
+        {/* Content */}
+        <div ref={containerRef} className="flex-1 overflow-hidden p-4 flex items-start justify-center">
           <div
             ref={templateRef}
             className="bg-muted/30 border border-border rounded-lg pb-6"
@@ -275,7 +273,6 @@ export function AdArtifactFullView({ artifactId, onClose, onCollapseToInline, is
               transformOrigin: 'top center',
             }}
           >
-            <ArtifactControlsBar showMediaCount={true} />
             {TemplateComponent ? (
               <Suspense fallback={
                 <div className="flex items-center justify-center p-8">
@@ -290,8 +287,8 @@ export function AdArtifactFullView({ artifactId, onClose, onCollapseToInline, is
               </div>
             )}
           </div>
-        </ArtifactProvider>
-      </div>
+        </div>
+      </ArtifactProvider>
     </div>
   );
 }

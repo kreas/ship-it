@@ -173,7 +173,7 @@ export async function POST(req: Request) {
   // Ad tools only for marketing workspaces. Omit chatId: issue chat uses issue id.
   const adTools =
     purpose === "marketing" && workspaceId
-      ? createAdTools({ workspaceId, brandId: brand?.id })
+      ? createAdTools({ workspaceId, brandId: brand?.id, issueId: issueContext.id })
       : {};
   const tools = { ...issueTools, ...memoryTools, ...skillTools, ...adTools };
 

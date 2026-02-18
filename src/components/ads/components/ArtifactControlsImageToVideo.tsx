@@ -12,17 +12,36 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+/** Matches attach/close in side panel header */
+const compactTriggerClass =
+  "p-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none";
+
 const ArtifactControlsImageToVideoComponent = ({
   mediaIndex = 0,
   type = 'button',
+  compact = false,
 }: {
   mediaIndex?: number;
   type?: 'button' | 'dropdown';
+  compact?: boolean;
 }) => {
   const { imageToVideo, isGeneratingVideo, imageUrls, showVideo, currentIndex, currentImageUrl } =
     useArtifactMedia(mediaIndex);
 
   if (type === 'button') {
+    if (compact) {
+      return (
+        <button
+          type="button"
+          onClick={imageToVideo}
+          disabled={isGeneratingVideo}
+          title="Convert Image to Video"
+          className={compactTriggerClass}
+        >
+          <Video className="w-4 h-4 text-muted-foreground" />
+        </button>
+      );
+    }
     return (
       <Button
         variant="ghost"
@@ -44,17 +63,24 @@ const ArtifactControlsImageToVideoComponent = ({
   );
 };
 
-export const ArtifactControlsImageToVideo = () => {
+export const ArtifactControlsImageToVideo = ({ compact = false }: { compact?: boolean }) => {
   const { mediaCount } = useArtifact();
 
-  if (mediaCount === 1) return <ArtifactControlsImageToVideoComponent />;
+  if (mediaCount === 1) return <ArtifactControlsImageToVideoComponent compact={compact} />;
   if (mediaCount > 1) {
+    const trigger = compact ? (
+      <button type="button" title="Convert Image to Video" className={compactTriggerClass}>
+        <Video className="w-4 h-4 text-muted-foreground" />
+      </button>
+    ) : (
+      <Button variant="ghost" size="icon" title="Convert Image to Video">
+        <Video className="w-4 h-4" />
+      </Button>
+    );
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" title="Convert Image to Video">
-            <Video className="w-4 h-4" />
-          </Button>
+          {trigger}
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="start">
           {Array.from({ length: mediaCount }).map((_, mediaIndex) => (

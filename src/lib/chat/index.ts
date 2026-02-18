@@ -431,4 +431,5 @@ export const AD_TOOLS_PROMPT = `
 - For image prompts, write descriptive scenes focusing on mood, composition, and lighting — avoid text in images
 - Use one strong, clear image per ad slot unless the user specifically asks for multiple
 - Match the ad copy length to the platform's conventions (e.g., short for Instagram, detailed for LinkedIn)
-- Always provide meaningful CTA text that matches the campaign goal`;
+- Always provide meaningful CTA text that matches the campaign goal
+- **Auto-attach**: After creating an ad, use \`attach_ad_to_issue\` to attach it to the current issue as an HTML preview file`;

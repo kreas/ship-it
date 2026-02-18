@@ -1,6 +1,6 @@
 import { tool, jsonSchema } from "ai";
 import { z } from "zod";
-import { createAdArtifact } from "@/lib/actions/ad-artifacts";
+import { createAdArtifact, attachAdArtifactToIssue } from "@/lib/actions/ad-artifacts";
 import { getWorkspaceBrand } from "@/lib/actions/brand";
 import { mergeWorkspaceBrandIntoContent } from "@/lib/ads/merge-workspace-brand";
 
@@ -21,6 +21,8 @@ interface AdToolsContext {
   /** Only set when chat is a workspace chat (workspace_chats.id). Omit for issue chat to avoid FK violation. */
   chatId?: string;
   brandId?: string;
+  /** When set, enables the attach_ad_to_issue tool to attach artifacts to this issue. */
+  issueId?: string;
 }
 
 /**
@@ -144,5 +146,28 @@ export function createAdTools(context: AdToolsContext) {
     create_ad_linkedin_carousel: createAdTool(LinkedInCarouselAdSchema, context),
     create_ad_google_search_ad: createAdTool(GoogleSearchAdSchema, context),
     create_ad_facebook_in_stream_video: createAdTool(FacebookInStreamVideoTool, context),
+    ...(context.issueId
+      ? {
+          attach_ad_to_issue: tool({
+            description:
+              "Attach an ad artifact to the current issue as an HTML file. Call this after creating an ad when the user wants it attached.",
+            parameters: z.object({
+              artifactId: z
+                .string()
+                .describe("The artifact ID returned by a create_ad_* tool"),
+            }),
+            execute: async ({ artifactId }) => {
+              const result = await attachAdArtifactToIssue(
+                artifactId,
+                context.issueId!,
+              );
+              if (result.success) {
+                return { success: true, message: "Ad attached to issue" };
+              }
+              return { success: false, error: result.error };
+            },
+          }),
+        }
+      : {}),
   };
 }

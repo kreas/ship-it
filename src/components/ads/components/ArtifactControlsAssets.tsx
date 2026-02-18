@@ -21,16 +21,28 @@ const ArtifactControlsMediaAssets = ({ mediaIndex = 0 }: { mediaIndex?: number }
   );
 };
 
-export const ArtifactControlsAssets = () => {
+/** Matches attach/close in side panel header */
+const compactTriggerClass =
+  "p-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none";
+
+export const ArtifactControlsAssets = ({ compact = false }: { compact?: boolean }) => {
   const { mediaCount } = useArtifact();
   if (mediaCount < 1) return null;
+
+  const trigger = compact ? (
+    <button type="button" title="Assets Versions" className={compactTriggerClass}>
+      <MoreVertical className="w-4 h-4 text-muted-foreground" />
+    </button>
+  ) : (
+    <Button variant="ghost" size="icon" title="Assets Versions">
+      <MoreVertical className="w-4 h-4" />
+    </Button>
+  );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title="Assets Versions">
-          <MoreVertical className="w-4 h-4" />
-        </Button>
+        {trigger}
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
         {mediaCount === 1 && <ArtifactControlsAssetsDropdown mediaIndex={0} />}

@@ -12,17 +12,36 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+/** Matches attach/close in side panel header */
+const compactTriggerClass =
+  "p-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none";
+
 const ArtifactControlsRegenerateComponent = ({
   mediaIndex = 0,
   type = 'button',
+  compact = false,
 }: {
   mediaIndex?: number;
   type?: 'button' | 'dropdown';
+  compact?: boolean;
 }) => {
   const { regenerate, isRegenerating, imageUrls, showVideo, currentIndex, currentImageUrl } =
     useArtifactMedia(mediaIndex);
 
   if (type === 'button') {
+    if (compact) {
+      return (
+        <button
+          type="button"
+          onClick={regenerate}
+          disabled={isRegenerating}
+          title="Regenerate"
+          className={compactTriggerClass}
+        >
+          <RefreshCcw className="w-4 h-4 text-muted-foreground" />
+        </button>
+      );
+    }
     return (
       <Button variant="ghost" size="icon" onClick={regenerate} disabled={isRegenerating} title="Regenerate">
         <RefreshCcw className="w-4 h-4" />
@@ -39,17 +58,24 @@ const ArtifactControlsRegenerateComponent = ({
   );
 };
 
-export const ArtifactControlsRegenerate = () => {
+export const ArtifactControlsRegenerate = ({ compact = false }: { compact?: boolean }) => {
   const { mediaCount } = useArtifact();
 
-  if (mediaCount === 1) return <ArtifactControlsRegenerateComponent />;
+  if (mediaCount === 1) return <ArtifactControlsRegenerateComponent compact={compact} />;
   if (mediaCount > 1) {
+    const trigger = compact ? (
+      <button type="button" title="Regenerate" className={compactTriggerClass}>
+        <RefreshCcw className="w-4 h-4 text-muted-foreground" />
+      </button>
+    ) : (
+      <Button variant="ghost" size="icon" title="Regenerate">
+        <RefreshCcw className="w-4 h-4" />
+      </Button>
+    );
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" title="Regenerate">
-            <RefreshCcw className="w-4 h-4" />
-          </Button>
+          {trigger}
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="start">
           {Array.from({ length: mediaCount }).map((_, mediaIndex) => (
