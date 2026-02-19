@@ -68,4 +68,8 @@ export const queryKeys = {
     issueLinks: (issueId: string) => ["knowledge", "issueLinks", issueId] as const,
     tags: (workspaceId: string) => ["knowledge", workspaceId, "tags"] as const,
   },
+  profile: {
+    all: ["profile"] as const,
+    detail: () => ["profile", "detail"] as const,
+  },
 } as const;
