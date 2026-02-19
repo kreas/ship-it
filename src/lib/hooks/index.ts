@@ -105,6 +105,8 @@ export {
 
 export { useMounted } from "./use-mounted";
 
+export { useUserProfile, useUpdateUserProfile } from "./use-profile";
+
 export { useEpicTitle } from "./use-epic-title";
 
 export {

@@ -167,6 +167,44 @@ export const GROUP_BY = {
 
 export type GroupBy = (typeof GROUP_BY)[keyof typeof GROUP_BY];
 
+// AI Communication styles for user preferences
+export const COMMUNICATION_STYLE = {
+  PRECISE: "precise",
+  FRIENDLY: "friendly",
+  CASUAL: "casual",
+  FORMAL: "formal",
+  TECHNICAL: "technical",
+} as const;
+
+export type CommunicationStyle =
+  (typeof COMMUNICATION_STYLE)[keyof typeof COMMUNICATION_STYLE];
+
+export const COMMUNICATION_STYLE_CONFIG: Record<
+  CommunicationStyle,
+  { label: string; description: string }
+> = {
+  [COMMUNICATION_STYLE.PRECISE]: {
+    label: "Precise",
+    description: "Clear, direct responses focused on accuracy",
+  },
+  [COMMUNICATION_STYLE.FRIENDLY]: {
+    label: "Friendly",
+    description: "Warm, approachable tone with helpful context",
+  },
+  [COMMUNICATION_STYLE.CASUAL]: {
+    label: "Casual",
+    description: "Relaxed, conversational style",
+  },
+  [COMMUNICATION_STYLE.FORMAL]: {
+    label: "Formal",
+    description: "Professional, structured communication",
+  },
+  [COMMUNICATION_STYLE.TECHNICAL]: {
+    label: "Technical",
+    description: "Detailed, technical explanations with specifics",
+  },
+};
+
 // Workspace purpose types
 export const WORKSPACE_PURPOSE = {
   SOFTWARE: "software",

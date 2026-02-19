@@ -27,7 +27,7 @@ import type {
   issueKnowledgeDocuments,
   knowledgeAssets,
 } from "./db/schema";
-import type { Status, Priority } from "./design-tokens";
+import type { Status, Priority, CommunicationStyle } from "./design-tokens";
 
 // Base types inferred from schema
 export type User = typeof users.$inferSelect;
@@ -54,6 +54,26 @@ export type KnowledgeDocumentTag = typeof knowledgeDocumentTags.$inferSelect;
 export type KnowledgeDocumentLink = typeof knowledgeDocumentLinks.$inferSelect;
 export type IssueKnowledgeDocument = typeof issueKnowledgeDocuments.$inferSelect;
 export type KnowledgeAsset = typeof knowledgeAssets.$inferSelect;
+
+// User profile types
+export type AICommunicationStyle = CommunicationStyle;
+
+export type UpdateUserProfileInput = {
+  role?: string | null;
+  bio?: string | null;
+  aiCommunicationStyle?: AICommunicationStyle | null;
+  aiCustomInstructions?: string | null;
+};
+
+export type UserProfileWithWorkspaces = User & {
+  workspaces: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    purpose: string;
+    role: string;
+  }>;
+};
 
 // Attachment with signed URL for display
 export type AttachmentWithUrl = Attachment & { url: string };

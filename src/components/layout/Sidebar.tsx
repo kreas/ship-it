@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Home,
   BookOpen,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW } from "@/lib/design-tokens";
@@ -328,6 +329,12 @@ export function Sidebar() {
           label="All Projects"
           isCollapsed={sidebarCollapsed}
           href="/projects"
+        />
+        <NavItem
+          icon={<UserCircle className="w-4 h-4" />}
+          label="Profile"
+          isCollapsed={sidebarCollapsed}
+          href="/profile"
         />
         <NavItem
           icon={<Settings className="w-4 h-4" />}

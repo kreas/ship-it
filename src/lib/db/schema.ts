@@ -12,6 +12,10 @@ export const users = sqliteTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   avatarUrl: text("avatar_url"),
+  role: text("role"),
+  bio: text("bio"),
+  aiCommunicationStyle: text("ai_communication_style"),
+  aiCustomInstructions: text("ai_custom_instructions"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
