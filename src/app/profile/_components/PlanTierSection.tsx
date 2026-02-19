@@ -34,13 +34,13 @@ const PLANS = [
 export function PlanTierSection() {
   return (
     <div>
-      <h3 className="text-lg font-semibold text-foreground mb-3">Plan</h3>
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Plan</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {PLANS.map((plan) => (
           <div
             key={plan.name}
             className={cn(
-              "rounded-lg border bg-card p-6 flex flex-col",
+              "rounded-lg border p-6 flex flex-col",
               plan.current
                 ? "ring-2 ring-primary border-primary"
                 : "border-border"

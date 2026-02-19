@@ -34,32 +34,32 @@ export function ProfileInfoSection({ profile }: ProfileInfoSectionProps) {
   };
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold text-foreground mb-3">Profile Info</h3>
-      <div className="rounded-lg border border-border bg-card">
-        <SettingsRow label="Role" description="Your job title or role">
-          <Input
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            placeholder="e.g. Developer, Designer, PM"
-          />
-        </SettingsRow>
-        <div className="px-6 py-4">
-          <div className="mb-2">
-            <div className="text-sm font-medium text-foreground">Bio</div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Used by AI to personalize interactions
-            </div>
-          </div>
-          <Textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder="A brief bio about yourself..."
-            className="min-h-[200px]"
-          />
-        </div>
+    <div className="border-b border-border">
+      <div className="px-6 pt-6 pb-2">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Profile Info</h3>
       </div>
-      <div className="flex justify-end mt-4">
+      <SettingsRow label="Role" description="Your job title or role">
+        <Input
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="e.g. Developer, Designer, PM"
+        />
+      </SettingsRow>
+      <div className="px-6 py-4">
+        <div className="mb-2">
+          <div className="text-sm font-medium text-foreground">Bio</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            Used by AI to personalize interactions
+          </div>
+        </div>
+        <Textarea
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder="A brief bio about yourself..."
+          className="min-h-[200px]"
+        />
+      </div>
+      <div className="flex justify-end px-6 pb-4">
         <Button
           onClick={handleSave}
           disabled={!hasChanges || mutation.isPending}

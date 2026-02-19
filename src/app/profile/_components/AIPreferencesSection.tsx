@@ -51,58 +51,56 @@ export function AIPreferencesSection({ profile }: AIPreferencesSectionProps) {
   };
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold text-foreground mb-3">
-        AI Preferences
-      </h3>
-      <div className="rounded-lg border border-border bg-card">
-        <SettingsRow
-          label="Communication Style"
-          description="How AI should communicate with you"
-        >
-          <Select
-            value={style}
-            onValueChange={(value) => setStyle(value as CommunicationStyle)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Choose a style..." />
-            </SelectTrigger>
-            <SelectContent>
-              {(
-                Object.keys(COMMUNICATION_STYLE) as Array<
-                  keyof typeof COMMUNICATION_STYLE
-                >
-              ).map((key) => {
-                const value = COMMUNICATION_STYLE[key];
-                const config = COMMUNICATION_STYLE_CONFIG[value];
-                return (
-                  <SelectItem key={value} value={value}>
-                    <span>{config.label}</span>
-                    <span className="text-muted-foreground ml-2 text-xs">
-                      {config.description}
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </SettingsRow>
-        <div className="px-6 py-4">
-          <div className="mb-2">
-            <div className="text-sm font-medium text-foreground">Custom Instructions</div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Additional context or rules for AI
-            </div>
-          </div>
-          <Textarea
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="e.g. Always respond in bullet points, prefer TypeScript examples..."
-            className="min-h-[200px]"
-          />
-        </div>
+    <div className="border-b border-border">
+      <div className="px-6 pt-6 pb-2">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">AI Preferences</h3>
       </div>
-      <div className="flex justify-end mt-4">
+      <SettingsRow
+        label="Communication Style"
+        description="How AI should communicate with you"
+      >
+        <Select
+          value={style}
+          onValueChange={(value) => setStyle(value as CommunicationStyle)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a style..." />
+          </SelectTrigger>
+          <SelectContent>
+            {(
+              Object.keys(COMMUNICATION_STYLE) as Array<
+                keyof typeof COMMUNICATION_STYLE
+              >
+            ).map((key) => {
+              const value = COMMUNICATION_STYLE[key];
+              const config = COMMUNICATION_STYLE_CONFIG[value];
+              return (
+                <SelectItem key={value} value={value}>
+                  <span>{config.label}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    {config.description}
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </SettingsRow>
+      <div className="px-6 py-4">
+        <div className="mb-2">
+          <div className="text-sm font-medium text-foreground">Custom Instructions</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            Additional context or rules for AI
+          </div>
+        </div>
+        <Textarea
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder="e.g. Always respond in bullet points, prefer TypeScript examples..."
+          className="min-h-[200px]"
+        />
+      </div>
+      <div className="flex justify-end px-6 pb-4">
         <Button
           onClick={handleSave}
           disabled={!hasChanges || mutation.isPending}
