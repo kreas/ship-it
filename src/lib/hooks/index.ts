@@ -109,6 +109,8 @@ export { useUserProfile, useUpdateUserProfile } from "./use-profile";
 
 export { useEpicTitle } from "./use-epic-title";
 
+export { useUploadImage } from "./use-upload-image";
+
 export {
   useKnowledgeFolders,
   useKnowledgeDocuments,
