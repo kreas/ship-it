@@ -11,10 +11,7 @@ interface ClaimPageProps {
 export default async function ClaimPage({ params }: ClaimPageProps) {
   const { token } = await params;
 
-  // Validate the invite code
-  const { valid, errorMessage } = await validateInviteCode(token);
-
-  // Check if user is authenticated
+  // Check auth first so we can pass userId to validation
   const authUser = await getCurrentUser();
   let isAuthenticated = false;
 
@@ -33,6 +30,12 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
       redirect("/projects");
     }
   }
+
+  // Validate the invite code (with userId for duplicate claim detection)
+  const { valid, errorMessage } = await validateInviteCode(
+    token,
+    authUser?.id
+  );
 
   return (
     <ClaimCard

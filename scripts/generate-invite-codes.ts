@@ -4,6 +4,7 @@
  * Usage:
  *   npx tsx scripts/generate-invite-codes.ts --count 5 --label "Beta batch 1"
  *   npx tsx scripts/generate-invite-codes.ts --count 10 --expires-in-days 30
+ *   npx tsx scripts/generate-invite-codes.ts --count 1 --max-uses 50 --label "Public beta"
  */
 
 import { createClient } from "@libsql/client";
@@ -29,9 +30,17 @@ async function main() {
   const expiresInDays = args["expires-in-days"]
     ? parseInt(args["expires-in-days"], 10)
     : null;
+  const maxUses = args["max-uses"]
+    ? parseInt(args["max-uses"], 10)
+    : null;
 
   if (count < 1 || count > 100) {
     console.error("Count must be between 1 and 100");
+    process.exit(1);
+  }
+
+  if (maxUses !== null && (isNaN(maxUses) || maxUses < 1)) {
+    console.error("--max-uses must be a positive integer");
     process.exit(1);
   }
 
@@ -54,6 +63,7 @@ async function main() {
 
   console.log(`Generating ${count} invite code(s)...`);
   if (label) console.log(`Label: ${label}`);
+  if (maxUses !== null) console.log(`Max uses: ${maxUses}`);
   if (expiresAt) console.log(`Expires: ${expiresAt.toISOString()}`);
   console.log("");
 
@@ -64,6 +74,7 @@ async function main() {
     await db.insert(inviteCodes).values({
       id,
       label,
+      maxUses,
       createdAt: now,
       expiresAt,
     });

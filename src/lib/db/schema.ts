@@ -25,9 +25,27 @@ export const users = sqliteTable("users", {
 export const inviteCodes = sqliteTable("invite_codes", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   label: text("label"), // optional admin label, e.g. "Beta batch 1"
+  maxUses: integer("max_uses"), // nullable = unlimited uses
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   expiresAt: integer("expires_at", { mode: "timestamp" }), // nullable = no expiry
 });
+
+// Invite Code Claims - tracks who claimed each code
+export const inviteCodeClaims = sqliteTable(
+  "invite_code_claims",
+  {
+    inviteCodeId: text("invite_code_id")
+      .notNull()
+      .references(() => inviteCodes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    claimedAt: integer("claimed_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.inviteCodeId, table.userId] }),
+  })
+);
 
 // Brands - user-owned brand identities (reusable across workspaces)
 export const brands = sqliteTable("brands", {
