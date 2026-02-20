@@ -64,6 +64,13 @@
       "when": 1771478682004,
       "tag": "0008_true_mister_fear",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1771543894358,
+      "tag": "0009_many_jack_power",
+      "breakpoints": true
     }
   ]
 }

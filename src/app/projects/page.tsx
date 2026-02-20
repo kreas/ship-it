@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
-import { getUserWorkspaces } from "@/lib/actions/workspace";
+import { requireActiveUser, getUserWorkspaces } from "@/lib/actions/workspace";
 import { Plus, Folder, LayoutDashboard } from "lucide-react";
 import type { Workspace } from "@/lib/types";
 
@@ -50,12 +48,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
 }
 
 export default async function ProjectsPage() {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
+  await requireActiveUser();
   const workspaces = await getUserWorkspaces();
 
   // Sort by most recently updated

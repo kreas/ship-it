@@ -57,6 +57,18 @@ export async function requireAuth(): Promise<User> {
 }
 
 /**
+ * Require an authenticated user with "active" status.
+ * Redirects waitlisted users to /waitlist.
+ */
+export async function requireActiveUser(): Promise<User> {
+  const user = await requireAuth();
+  if (user.status !== "active") {
+    redirect("/waitlist");
+  }
+  return user;
+}
+
+/**
  * Check if user has access to workspace with optional minimum role.
  * Wrapped with React.cache() to deduplicate within a single request.
  */
@@ -131,7 +143,7 @@ export async function createWorkspace(
   name: string,
   purpose: TemplateWorkspacePurpose = "software"
 ): Promise<Workspace> {
-  const user = await requireAuth();
+  const user = await requireActiveUser();
   const now = new Date();
 
   // Generate unique slug
@@ -233,7 +245,7 @@ export async function createCustomWorkspace(
   customLabels: Array<{ name: string; color: string }>,
   suggestedIssues?: Array<{ title: string; description?: string }>
 ): Promise<Workspace> {
-  const user = await requireAuth();
+  const user = await requireActiveUser();
   const now = new Date();
 
   // Validate columns
