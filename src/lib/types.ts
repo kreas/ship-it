@@ -8,6 +8,7 @@ import type {
   users,
   workspaces,
   workspaceMembers,
+  workspaceInvitations,
   attachments,
   workspaceSkills,
   workspaceMcpServers,
@@ -26,6 +27,7 @@ import type {
   knowledgeDocumentLinks,
   issueKnowledgeDocuments,
   knowledgeAssets,
+  inviteCodes,
 } from "./db/schema";
 import type { Status, Priority, CommunicationStyle } from "./design-tokens";
 
@@ -54,6 +56,14 @@ export type KnowledgeDocumentTag = typeof knowledgeDocumentTags.$inferSelect;
 export type KnowledgeDocumentLink = typeof knowledgeDocumentLinks.$inferSelect;
 export type IssueKnowledgeDocument = typeof issueKnowledgeDocuments.$inferSelect;
 export type KnowledgeAsset = typeof knowledgeAssets.$inferSelect;
+
+// Invite codes
+export type InviteCode = typeof inviteCodes.$inferSelect;
+export type UserStatus = "waitlisted" | "active";
+
+// Workspace invitations
+export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;
+export type WorkspaceInvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 
 // User profile types
 export type AICommunicationStyle = CommunicationStyle;

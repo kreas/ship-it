@@ -12,12 +12,21 @@ export const users = sqliteTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   avatarUrl: text("avatar_url"),
+  status: text("status").notNull().default("waitlisted"), // "waitlisted" | "active"
   role: text("role"),
   bio: text("bio"),
   aiCommunicationStyle: text("ai_communication_style"),
   aiCustomInstructions: text("ai_custom_instructions"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+// Invite Codes - reusable beta invite codes
+export const inviteCodes = sqliteTable("invite_codes", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  label: text("label"), // optional admin label, e.g. "Beta batch 1"
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  expiresAt: integer("expires_at", { mode: "timestamp" }), // nullable = no expiry
 });
 
 // Brands - user-owned brand identities (reusable across workspaces)
@@ -80,6 +89,24 @@ export const workspaceMembers = sqliteTable(
     pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
   })
 );
+
+// Workspace Invitations - email invitations to join a workspace
+export const workspaceInvitations = sqliteTable("workspace_invitations", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  token: text("token").notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  invitedBy: text("invited_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending | accepted | expired | revoked
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  claimedAt: integer("claimed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
 
 // Columns - status columns within workspaces
 export const columns = sqliteTable("columns", {

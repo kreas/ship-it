@@ -15,6 +15,15 @@ export interface WorkOSUserData {
   avatarUrl: string | null;
 }
 
+const AUTO_ACTIVE_DOMAINS = ["civilization.agency", "stabilization.hsc"];
+
+function isAutoActiveDomain(email: string): boolean {
+  const lastAt = email.lastIndexOf("@");
+  if (lastAt === -1) return false;
+  const domain = email.substring(lastAt + 1).toLowerCase();
+  return AUTO_ACTIVE_DOMAINS.includes(domain);
+}
+
 /**
  * Sync a user from WorkOS to the database.
  * Creates new user or updates existing one.
@@ -31,7 +40,12 @@ export async function syncUserFromWorkOS(
     .get();
 
   if (existingUser) {
-    // Update existing user
+    // Auto-upgrade waitlisted users with allowlisted email domains
+    const status =
+      existingUser.status === "waitlisted" && isAutoActiveDomain(userData.email)
+        ? "active"
+        : existingUser.status;
+
     await db
       .update(users)
       .set({
@@ -39,6 +53,7 @@ export async function syncUserFromWorkOS(
         firstName: userData.firstName,
         lastName: userData.lastName,
         avatarUrl: userData.avatarUrl,
+        status,
         updatedAt: now,
       })
       .where(eq(users.id, userData.id));
@@ -49,17 +64,21 @@ export async function syncUserFromWorkOS(
       firstName: userData.firstName,
       lastName: userData.lastName,
       avatarUrl: userData.avatarUrl,
+      status,
       updatedAt: now,
     };
   }
 
-  // Create new user
+  // Auto-activate new users with allowlisted email domains
+  const status = isAutoActiveDomain(userData.email) ? "active" : "waitlisted";
+
   const newUser: User = {
     id: userData.id,
     email: userData.email,
     firstName: userData.firstName,
     lastName: userData.lastName,
     avatarUrl: userData.avatarUrl,
+    status,
     role: null,
     bio: null,
     aiCommunicationStyle: null,
