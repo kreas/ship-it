@@ -8,6 +8,7 @@ import type {
   users,
   workspaces,
   workspaceMembers,
+  workspaceInvitations,
   attachments,
   workspaceSkills,
   workspaceMcpServers,
@@ -59,6 +60,10 @@ export type KnowledgeAsset = typeof knowledgeAssets.$inferSelect;
 // Invite codes
 export type InviteCode = typeof inviteCodes.$inferSelect;
 export type UserStatus = "waitlisted" | "active";
+
+// Workspace invitations
+export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;
+export type WorkspaceInvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 
 // User profile types
 export type AICommunicationStyle = CommunicationStyle;

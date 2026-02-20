@@ -90,6 +90,24 @@ export const workspaceMembers = sqliteTable(
   })
 );
 
+// Workspace Invitations - email invitations to join a workspace
+export const workspaceInvitations = sqliteTable("workspace_invitations", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  token: text("token").notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  invitedBy: text("invited_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending | accepted | expired | revoked
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  claimedAt: integer("claimed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // Columns - status columns within workspaces
 export const columns = sqliteTable("columns", {
   id: text("id").primaryKey(),

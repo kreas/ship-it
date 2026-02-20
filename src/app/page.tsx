@@ -17,7 +17,7 @@ export default async function Home() {
   const cookieStore = await cookies();
   const returnTo = cookieStore.get("returnTo")?.value;
 
-  if (returnTo?.startsWith("/beta/")) {
+  if (returnTo?.startsWith("/beta/") || returnTo?.startsWith("/invite/")) {
     redirect(returnTo);
   }
 
