@@ -28,6 +28,7 @@ import type {
   issueKnowledgeDocuments,
   knowledgeAssets,
   inviteCodes,
+  inviteCodeClaims,
 } from "./db/schema";
 import type { Status, Priority, CommunicationStyle } from "./design-tokens";
 
@@ -59,6 +60,7 @@ export type KnowledgeAsset = typeof knowledgeAssets.$inferSelect;
 
 // Invite codes
 export type InviteCode = typeof inviteCodes.$inferSelect;
+export type InviteCodeClaim = typeof inviteCodeClaims.$inferSelect;
 export type UserStatus = "waitlisted" | "active";
 
 // Workspace invitations

@@ -59,4 +59,42 @@ describe("invite code validation", () => {
       expect(isExpired).toBeFalsy();
     });
   });
+
+  describe("maxUses exhaustion logic", () => {
+    it("null maxUses means unlimited — never exhausted", () => {
+      const code = { maxUses: null as number | null };
+      const claimCount = 1000;
+      const isExhausted = code.maxUses !== null && claimCount >= code.maxUses;
+      expect(isExhausted).toBe(false);
+    });
+
+    it("allows claims when under maxUses limit", () => {
+      const code = { maxUses: 5 };
+      const claimCount = 3;
+      const isExhausted = code.maxUses !== null && claimCount >= code.maxUses;
+      expect(isExhausted).toBe(false);
+    });
+
+    it("rejects claims when at maxUses limit", () => {
+      const code = { maxUses: 5 };
+      const claimCount = 5;
+      const isExhausted = code.maxUses !== null && claimCount >= code.maxUses;
+      expect(isExhausted).toBe(true);
+    });
+
+    it("rejects claims when over maxUses limit", () => {
+      const code = { maxUses: 3 };
+      const claimCount = 10;
+      const isExhausted = code.maxUses !== null && claimCount >= code.maxUses;
+      expect(isExhausted).toBe(true);
+    });
+
+    it("maxUses of 1 behaves like single-use", () => {
+      const code = { maxUses: 1 };
+      // No claims yet — allowed
+      expect(code.maxUses !== null && 0 >= code.maxUses).toBe(false);
+      // One claim — exhausted
+      expect(code.maxUses !== null && 1 >= code.maxUses).toBe(true);
+    });
+  });
 });
