@@ -160,6 +160,9 @@ export function AdArtifactInline({
     );
   }
 
+  const templateEntry = getTemplateEntry(artifact.data.type);
+  const enableGenerate = templateEntry?.needsImageGeneration ?? false;
+
   return (
     <div className="mt-3 mb-3 max-w-fit">
       <ArtifactProvider
@@ -168,7 +171,7 @@ export function AdArtifactInline({
         artifactId={artifact.data.id}
         workspaceId={workspaceId}
         mediaUrls={artifact.resolvedMediaBySlot}
-        enableGenerate={false}
+        enableGenerate={enableGenerate}
         onRegenerate={() => {}}
         onSave={() => {}}
       >

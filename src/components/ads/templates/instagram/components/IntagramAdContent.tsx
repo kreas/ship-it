@@ -4,6 +4,7 @@ import { instagramColors } from '../config';
 import { getAspectRatioValue, type AspectRatio } from '@/components/ads/types/ContentData';
 import { ArtifactMedia } from '@/components/ads/components/ArtifactMedia';
 
+
 interface InstagramAdContentProps {
   mediaIndex?: number;
   aspectRatio?: AspectRatio;
@@ -12,6 +13,10 @@ interface InstagramAdContentProps {
 }
 
 export function InstagramAdContent({ aspectRatio = '1:1', content, style, mediaIndex }: InstagramAdContentProps) {
+  const imageBlock = (content as { content?: { prompt?: string; altText?: string } }).content ?? content;
+  const prompt = (imageBlock?.prompt)?.trim() ?? '';
+  const altText = (imageBlock?.altText)?.trim() ?? '';
+
   return (
     <div
       className="w-full"
@@ -22,8 +27,8 @@ export function InstagramAdContent({ aspectRatio = '1:1', content, style, mediaI
       }}
     >
       <ArtifactMedia
-        prompt={content.prompt}
-        altText={content.altText}
+        prompt={prompt}
+        altText={altText}
         aspectRatio={aspectRatio}
         mediaIndex={mediaIndex}
       />
