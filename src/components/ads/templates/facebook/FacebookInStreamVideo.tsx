@@ -18,7 +18,7 @@ type FacebookInStreamVideoToolProps = MetaDefaultProps<{
 
 function EngagementMetrics() {
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-500 w-full justify-between">
+    <div className="flex items-center gap-2 text-sm text-[#65676B] w-full justify-between">
       <div className="flex items-center gap-2">
         <div className="flex -space-x-1">
           <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-500 rounded-full text-xs">&#x1F44D;</span>
@@ -50,9 +50,9 @@ function SecondaryAd({
   imageBackgroundColor?: string;
 }) {
   return (
-    <Card className="w-full max-w-xl bg-white duration-300 animate-in fade-in">
+    <Card className="w-full max-w-xl bg-white duration-300 animate-in fade-in text-[#1c1e21]">
       <CardHeader className="flex flex-row items-start space-x-4 p-4 justify-between">
-        <a href="#" className="flex items-center gap-2">
+        <a href="#" className="flex items-center gap-2 text-[#1c1e21]">
           <Avatar
             className="h-8 w-8"
             style={imageBackgroundColor ? { backgroundColor: imageBackgroundColor } : { backgroundColor: 'rgb(224 242 254)' }}
@@ -62,16 +62,16 @@ function SecondaryAd({
           </Avatar>
           <div className="flex flex-col">
             <span className="text-sm font-semibold">{companyName}</span>
-            <span className="text-xs text-muted-foreground">Sponsored</span>
+            <span className="text-xs text-[#65676B]">Sponsored</span>
           </div>
         </a>
         <div className="flex items-center gap-2">
           <button className="ml-auto rounded-full p-2">
-            <MoreHorizontal className="h-5 w-5 text-gray-500" />
+            <MoreHorizontal className="h-5 w-5 text-[#65676B]" />
             <span className="sr-only">More options</span>
           </button>
-          <button className="ml-auto rounded-full p-0.5 border-2 border-gray-500" onClick={handleCollapse}>
-            <ChevronUp className="h-5 w-5 text-gray-500" />
+          <button className="ml-auto rounded-full p-0.5 border-2 border-[#65676B]" onClick={handleCollapse}>
+            <ChevronUp className="h-5 w-5 text-[#65676B]" />
             <span className="sr-only">Collapse</span>
           </button>
         </div>
@@ -89,8 +89,8 @@ function SecondaryAd({
           </div>
           <div className="flex flex-col justify-between text-sm py-3">
             <div className="space-y-0">
-              <h2 className="font-semibold">{title}</h2>
-              <p className="text-muted-foreground">{description}</p>
+              <h2 className="font-semibold text-[#1c1e21]">{title}</h2>
+              <p className="text-[#65676B]">{description}</p>
             </div>
           </div>
         </div>
@@ -124,10 +124,10 @@ export default function FacebookInStreamVideo({ content }: FacebookInStreamVideo
   }, []);
 
   return (
-    <div className="flex flex-col gap-4 items-center" style={{ color: "#050505" }}>
+    <div className="flex flex-col gap-4 items-center text-[#1c1e21]">
       <Card className="w-full max-w-md overflow-hidden bg-white">
         <CardHeader className="flex flex-row items-center space-x-4 p-4 justify-between">
-          <a href={content.url} target="_blank" className="flex items-center gap-2">
+          <a href={content.url} target="_blank" className="flex items-center gap-2 text-[#1c1e21]">
             <Avatar
               className="h-8 w-8"
               style={profileImageBackgroundColor ? { backgroundColor: profileImageBackgroundColor } : undefined}
@@ -137,16 +137,16 @@ export default function FacebookInStreamVideo({ content }: FacebookInStreamVideo
             </Avatar>
             <div className="flex flex-col">
               <span className="text-sm font-semibold">{companyName}</span>
-              <span className="text-xs text-muted-foreground">Sponsored</span>
+              <span className="text-xs text-[#65676B]">Sponsored</span>
             </div>
           </a>
-          <Button variant="ghost" size="icon" className="ml-auto rounded-full">
+          <Button variant="ghost" size="icon" className="ml-auto rounded-full text-[#1c1e21]">
             <MoreHorizontal className="h-5 w-5" />
             <span className="sr-only">More options</span>
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          <p className="px-4 pb-4">{content.primaryText}</p>
+          <p className="px-4 pb-4 text-[#1c1e21]">{content.primaryText}</p>
           <ArtifactMedia
             prompt={content.image}
             altText={companyName}
@@ -157,21 +157,21 @@ export default function FacebookInStreamVideo({ content }: FacebookInStreamVideo
             <EngagementMetrics />
             <div className="flex items-center border-t border-b border-gray-200 py-1">
               <button
-                className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-50 text-gray-600"
+                className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-50 text-[#65676B]"
                 aria-label="Like"
               >
                 <Heart className="w-5 h-5" />
                 <span>Like</span>
               </button>
               <button
-                className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-50 text-gray-600"
+                className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-50 text-[#65676B]"
                 aria-label="Comment"
               >
                 <MessageCircle className="w-5 h-5" />
                 <span>Comment</span>
               </button>
               <button
-                className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-50 text-gray-600"
+                className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-50 text-[#65676B]"
                 aria-label="Share"
               >
                 <Share className="w-5 h-5" />

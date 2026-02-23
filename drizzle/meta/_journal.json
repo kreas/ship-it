@@ -22,6 +22,13 @@
       "when": 1771334502102,
       "tag": "0002_chief_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1771446175747,
+      "tag": "0003_true_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

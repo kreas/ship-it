@@ -360,6 +360,7 @@ export const adArtifacts = sqliteTable("ad_artifacts", {
   name: text("name").notNull(),
   content: text("content").notNull(), // JSON string of template-specific content
   mediaAssets: text("media_assets"), // JSON array of ArtifactMediaUrls
+  issueAttachmentId: text("issue_attachment_id"),
   brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),

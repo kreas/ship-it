@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, User, FileText } from "lucide-react";
+import { Bot, User, FileText, Check } from "lucide-react";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
 import { ToolResultDisplay } from "@/components/ai-elements/ToolResultDisplay";
 import {
@@ -32,6 +32,7 @@ interface CreateAdResult {
   platform: string;
   templateType: string;
   type: string;
+  updated?: boolean;
 }
 
 interface ChatMessageProps {
@@ -181,6 +182,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
               if (toolName.startsWith("create_ad_") && toolPart.output) {
                 const result = toolPart.output as CreateAdResult;
                 if (result.success) {
+                  if (result.updated) {
+                    return (
+                      <div key={index} className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Check className="w-3 h-3 text-green-500" />
+                        <span>Updated <span className="font-medium text-foreground">{result.name}</span></span>
+                        <button
+                          onClick={() => viewArtifact(result.artifactId)}
+                          className="underline hover:text-foreground transition-colors"
+                        >
+                          View
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
                     <AdArtifactInline
                       key={index}

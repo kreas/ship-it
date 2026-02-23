@@ -1,5 +1,5 @@
 import { generateImage } from "@/lib/services/image-generation";
-import { updateAdArtifactMedia } from "@/lib/actions/ad-artifacts";
+import { updateAdArtifactMedia, refreshAdAttachment } from "@/lib/actions/ad-artifacts";
 import { db } from "@/lib/db";
 import { adArtifacts } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -49,6 +49,11 @@ export async function POST(req: Request) {
       }
       assets[mediaIndex] = { ...assets[mediaIndex], storageKey: result.storageKey };
       await updateAdArtifactMedia(artifactId, JSON.stringify(assets));
+
+      // Refresh the HTML attachment with new media
+      refreshAdAttachment(artifactId).catch((err) =>
+        console.error("Failed to refresh ad attachment:", err)
+      );
     }
 
     return Response.json({

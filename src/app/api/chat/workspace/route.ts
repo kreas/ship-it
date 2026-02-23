@@ -63,7 +63,8 @@ const AD_TOOLS_SECTION = `
 - For image prompts, write descriptive scenes focusing on mood, composition, and lighting — avoid text in images
 - Use one strong, clear image per ad slot unless the user specifically asks for multiple
 - Match the ad copy length to the platform's conventions (e.g., short for Instagram, detailed for LinkedIn)
-- Always provide meaningful CTA text that matches the campaign goal`;
+- Always provide meaningful CTA text that matches the campaign goal
+- **Updating existing ads**: ONLY pass \`existingArtifactId\` when the user **explicitly** says to modify, change, update, or edit an ad that was created earlier in this conversation (e.g., "change the headline", "update the CTA", "make it shorter"). Get the \`artifactId\` from the previous \`create_ad_*\` tool result. **NEVER** pass \`existingArtifactId\` when the user asks to create, make, generate, or wants a different/new ad — omit the field entirely in that case.`;
 
 const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing workspace. You can help with:
 

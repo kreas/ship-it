@@ -4,6 +4,7 @@ import React, { createContext, useContext, useCallback, useState, useRef, useEff
 import type { Artifact, ArtifactMediaUrls, ArtifactSaveData, MediaTrackingCallbacks } from '../types/ArtifactData';
 import { ArtifactSaveService } from '../services/ArtifactSaveService';
 import { getExtensionFromUrl, sanitizeFileName } from '../utils';
+import { updateAdArtifactContent } from '@/lib/actions/ad-artifacts';
 
 // Context Types
 export interface ArtifactContextValue {
@@ -38,6 +39,13 @@ export interface ArtifactContextValue {
 
   // Save data
   getArtifactSaveData: () => ArtifactSaveData;
+
+  // Content editing
+  localContent: unknown;
+  updateContent: (newContent: unknown) => void;
+  saveContent: (artifactId: string) => Promise<void>;
+  isDirty: boolean;
+  isSavingContent: boolean;
 }
 
 // Provider Props
@@ -99,6 +107,11 @@ export const ArtifactProvider: React.FC<ArtifactProviderProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState<false | number>(false);
   const [isRegenerating, setIsRegenerating] = useState<false | number>(false);
+
+  // Content editing state
+  const [localContent, setLocalContent] = useState<unknown>(artifact?.content);
+  const [isSavingContent, setIsSavingContent] = useState(false);
+  const originalContentRef = useRef<unknown>(artifact?.content);
 
   // Track contexts for better organization
   const urlContexts = useRef<Map<string, string>[]>([]);
@@ -419,6 +432,25 @@ export const ArtifactProvider: React.FC<ArtifactProviderProps> = ({
     }
   }, [mediaUrls, name]);
 
+  // Content editing actions
+  const updateContent = useCallback((newContent: unknown) => {
+    setLocalContent(newContent);
+  }, []);
+
+  const saveContent = useCallback(async (artifactId: string) => {
+    setIsSavingContent(true);
+    try {
+      const result = await updateAdArtifactContent(artifactId, JSON.stringify(localContent));
+      if (result) {
+        originalContentRef.current = localContent;
+      }
+    } finally {
+      setIsSavingContent(false);
+    }
+  }, [localContent]);
+
+  const isDirty = JSON.stringify(localContent) !== JSON.stringify(originalContentRef.current);
+
   const saveRef = useRef(save);
   saveRef.current = save;
   const prevRegeneratingRef = useRef<false | number>(false);
@@ -452,6 +484,11 @@ export const ArtifactProvider: React.FC<ArtifactProviderProps> = ({
     isRegenerating,
     isDownloading,
     getArtifactSaveData,
+    localContent,
+    updateContent,
+    saveContent,
+    isDirty,
+    isSavingContent,
   };
 
   return <ArtifactContext.Provider value={contextValue}>{children}</ArtifactContext.Provider>;

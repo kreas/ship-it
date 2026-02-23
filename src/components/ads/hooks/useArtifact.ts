@@ -4,7 +4,7 @@ import { useArtifactContext } from '../context/ArtifactProvider';
  * Hook to access basic artifact information
  */
 export const useArtifact = () => {
-  const { artifact, name, mediaUrls } = useArtifactContext();
+  const { artifact, name, mediaUrls, localContent } = useArtifactContext();
 
   const imageCount = mediaUrls.reduce((acc, mediaUrl) => acc + (mediaUrl?.imageUrls?.length ?? 0), 0);
   const videoCount = mediaUrls.reduce((acc, mediaUrl) => acc + (mediaUrl?.videoUrls?.length ?? 0), 0);
@@ -16,7 +16,7 @@ export const useArtifact = () => {
     id: artifact.id,
     type: artifact.type,
     format: artifact.format,
-    content: artifact.content,
+    content: localContent ?? artifact.content,
     mediaCount,
     imageCount,
     videoCount,

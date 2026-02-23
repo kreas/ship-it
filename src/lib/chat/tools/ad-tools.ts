@@ -1,6 +1,6 @@
 import { tool, jsonSchema } from "ai";
 import { z } from "zod";
-import { createAdArtifact, attachAdArtifactToIssue } from "@/lib/actions/ad-artifacts";
+import { createAdArtifact, attachAdArtifactToIssue, updateAdArtifactContent } from "@/lib/actions/ad-artifacts";
 import { getWorkspaceBrand } from "@/lib/actions/brand";
 import { mergeWorkspaceBrandIntoContent } from "@/lib/ads/merge-workspace-brand";
 
@@ -21,7 +21,7 @@ interface AdToolsContext {
   /** Only set when chat is a workspace chat (workspace_chats.id). Omit for issue chat to avoid FK violation. */
   chatId?: string;
   brandId?: string;
-  /** When set, enables the attach_ad_to_issue tool to attach artifacts to this issue. */
+  /** When set, ads are automatically attached to this issue on creation. */
   issueId?: string;
 }
 
@@ -77,10 +77,19 @@ function createAdTool(
           reused: "inline",
         }) as Record<string, unknown>;
         const { $schema, ...clean } = raw;
-        return clean;
+        return {
+          ...clean,
+          properties: {
+            ...((clean.properties as Record<string, unknown>) ?? {}),
+            existingArtifactId: {
+              type: "string",
+              description: "ID of an existing ad artifact to update in place. Get this from a previous create_ad_* tool result in the conversation. Omit when creating a new ad.",
+            },
+          },
+        };
       },
     ),
-    execute: async (input: { name: string; type: string; content: unknown }) => {
+    execute: async (input: { name: string; type: string; content: unknown; existingArtifactId?: string }) => {
       const { platform, templateType } = parseTemplateType(input.type);
 
       try {
@@ -101,6 +110,27 @@ function createAdTool(
           );
         }
 
+        // UPDATE existing artifact in place
+        if (input.existingArtifactId) {
+          const updated = await updateAdArtifactContent(
+            input.existingArtifactId,
+            JSON.stringify(contentToSave)
+          );
+          if (!updated) {
+            return { success: false, error: "Artifact not found or update failed" };
+          }
+          return {
+            success: true,
+            updated: true,
+            artifactId: updated.id,
+            name: updated.name,
+            platform: updated.platform,
+            templateType: updated.templateType,
+            type: input.type,
+          };
+        }
+
+        // CREATE new artifact (existing flow unchanged)
         const artifact = await createAdArtifact({
           workspaceId: context.workspaceId,
           chatId: context.chatId, // only set for workspace chat; omit for issue chat (FK references workspace_chats.id)
@@ -111,9 +141,23 @@ function createAdTool(
           brandId: context.brandId,
         });
 
+        // Auto-attach to issue when in issue chat context
+        let attachmentId: string | undefined;
+        if (context.issueId) {
+          try {
+            const attachResult = await attachAdArtifactToIssue(artifact.id, context.issueId);
+            if (attachResult.success) {
+              attachmentId = attachResult.attachmentId;
+            }
+          } catch (e) {
+            console.error("Failed to auto-attach ad to issue:", e);
+          }
+        }
+
         return {
           success: true,
           artifactId: artifact.id,
+          attachmentId,
           name: input.name,
           platform,
           templateType,
@@ -146,28 +190,5 @@ export function createAdTools(context: AdToolsContext) {
     create_ad_linkedin_carousel: createAdTool(LinkedInCarouselAdSchema, context),
     create_ad_google_search_ad: createAdTool(GoogleSearchAdSchema, context),
     create_ad_facebook_in_stream_video: createAdTool(FacebookInStreamVideoTool, context),
-    ...(context.issueId
-      ? {
-          attach_ad_to_issue: tool({
-            description:
-              "Attach an ad artifact to the current issue as an HTML file. Call this after creating an ad when the user wants it attached.",
-            parameters: z.object({
-              artifactId: z
-                .string()
-                .describe("The artifact ID returned by a create_ad_* tool"),
-            }),
-            execute: async ({ artifactId }) => {
-              const result = await attachAdArtifactToIssue(
-                artifactId,
-                context.issueId!,
-              );
-              if (result.success) {
-                return { success: true, message: "Ad attached to issue" };
-              }
-              return { success: false, error: result.error };
-            },
-          }),
-        }
-      : {}),
   };
 }
