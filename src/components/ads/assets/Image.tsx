@@ -1,5 +1,6 @@
 "use client";
 
+import "./image-placeholder.css";
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { RefreshCcw } from 'lucide-react';
 
@@ -148,33 +149,53 @@ export default function GeneratedImage({
     hasAttemptedRegenerate.current = true;
   }, [enableRegenerate, prompt]);
 
+  const hasImage = !!(imageUrl ?? generatedImage);
+  const showSkeleton = !hasImage;
+
   return (
     <div
-      className="relative group h-full w-full"
+      className="relative group h-full w-full min-h-0"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <img
-        src={imageUrl ?? (generatedImage || '/placeholder.svg')}
-        alt={isLoading ? 'Generating image...' : alt}
-        className={className}
-        data-image-type={dataImageType}
-      />
-      {isLoading || loading ? (
-        <div className="absolute inset-0 w-full h-full bg-black/50 flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      {showSkeleton ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div
+            className="absolute inset-0 h-full w-full rounded-none bg-muted artifact-skeleton-subtle"
+            aria-hidden
+          />
+          {(isLoading || loading) && (
+            <div className="relative z-10 flex flex-col items-center gap-2 text-muted-foreground">
+              <div className="h-8 w-8 border-2 border-muted-foreground/40 border-t-muted-foreground rounded-full animate-spin" />
+              <span className="text-xs">Generating image…</span>
+            </div>
+          )}
         </div>
       ) : (
-        isHovered && (
-          <button
-            onClick={handleRegenerate}
-            className="absolute inset-0 w-full h-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-1 pt-4"
-            aria-label="Regenerate image"
-          >
-            <RefreshCcw className="w-8 h-8 text-white" />
-            <span className="text-white block text-sm">Regenerate</span>
-          </button>
-        )
+        <>
+          <img
+            src={imageUrl ?? generatedImage ?? ''}
+            alt={isLoading ? 'Generating image...' : alt}
+            className={className}
+            data-image-type={dataImageType}
+          />
+          {isLoading || loading ? (
+            <div className="absolute inset-0 w-full h-full bg-black/50 flex items-center justify-center">
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            isHovered && (
+              <button
+                onClick={handleRegenerate}
+                className="absolute inset-0 w-full h-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-1 pt-4"
+                aria-label="Regenerate image"
+              >
+                <RefreshCcw className="w-8 h-8 text-white" />
+                <span className="text-white block text-sm">Regenerate</span>
+              </button>
+            )
+          )}
+        </>
       )}
     </div>
   );
