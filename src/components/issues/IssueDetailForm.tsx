@@ -14,6 +14,7 @@ import { AssigneeSelect } from "./properties/AssigneeSelect";
 import { LabelSelect } from "./properties/LabelSelect";
 import { DatePicker } from "./properties/DatePicker";
 import { EstimateInput } from "./properties/EstimateInput";
+import { EpicBadge } from "./EpicBadge";
 import { Comments } from "./Comments";
 import { ActivityFeed } from "./ActivityFeed";
 import { SubtaskList } from "./SubtaskList";
@@ -27,6 +28,7 @@ import {
   useDeleteComment,
   useSubtaskCount,
   useWorkspaceMembers,
+  useUploadImage,
 } from "@/lib/hooks";
 import type { IssueWithLabels, Comment } from "@/lib/types";
 import type { Priority } from "@/lib/design-tokens";
@@ -57,6 +59,10 @@ export function IssueDetailForm({
   } = useBoardContext();
 
   const { data: members = [] } = useWorkspaceMembers(workspaceId);
+  const uploadImage = useUploadImage(workspaceId);
+  const epicTitle = issue.epicId
+    ? board.epics?.find((e) => e.id === issue.epicId)?.title ?? null
+    : null;
   const [title, setTitle] = useState(issue.title);
   const [description, setDescription] = useState(issue.description || "");
   const [isDescriptionDialogOpen, setIsDescriptionDialogOpen] = useState(false);
@@ -231,6 +237,16 @@ export function IssueDetailForm({
                 }
               />
             </div>
+            {epicTitle ? (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">
+                  Epic
+                </label>
+                <div className="py-1.5">
+                  <EpicBadge title={epicTitle} />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Labels */}
@@ -289,6 +305,7 @@ export function IssueDetailForm({
             value={description}
             onChange={setDescription}
             onClose={handleDescriptionSave}
+            onUploadImage={uploadImage}
           />
 
           {/* Subtasks - only show for parent issues (not subtasks) */}

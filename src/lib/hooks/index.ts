@@ -104,3 +104,30 @@ export {
 } from "./use-soul-chat";
 
 export { useMounted } from "./use-mounted";
+
+export { useUserProfile, useUpdateUserProfile } from "./use-profile";
+
+export { useEpicTitle } from "./use-epic-title";
+
+export { useUploadImage } from "./use-upload-image";
+
+export {
+  useKnowledgeFolders,
+  useKnowledgeDocuments,
+  useKnowledgeDocument,
+  useKnowledgeTags,
+  useCreateKnowledgeFolder,
+  useCreateKnowledgeDocument,
+  useCreateKnowledgeDocumentUpload,
+  useFinalizeKnowledgeDocumentUpload,
+  useUpdateKnowledgeDocument,
+  useDeleteKnowledgeDocument,
+  useDeleteKnowledgeFolder,
+  useMoveKnowledgeDocument,
+  useRenameKnowledgeDocument,
+  useMoveKnowledgeFolder,
+  useRenameKnowledgeFolder,
+  useIssueKnowledgeLinks,
+  useLinkKnowledgeToIssue,
+  useUnlinkKnowledgeFromIssue,
+} from "./use-knowledge";

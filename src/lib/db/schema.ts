@@ -12,9 +12,40 @@ export const users = sqliteTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   avatarUrl: text("avatar_url"),
+  status: text("status").notNull().default("waitlisted"), // "waitlisted" | "active"
+  role: text("role"),
+  bio: text("bio"),
+  aiCommunicationStyle: text("ai_communication_style"),
+  aiCustomInstructions: text("ai_custom_instructions"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+// Invite Codes - reusable beta invite codes
+export const inviteCodes = sqliteTable("invite_codes", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  label: text("label"), // optional admin label, e.g. "Beta batch 1"
+  maxUses: integer("max_uses"), // nullable = unlimited uses
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  expiresAt: integer("expires_at", { mode: "timestamp" }), // nullable = no expiry
+});
+
+// Invite Code Claims - tracks who claimed each code
+export const inviteCodeClaims = sqliteTable(
+  "invite_code_claims",
+  {
+    inviteCodeId: text("invite_code_id")
+      .notNull()
+      .references(() => inviteCodes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    claimedAt: integer("claimed_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.inviteCodeId, table.userId] }),
+  })
+);
 
 // Brands - user-owned brand identities (reusable across workspaces)
 export const brands = sqliteTable("brands", {
@@ -77,6 +108,24 @@ export const workspaceMembers = sqliteTable(
   })
 );
 
+// Workspace Invitations - email invitations to join a workspace
+export const workspaceInvitations = sqliteTable("workspace_invitations", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  token: text("token").notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  invitedBy: text("invited_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending | accepted | expired | revoked
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  claimedAt: integer("claimed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // Columns - status columns within workspaces
 export const columns = sqliteTable("columns", {
   id: text("id").primaryKey(),
@@ -89,6 +138,20 @@ export const columns = sqliteTable("columns", {
   // Maps this column to a workflow status (backlog, todo, in_progress, done, canceled)
   // Used to auto-move issues when their status changes
   status: text("status"),
+});
+
+// Epics - grouping for planning sessions
+export const epics = sqliteTable("epics", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("active"), // active, completed, canceled
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 // Cycles - time-boxed iterations (sprints)
@@ -120,6 +183,9 @@ export const issues = sqliteTable("issues", {
   estimate: integer("estimate"), // Story points
   dueDate: integer("due_date", { mode: "timestamp" }),
   cycleId: text("cycle_id").references(() => cycles.id, {
+    onDelete: "set null",
+  }),
+  epicId: text("epic_id").references(() => epics.id, {
     onDelete: "set null",
   }),
   // Subtask support: references parent issue (1 level only - subtasks cannot have subtasks)
@@ -376,5 +442,113 @@ export const aiSuggestions = sqliteTable("ai_suggestions", {
   description: text("description"),
   priority: integer("priority").notNull().default(4), // 0=urgent, 1=high, 2=medium, 3=low, 4=none
   toolsRequired: text("tools_required"), // JSON array - hint for which tools
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Knowledge Base folders (workspace-scoped tree)
+export const knowledgeFolders = sqliteTable("knowledge_folders", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  parentFolderId: text("parent_folder_id"),
+  name: text("name").notNull(),
+  path: text("path").notNull(), // e.g. "product/api"
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Knowledge Base documents
+export const knowledgeDocuments = sqliteTable("knowledge_documents", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  folderId: text("folder_id").references(() => knowledgeFolders.id, {
+    onDelete: "set null",
+  }),
+  title: text("title").notNull(),
+  slug: text("slug").notNull(),
+  mimeType: text("mime_type").notNull().default("text/markdown"),
+  fileExtension: text("file_extension").notNull().default("md"),
+  size: integer("size").notNull().default(0),
+  storageKey: text("storage_key").notNull(),
+  previewStorageKey: text("preview_storage_key"),
+  previewMimeType: text("preview_mime_type"),
+  previewStatus: text("preview_status").notNull().default("ready"),
+  previewError: text("preview_error"),
+  contentHash: text("content_hash"),
+  summary: text("summary"),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Extracted #tags for filtering and autocomplete
+export const knowledgeDocumentTags = sqliteTable(
+  "knowledge_document_tags",
+  {
+    documentId: text("document_id")
+      .notNull()
+      .references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+    tag: text("tag").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.documentId, table.tag] }),
+  })
+);
+
+// Wiki-link graph between documents
+export const knowledgeDocumentLinks = sqliteTable(
+  "knowledge_document_links",
+  {
+    sourceDocumentId: text("source_document_id")
+      .notNull()
+      .references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+    targetDocumentId: text("target_document_id")
+      .notNull()
+      .references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+    linkType: text("link_type").notNull().default("wiki"), // wiki | ticket
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.sourceDocumentId, table.targetDocumentId, table.linkType] }),
+  })
+);
+
+// Explicit issue -> knowledge document links
+export const issueKnowledgeDocuments = sqliteTable(
+  "issue_knowledge_documents",
+  {
+    issueId: text("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+    linkedBy: text("linked_by").references(() => users.id, { onDelete: "set null" }),
+    linkedAt: integer("linked_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.issueId, table.documentId] }),
+  })
+);
+
+// Knowledge assets (images embedded in markdown docs)
+export const knowledgeAssets = sqliteTable("knowledge_assets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  documentId: text("document_id").references(() => knowledgeDocuments.id, {
+    onDelete: "cascade",
+  }),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  storageKey: text("storage_key").notNull(),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

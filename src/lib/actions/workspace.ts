@@ -11,6 +11,7 @@ import {
   labels,
   users,
   issues,
+  knowledgeFolders,
 } from "../db/schema";
 import { eq, and, asc, inArray } from "drizzle-orm";
 import type {
@@ -53,6 +54,18 @@ export async function requireAuth(): Promise<User> {
   });
 
   return dbUser;
+}
+
+/**
+ * Require an authenticated user with "active" status.
+ * Redirects waitlisted users to /waitlist.
+ */
+export async function requireActiveUser(): Promise<User> {
+  const user = await requireAuth();
+  if (user.status !== "active") {
+    redirect("/waitlist");
+  }
+  return user;
 }
 
 /**
@@ -130,7 +143,7 @@ export async function createWorkspace(
   name: string,
   purpose: TemplateWorkspacePurpose = "software"
 ): Promise<Workspace> {
-  const user = await requireAuth();
+  const user = await requireActiveUser();
   const now = new Date();
 
   // Generate unique slug
@@ -195,6 +208,18 @@ export async function createWorkspace(
     });
   }
 
+  // Create root knowledge base folder
+  await db.insert(knowledgeFolders).values({
+    id: crypto.randomUUID(),
+    workspaceId,
+    parentFolderId: null,
+    name: "Knowledge Base",
+    path: "knowledge-base",
+    createdBy: user.id,
+    createdAt: now,
+    updatedAt: now,
+  });
+
   // Create default labels based on purpose
   for (const label of config.defaultLabels) {
     await db.insert(labels).values({
@@ -220,7 +245,7 @@ export async function createCustomWorkspace(
   customLabels: Array<{ name: string; color: string }>,
   suggestedIssues?: Array<{ title: string; description?: string }>
 ): Promise<Workspace> {
-  const user = await requireAuth();
+  const user = await requireActiveUser();
   const now = new Date();
 
   // Validate columns
@@ -447,7 +472,11 @@ export async function getWorkspaceMembers(
 }
 
 /**
- * Invite a member to workspace by email
+ * Invite a member to workspace by email.
+ * Handles three cases:
+ * 1. User exists + active → add to workspace directly
+ * 2. User exists + waitlisted → create invitation, send email
+ * 3. User doesn't exist → create invitation, send email
  */
 export async function inviteMember(
   workspaceId: string,
@@ -463,45 +492,52 @@ export async function inviteMember(
     .where(eq(users.email, email))
     .get();
 
-  if (!user) {
-    return {
-      success: false,
-      message: "User not found. They must sign up first.",
-    };
-  }
-
-  // Check if already a member
-  const existingMember = await db
-    .select()
-    .from(workspaceMembers)
-    .where(
-      and(
-        eq(workspaceMembers.workspaceId, workspaceId),
-        eq(workspaceMembers.userId, user.id)
+  // Case 1: User exists and is active — add directly
+  if (user && user.status === "active") {
+    // Check if already a member
+    const existingMember = await db
+      .select()
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, user.id)
+        )
       )
-    )
-    .get();
+      .get();
 
-  if (existingMember) {
+    if (existingMember) {
+      return {
+        success: false,
+        message: "User is already a member of this workspace.",
+      };
+    }
+
+    await db.insert(workspaceMembers).values({
+      workspaceId,
+      userId: user.id,
+      role,
+      createdAt: new Date(),
+    });
+
+    revalidatePath(`/w/${workspaceId}`);
+
     return {
-      success: false,
-      message: "User is already a member of this workspace.",
+      success: true,
+      message: `${user.firstName || user.email} has been added to the workspace.`,
     };
   }
 
-  // Add as member
-  await db.insert(workspaceMembers).values({
-    workspaceId,
-    userId: user.id,
-    role,
-    createdAt: new Date(),
-  });
+  // Case 2 & 3: User is waitlisted or doesn't exist — send invitation
+  const { createWorkspaceInvitation } = await import(
+    "./workspace-invitations"
+  );
 
-  revalidatePath(`/w/${workspaceId}`);
+  await createWorkspaceInvitation(workspaceId, email, role);
 
   return {
     success: true,
-    message: `${user.firstName || user.email} has been added to the workspace.`,
+    message: `Invitation sent to ${email}.`,
   };
 }
 

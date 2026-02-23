@@ -60,4 +60,16 @@ export const queryKeys = {
   soul: {
     chat: (workspaceId: string) => ["soul", workspaceId, "chat"] as const,
   },
+  knowledge: {
+    folders: (workspaceId: string) => ["knowledge", workspaceId, "folders"] as const,
+    documents: (workspaceId: string, folderId?: string | null, tag?: string | null, query?: string | null) =>
+      ["knowledge", workspaceId, "documents", folderId ?? null, tag ?? null, query ?? null] as const,
+    document: (documentId: string) => ["knowledge", "document", documentId] as const,
+    issueLinks: (issueId: string) => ["knowledge", "issueLinks", issueId] as const,
+    tags: (workspaceId: string) => ["knowledge", workspaceId, "tags"] as const,
+  },
+  profile: {
+    all: ["profile"] as const,
+    detail: () => ["profile", "detail"] as const,
+  },
 } as const;

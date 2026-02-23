@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid,
+  LayoutDashboard,
   List,
   Settings,
   ChevronLeft,
@@ -18,6 +19,8 @@ import {
   Wand2,
   MessageSquare,
   Home,
+  BookOpen,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW } from "@/lib/design-tokens";
@@ -116,6 +119,7 @@ export function Sidebar() {
     setCreateIssueOpen,
     setCommandPaletteOpen,
     setAIPlanningOpen,
+    setEpicsDrawerOpen,
   } = useAppShell();
 
   const workspaceContext = useOptionalWorkspaceContext();
@@ -290,11 +294,24 @@ export function Sidebar() {
             isCollapsed={sidebarCollapsed}
           />
           <NavItem
+            icon={<Layers className="w-4 h-4" />}
+            label="Epics"
+            isCollapsed={sidebarCollapsed}
+            onClick={() => setEpicsDrawerOpen(true)}
+          />
+          <NavItem
             icon={<MessageSquare className="w-4 h-4" />}
             label="Chat"
             isCollapsed={sidebarCollapsed}
             href={workspace ? `/w/${workspace.slug}/chat` : undefined}
             shortcut="G A"
+          />
+          <NavItem
+            icon={<BookOpen className="w-4 h-4" />}
+            label="Knowledge"
+            isCollapsed={sidebarCollapsed}
+            href={workspace ? `/w/${workspace.slug}/knowledge` : undefined}
+            shortcut="G K"
           />
         </NavSection>
       </nav>
@@ -302,10 +319,22 @@ export function Sidebar() {
       {/* Footer Actions */}
       <div className="p-2 border-t border-sidebar-border">
         <NavItem
+          icon={<LayoutDashboard className="w-4 h-4" />}
+          label="Dashboard"
+          isCollapsed={sidebarCollapsed}
+          href="/dashboard"
+        />
+        <NavItem
           icon={<Home className="w-4 h-4" />}
           label="All Projects"
           isCollapsed={sidebarCollapsed}
           href="/projects"
+        />
+        <NavItem
+          icon={<UserCircle className="w-4 h-4" />}
+          label="Profile"
+          isCollapsed={sidebarCollapsed}
+          href="/profile"
         />
         <NavItem
           icon={<Settings className="w-4 h-4" />}

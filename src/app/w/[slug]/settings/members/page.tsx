@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { UserPlus, Trash2, Shield, User, Eye } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { UserPlus, Trash2, Shield, User, Eye, Clock, Mail } from "lucide-react";
 import {
   inviteMember,
   removeMember,
   updateMemberRole,
 } from "@/lib/actions/workspace";
+import {
+  getWorkspacePendingInvitations,
+  revokeWorkspaceInvitation,
+} from "@/lib/actions/workspace-invitations";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { GradientPage } from "@/components/ui/gradient-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useSettingsContext } from "../context";
-import type { WorkspaceRole } from "@/lib/types";
+import type { WorkspaceRole, WorkspaceInvitation } from "@/lib/types";
 
 const ROLE_OPTIONS: {
   value: WorkspaceRole;
@@ -37,6 +41,25 @@ export default function MembersPage() {
     text: string;
   } | null>(null);
 
+  // Pending invitations state
+  const [pendingInvitations, setPendingInvitations] = useState<
+    WorkspaceInvitation[]
+  >([]);
+
+  const loadPendingInvitations = useCallback(async () => {
+    if (!workspace || !isAdmin) return;
+    try {
+      const invitations = await getWorkspacePendingInvitations(workspace.id);
+      setPendingInvitations(invitations);
+    } catch {
+      // Silently fail — admin-only feature
+    }
+  }, [workspace, isAdmin]);
+
+  useEffect(() => {
+    loadPendingInvitations();
+  }, [loadPendingInvitations]);
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspace || !inviteEmail.trim()) return;
@@ -58,6 +81,7 @@ export default function MembersPage() {
       if (result.success) {
         setInviteEmail("");
         await refreshMembers();
+        await loadPendingInvitations();
       }
     } catch (err) {
       setInviteMessage({
@@ -89,6 +113,19 @@ export default function MembersPage() {
       await refreshMembers();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update role");
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    if (!workspace) return;
+
+    try {
+      await revokeWorkspaceInvitation(workspace.id, invitationId);
+      await loadPendingInvitations();
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Failed to revoke invitation"
+      );
     }
   };
 
@@ -149,6 +186,53 @@ export default function MembersPage() {
                 </div>
               )}
             </form>
+          </div>
+        )}
+
+        {/* Pending Invitations (admin only) */}
+        {isAdmin && pendingInvitations.length > 0 && (
+          <div className="mb-8 bg-card rounded-lg border border-border overflow-hidden">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Pending Invitations
+              </h2>
+            </div>
+            <div className="divide-y divide-border">
+              {pendingInvitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="settings-list-item flex items-center justify-between px-6 py-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">
+                        {invitation.email}
+                      </span>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="capitalize">{invitation.role}</span>
+                        <span>·</span>
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          Expires{" "}
+                          {invitation.expiresAt.toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRevokeInvitation(invitation.id)}
+                    className="p-1.5 text-muted-foreground hover:text-destructive rounded transition-colors"
+                    title="Revoke invitation"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

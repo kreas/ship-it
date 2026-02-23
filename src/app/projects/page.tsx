@@ -1,8 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
-import { getUserWorkspaces } from "@/lib/actions/workspace";
-import { Plus, Folder } from "lucide-react";
+import { requireActiveUser, getUserWorkspaces } from "@/lib/actions/workspace";
+import { Plus, Folder, LayoutDashboard } from "lucide-react";
 import type { Workspace } from "@/lib/types";
 
 function formatDate(date: Date): string {
@@ -50,12 +48,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
 }
 
 export default async function ProjectsPage() {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
+  await requireActiveUser();
   const workspaces = await getUserWorkspaces();
 
   // Sort by most recently updated
@@ -67,11 +60,20 @@ export default async function ProjectsPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-            Projects
-          </p>
-          <h1 className="text-3xl font-bold text-sky-400">My Projects</h1>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              Projects
+            </p>
+            <h1 className="text-3xl font-bold text-sky-400">My Projects</h1>
+          </div>
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            My Dashboard
+          </Link>
         </div>
 
         {/* Canvas Embed Placeholder */}

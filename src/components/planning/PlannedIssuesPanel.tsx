@@ -2,11 +2,11 @@
 
 import { useState, useCallback } from "react";
 import { Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
-import { marked } from "marked";
 import { cn } from "@/lib/utils";
 import { PRIORITY_CONFIG } from "@/lib/design-tokens";
+import { LexicalMarkdownPreview } from "@/components/ui/lexical";
 import { PriorityIcon } from "@/components/issues/PriorityIcon";
-import type { PlannedIssue } from "./PlanningChatPanel";
+import type { PlannedIssue, EpicSummary } from "./PlanningChatPanel";
 
 interface PlannedIssuesPanelProps {
   issues: PlannedIssue[];
@@ -14,6 +14,7 @@ interface PlannedIssuesPanelProps {
   onRemoveIssue: (id: string) => void;
   onCreateAll: () => void;
   isCreating: boolean;
+  epicSummary?: EpicSummary | null;
 }
 
 function IssueCard({
@@ -99,11 +100,9 @@ function IssueCard({
             <h4 className="text-sm font-medium truncate">{issue.title}</h4>
             {statusIcon}
           </div>
-          <div
-            className="text-xs text-muted-foreground mt-1 prose prose-xs dark:prose-invert max-w-none prose-p:my-0.5 prose-ul:my-0.5 prose-li:my-0 prose-headings:my-1 prose-headings:text-xs"
-            dangerouslySetInnerHTML={{
-              __html: marked.parse(issue.description, { async: false }),
-            }}
+          <LexicalMarkdownPreview
+            content={issue.description}
+            className="text-xs text-muted-foreground mt-1 prose-p:my-0.5 prose-ul:my-0.5 prose-li:my-0 prose-headings:my-1 prose-headings:text-xs"
           />
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -143,6 +142,7 @@ export function PlannedIssuesPanel({
   onRemoveIssue,
   onCreateAll,
   isCreating,
+  epicSummary,
 }: PlannedIssuesPanelProps) {
   const pendingCount = issues.filter((i) => i.status === "pending").length;
   const createdCount = issues.filter((i) => i.status === "created").length;
@@ -152,7 +152,9 @@ export function PlannedIssuesPanel({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
         <div>
-          <h3 className="text-sm font-medium">Planned Issues</h3>
+          <h3 className="text-sm font-medium">
+            {epicSummary ? epicSummary.title : "Planned Issues"}
+          </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {issues.length === 0
               ? "Issues will appear here as you chat"

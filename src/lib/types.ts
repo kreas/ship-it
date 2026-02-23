@@ -8,6 +8,7 @@ import type {
   users,
   workspaces,
   workspaceMembers,
+  workspaceInvitations,
   attachments,
   workspaceSkills,
   workspaceMcpServers,
@@ -20,8 +21,17 @@ import type {
   audienceMembers,
   workspaceMemories,
   adArtifacts,
+  epics,
+  knowledgeFolders,
+  knowledgeDocuments,
+  knowledgeDocumentTags,
+  knowledgeDocumentLinks,
+  issueKnowledgeDocuments,
+  knowledgeAssets,
+  inviteCodes,
+  inviteCodeClaims,
 } from "./db/schema";
-import type { Status, Priority } from "./design-tokens";
+import type { Status, Priority, CommunicationStyle } from "./design-tokens";
 
 // Base types inferred from schema
 export type User = typeof users.$inferSelect;
@@ -39,6 +49,44 @@ export type WorkspaceMcpServer = typeof workspaceMcpServers.$inferSelect;
 export type WorkspaceChat = typeof workspaceChats.$inferSelect;
 export type WorkspaceChatAttachment = typeof workspaceChatAttachments.$inferSelect;
 export type Brand = typeof brands.$inferSelect;
+export type Epic = typeof epics.$inferSelect;
+export type EpicStatus = "active" | "completed" | "canceled";
+export type CreateEpicInput = { title: string; description?: string; dueDate?: Date };
+export type KnowledgeFolder = typeof knowledgeFolders.$inferSelect;
+export type KnowledgeDocument = typeof knowledgeDocuments.$inferSelect;
+export type KnowledgeDocumentTag = typeof knowledgeDocumentTags.$inferSelect;
+export type KnowledgeDocumentLink = typeof knowledgeDocumentLinks.$inferSelect;
+export type IssueKnowledgeDocument = typeof issueKnowledgeDocuments.$inferSelect;
+export type KnowledgeAsset = typeof knowledgeAssets.$inferSelect;
+
+// Invite codes
+export type InviteCode = typeof inviteCodes.$inferSelect;
+export type InviteCodeClaim = typeof inviteCodeClaims.$inferSelect;
+export type UserStatus = "waitlisted" | "active";
+
+// Workspace invitations
+export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;
+export type WorkspaceInvitationStatus = "pending" | "accepted" | "expired" | "revoked";
+
+// User profile types
+export type AICommunicationStyle = CommunicationStyle;
+
+export type UpdateUserProfileInput = {
+  role?: string | null;
+  bio?: string | null;
+  aiCommunicationStyle?: AICommunicationStyle | null;
+  aiCustomInstructions?: string | null;
+};
+
+export type UserProfileWithWorkspaces = User & {
+  workspaces: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    purpose: string;
+    role: string;
+  }>;
+};
 
 // Attachment with signed URL for display
 export type AttachmentWithUrl = Attachment & { url: string };
@@ -78,6 +126,7 @@ export type WorkspaceWithColumnsAndIssues = Workspace & {
   columns: ColumnWithIssues[];
   labels: Label[];
   cycles: Cycle[];
+  epics: Epic[];
 };
 
 // Legacy alias for backward compatibility
@@ -96,6 +145,7 @@ export type CreateIssueInput = {
   estimate?: number;
   dueDate?: Date;
   cycleId?: string;
+  epicId?: string;
   labelIds?: string[];
   parentIssueId?: string; // For creating subtasks
   assigneeId?: string | null; // Workspace member assigned to this issue
@@ -352,3 +402,18 @@ export interface R2ChatConversation {
   };
   messages: R2ChatMessage[];
 }
+
+export type KnowledgeDocumentWithContent = KnowledgeDocument & {
+  content: string | null;
+  isMarkdown: boolean;
+  previewUrl: string | null;
+  downloadUrl: string;
+  previewStatus: "ready" | "pending" | "failed";
+  previewError: string | null;
+  tags: string[];
+  backlinks: KnowledgeDocument[];
+};
+
+export type KnowledgeFolderWithStats = KnowledgeFolder & {
+  documentCount: number;
+};
