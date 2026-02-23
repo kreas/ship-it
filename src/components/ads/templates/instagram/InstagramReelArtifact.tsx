@@ -11,6 +11,7 @@ import { InstagramAdProfile } from './components/InstagramAdProfile';
 import { instagramBranding, instagramColors, instagramLayout } from './config';
 import { useArtifact } from '@/components/ads/hooks/useArtifact';
 import { useArtifactMedia } from '@/components/ads/hooks/useArtifactMedia';
+import { ArtifactMedia } from '@/components/ads/components/ArtifactMedia';
 
 interface InstagramReelArtifactProps {
   className?: string;
@@ -21,11 +22,15 @@ export function InstagramReelArtifact({ className }: InstagramReelArtifactProps)
   const { mediaUrl } = useArtifactMedia(0);
 
   const [expanded, setExpanded] = useState(false);
-  const { profile, cta, caption, likes, comments } = artifact.content;
+  const { profile, cta, caption, likes, comments, content: reelContent } = artifact.content;
 
   const profileImage = (profile as { image?: string })?.image ?? instagramBranding.logoPlaceholder;
   const profileUsername = (profile as { username?: string })?.username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null })?.imageBackgroundColor;
+
+  const content = (reelContent as { prompt?: string; altText?: string }) ?? {};
+  const prompt = content.prompt ?? '';
+  const altText = content.altText ?? 'Reel image';
 
   return (
     <div className="h-full w-full">
@@ -71,17 +76,21 @@ export function InstagramReelArtifact({ className }: InstagramReelArtifactProps)
           </div>
         </div>
 
-        <div
-          className="absolute left-0 right-0 bottom-0 top-0 bg-black bg-cover bg-center rounded-[5px]"
-          style={{ backgroundImage: `url(${mediaUrl.currentImageUrl})` }}
-        >
-          {mediaUrl.showVideo && mediaUrl.videoUrls[mediaUrl.currentIndex] && (
+        <div className="absolute left-0 right-0 bottom-0 top-0 rounded-[5px] overflow-hidden bg-black">
+          {mediaUrl.showVideo && mediaUrl.videoUrls[mediaUrl.currentIndex] ? (
             <video
               src={mediaUrl.videoUrls[mediaUrl.currentIndex]}
               className="w-full h-full object-cover rounded-[5px]"
               autoPlay
               muted
               loop
+            />
+          ) : (
+            <ArtifactMedia
+              prompt={prompt}
+              altText={altText}
+              aspectRatio="9:16"
+              mediaIndex={0}
             />
           )}
         </div>
