@@ -51,7 +51,7 @@ export const LinkedInSingleImageAd: React.FC<Props> = ({ content }) => {
   );
 
   const headerTitle = companyName;
-  const profile = content && typeof (content as { profile?: unknown }).profile === "object" ? (content as { profile: { profileImageUrl?: string; imageBackgroundColor?: string | null } }).profile : undefined;
+  const profile = content && typeof (content as { profile?: unknown }).profile === "object" ? (content as unknown as { profile: { profileImageUrl?: string; imageBackgroundColor?: string | null } }).profile : undefined;
   const companyLogo = profile?.profileImageUrl ?? linkedInBranding.logoPlaceholder;
   const profileImageBg = profile?.imageBackgroundColor;
 

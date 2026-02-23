@@ -12,6 +12,7 @@ import { instagramBranding, instagramColors, instagramLayout } from './config';
 import { useArtifact } from '@/components/ads/hooks/useArtifact';
 import { useArtifactMedia } from '@/components/ads/hooks/useArtifactMedia';
 import { ArtifactMedia } from '@/components/ads/components/ArtifactMedia';
+import type { InstagramAdReel } from './types';
 
 interface InstagramReelArtifactProps {
   className?: string;
@@ -22,7 +23,9 @@ export function InstagramReelArtifact({ className }: InstagramReelArtifactProps)
   const { mediaUrl } = useArtifactMedia(0);
 
   const [expanded, setExpanded] = useState(false);
-  const { profile, cta, caption, likes, comments, content: reelContent } = artifact.content;
+  const { profile, cta, caption, likes, comments, content: reelContent } = (
+    artifact as unknown as { content: InstagramAdReel }
+  ).content;
 
   const profileImage = (profile as { image?: string })?.image ?? instagramBranding.logoPlaceholder;
   const profileUsername = (profile as { username?: string })?.username ?? 'Your Brand';

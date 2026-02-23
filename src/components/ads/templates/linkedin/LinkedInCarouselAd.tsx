@@ -98,7 +98,7 @@ export const LinkedInCarouselAd: React.FC<CarouselAdPropsType> = ({ content }) =
   };
 
   const headerTitle = companyName;
-  const profile = content && typeof (content as { profile?: unknown }).profile === "object" ? (content as { profile: { profileImageUrl?: string; imageBackgroundColor?: string | null } }).profile : undefined;
+  const profile = content && typeof (content as { profile?: unknown }).profile === "object" ? (content as unknown as { profile: { profileImageUrl?: string; imageBackgroundColor?: string | null } }).profile : undefined;
   const companyLogo =
     profile?.profileImageUrl ?? linkedInBranding.logoPlaceholder ?? profileImageUrl;
   const profileImageBg = profile?.imageBackgroundColor;
