@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ArtifactMedia } from '../../components/ArtifactMedia';
 import { type MetaDefaultProps } from '../../metaDefaults';
 
-type FacebookInStreamVideoToolProps = MetaDefaultProps<{
+export type FacebookInStreamVideoToolProps = MetaDefaultProps<{
   secondaryAd: {
     title: string;
     image: string;
