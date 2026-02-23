@@ -1,1 +1,0 @@
-ALTER TABLE `ad_artifacts` ADD `issue_attachment_id` text;

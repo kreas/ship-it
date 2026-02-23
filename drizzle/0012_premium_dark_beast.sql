@@ -8,6 +8,7 @@ CREATE TABLE `ad_artifacts` (
 	`name` text NOT NULL,
 	`content` text NOT NULL,
 	`media_assets` text,
+	`issue_attachment_id` text,
 	`brand_id` text,
 	`created_at` integer,
 	`updated_at` integer,
