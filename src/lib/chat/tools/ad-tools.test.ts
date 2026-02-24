@@ -8,22 +8,23 @@ function getExecute(tools: ReturnType<typeof createAdTools>, name: keyof ReturnT
 
 const mockCreateAdArtifact = vi.fn();
 const mockUpdateAdArtifactContent = vi.fn();
+const mockUpdateAdArtifactMedia = vi.fn();
 const mockAttachAdArtifactToIssue = vi.fn();
 const mockGetWorkspaceBrand = vi.fn();
-const mockMergeWorkspaceBrandIntoContent = vi.fn();
 
-vi.mock("@/lib/actions/ad-artifacts", () => ({
-  createAdArtifact: (...args: unknown[]) => mockCreateAdArtifact(...args),
-  updateAdArtifactContent: (...args: unknown[]) => mockUpdateAdArtifactContent(...args),
-  attachAdArtifactToIssue: (...args: unknown[]) => mockAttachAdArtifactToIssue(...args),
-}));
+vi.mock("@/lib/actions/ad-artifacts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/actions/ad-artifacts")>();
+  return {
+    ...actual,
+    createAdArtifact: (...args: unknown[]) => mockCreateAdArtifact(...args),
+    updateAdArtifactContent: (...args: unknown[]) => mockUpdateAdArtifactContent(...args),
+    updateAdArtifactMedia: (...args: unknown[]) => mockUpdateAdArtifactMedia(...args),
+    attachAdArtifactToIssue: (...args: unknown[]) => mockAttachAdArtifactToIssue(...args),
+  };
+});
 
 vi.mock("@/lib/actions/brand", () => ({
   getWorkspaceBrand: (...args: unknown[]) => mockGetWorkspaceBrand(...args),
-}));
-
-vi.mock("@/lib/ads/merge-workspace-brand", () => ({
-  mergeWorkspaceBrandIntoContent: (content: unknown) => mockMergeWorkspaceBrandIntoContent(content),
 }));
 
 describe("createAdTools", () => {
@@ -40,9 +41,10 @@ describe("createAdTools", () => {
     });
   });
 
-  it("returns all ad tool names", () => {
+  it("returns all ad tool names including get_workspace_brand", () => {
     const tools = createAdTools(baseContext);
     expect(Object.keys(tools)).toEqual([
+      "get_workspace_brand",
       "create_ad_instagram_feed_post",
       "create_ad_instagram_carousel",
       "create_ad_instagram_story",
@@ -84,23 +86,80 @@ describe("createAdTools", () => {
       );
     });
 
-    it("merges workspace brand when brand exists", async () => {
-      mockGetWorkspaceBrand.mockResolvedValue({
-        name: "Acme",
-        resolvedLogoUrl: "https://logo",
-        websiteUrl: "https://acme.com",
-        primaryColor: "#000",
+    it("creates artifact with imagePrompt only (profile image generated when ad is rendered)", async () => {
+      const tools = createAdTools(baseContext);
+      const result = await getExecute(tools, "create_ad_instagram_feed_post")({
+        name: "Ad without brand",
+        type: "ad-template:instagram-feed-post",
+        content: {
+          profile: { imagePrompt: "Minimalist logo", username: "My Brand" },
+          cta: { text: "Learn more" },
+          caption: "Test",
+          content: { prompt: "Test", altText: "Test" },
+        },
       });
-      mockMergeWorkspaceBrandIntoContent.mockImplementation((c: unknown) => c);
+
+      expect(result).toMatchObject({ success: true, artifactId: "artifact-1" });
+      expect(mockCreateAdArtifact).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining("Minimalist logo"),
+        })
+      );
+    });
+  });
+
+  describe("get_workspace_brand", () => {
+    it("returns brand null and placeholder when workspace has no brand", async () => {
+      mockGetWorkspaceBrand.mockResolvedValue(null);
 
       const tools = createAdTools(baseContext);
-      await getExecute(tools, "create_ad_instagram_feed_post")({
-        name: "Ad",
-        type: "ad-template:instagram-feed-post",
-        content: {},
+      const result = await getExecute(tools, "get_workspace_brand")({});
+
+      expect(result).toMatchObject({
+        brand: null,
+        profileImagePlaceholder: expect.stringContaining("Omit profile/company image URL and set imagePrompt"),
+      });
+      expect((result as { profileImagePlaceholder: string }).profileImagePlaceholder).toContain(
+        "generated when the ad is rendered"
+      );
+      expect(mockGetWorkspaceBrand).toHaveBeenCalledWith("workspace-1");
+    });
+
+    it("returns brand and forPlatform when workspace has brand", async () => {
+      mockGetWorkspaceBrand.mockResolvedValue({
+        name: "Acme",
+        resolvedLogoUrl: "https://logo.example.com/logo.png",
+        websiteUrl: "https://acme.com",
+        primaryColor: "#0066cc",
       });
 
-      expect(mockMergeWorkspaceBrandIntoContent).toHaveBeenCalled();
+      const tools = createAdTools(baseContext);
+      const result = await getExecute(tools, "get_workspace_brand")({});
+
+      expect(result).toMatchObject({
+        brand: {
+          name: "Acme",
+          resolvedLogoUrl: "https://logo.example.com/logo.png",
+          websiteUrl: "https://acme.com",
+          primaryColor: "#0066cc",
+          forPlatform: expect.any(Object),
+        },
+      });
+      const brand = (result as { brand: { forPlatform: Record<string, unknown> } }).brand;
+      expect(brand.forPlatform.instagram).toEqual({
+        profile: {
+          username: "Acme",
+          image: "https://logo.example.com/logo.png",
+          imageBackgroundColor: "#0066cc",
+        },
+      });
+      expect(brand.forPlatform.google).toMatchObject({
+        company: expect.objectContaining({
+          name: "Acme",
+          logo: "https://logo.example.com/logo.png",
+          url: "https://acme.com",
+        }),
+      });
     });
   });
 

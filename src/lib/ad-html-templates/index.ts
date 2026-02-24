@@ -28,7 +28,7 @@ export function escapeHtml(str: string): string {
 
 /**
  * Renders profile/company image HTML from content (workspace brand when present).
- * Uses profileImageUrl when available, otherwise a placeholder div with optional background color.
+ * Uses profileImageUrl when available; otherwise a placeholder div.
  */
 export function profileImageHtml(
   profileImageUrl: string | null | undefined,
@@ -47,8 +47,9 @@ export function profileImageHtml(
     : "background:#e0e0e0;";
   const size = `${sizePx}px`;
   const shape = round ? "50%" : "4px";
-  if (profileImageUrl && profileImageUrl.trim()) {
-    return `<img src="${escapeHtml(profileImageUrl.trim())}" alt="${escapeHtml(alt)}" width="${size}" height="${size}" style="width:${size};height:${size};border-radius:${shape};object-fit:cover;flex-shrink:0;" />`;
+  const url = profileImageUrl?.trim();
+  if (url) {
+    return `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" width="${size}" height="${size}" style="width:${size};height:${size};border-radius:${shape};object-fit:cover;flex-shrink:0;" />`;
   }
   return `<div style="width:${size};height:${size};border-radius:${shape};${bgStyle}flex-shrink:0;"></div>`;
 }

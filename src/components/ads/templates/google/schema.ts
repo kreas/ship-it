@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
+const companyLogoDescription =
+  'Company logo URL (optional). Omit to generate from prompt when the ad is rendered.';
+
 export const companySchema = z.object({
   name: z.string().describe('Name of the company (for display). When workspace has a brand, use the brand name.'),
-  logo: z.string().describe('URL of the company logo. Filled from workspace brand logo when the ad is saved; provide a placeholder if needed.'),
+  logo: z.string().optional().describe(companyLogoDescription),
   url: z.string().describe('Company website URL. Filled from workspace brand website when the ad is saved; provide a placeholder if needed.'),
   imageBackgroundColor: z.string().nullable().optional().describe('Background color for the profile image'),
 });

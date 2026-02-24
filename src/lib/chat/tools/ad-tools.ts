@@ -1,8 +1,13 @@
 import { tool, jsonSchema } from "ai";
 import { z } from "zod";
-import { createAdArtifact, attachAdArtifactToIssue, updateAdArtifactContent } from "@/lib/actions/ad-artifacts";
+import {
+  createAdArtifact,
+  attachAdArtifactToIssue,
+  updateAdArtifactContent,
+  updateAdArtifactMedia,
+} from "@/lib/actions/ad-artifacts";
 import { getWorkspaceBrand } from "@/lib/actions/brand";
-import { mergeWorkspaceBrandIntoContent } from "@/lib/ads/merge-workspace-brand";
+import { getBrandForAdContent } from "@/lib/ads/merge-workspace-brand";
 
 // Import schemas from each platform's template files
 import { InstagramFeedPostSchema } from "@/components/ads/templates/instagram/InstagramFeedPost";
@@ -110,28 +115,12 @@ function createAdTool(
       const { platform, templateType } = parseTemplateType(input.type);
 
       try {
-        // Resolve workspace brand into content on the backend so the frontend only renders content
-        let contentToSave = input.content as Record<string, unknown>;
-        const brand = await getWorkspaceBrand(context.workspaceId);
-        if (brand) {
-          contentToSave = mergeWorkspaceBrandIntoContent(
-            contentToSave,
-            {
-              name: brand.name,
-              resolvedLogoUrl: brand.resolvedLogoUrl ?? null,
-              websiteUrl: brand.websiteUrl ?? null,
-              primaryColor: brand.primaryColor ?? null,
-            },
-            platform,
-            templateType
-          );
-        }
 
         // UPDATE existing artifact in place
         if (input.existingArtifactId) {
           const updated = await updateAdArtifactContent(
             input.existingArtifactId,
-            JSON.stringify(contentToSave)
+            JSON.stringify(input.content)
           );
           if (!updated) {
             return { success: false, error: "Artifact not found or update failed" };
@@ -147,16 +136,19 @@ function createAdTool(
           };
         }
 
-        // CREATE new artifact (existing flow unchanged)
+        // CREATE new artifact
+        const contentObj = input.content as Record<string, unknown>;
         const artifact = await createAdArtifact({
           workspaceId: context.workspaceId,
-          chatId: context.chatId, // only set for workspace chat; omit for issue chat (FK references workspace_chats.id)
+          chatId: context.chatId,
           platform,
           templateType,
           name: input.name,
-          content: JSON.stringify(contentToSave),
+          content: JSON.stringify(contentObj),
           brandId: context.brandId,
         });
+
+        // Profile/company image is generated when the ad is rendered (no server-side generation).
 
         // Auto-attach to issue when in issue chat context
         let attachmentId: string | undefined;
@@ -192,6 +184,39 @@ function createAdTool(
 }
 
 /**
+ * Tool for the agent to fetch workspace brand and get profile/company structure
+ * for each ad platform. By default the agent should use this and fill ad content
+ * with the returned forPlatform[platform]; if the user asks for a custom profile/company
+ * image, the agent can override the image URL (e.g. with a generated image).
+ */
+function createGetWorkspaceBrandTool(context: AdToolsContext) {
+  return tool({
+    description:
+      "Get the workspace brand (name, logo URL, website, primary color) and ready-to-use profile/company structures for each ad platform. Call this before creating ads to fill profile and company fields from the brand by default. Use forPlatform[platform] when building content for create_ad_* tools. If the user asks for a custom or generated profile/company image, use that image URL instead of the brand logo.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const brand = await getWorkspaceBrand(context.workspaceId);
+      if (!brand) {
+        return {
+          brand: null,
+          profileImagePlaceholder:
+            "Omit profile/company image URL and set imagePrompt instead; the profile image will be generated when the ad is rendered.",
+        };
+      }
+      const snapshot = {
+        name: brand.name,
+        resolvedLogoUrl: brand.resolvedLogoUrl ?? null,
+        websiteUrl: brand.websiteUrl ?? null,
+        primaryColor: brand.primaryColor ?? null,
+      };
+      return {
+        brand: getBrandForAdContent(snapshot),
+      };
+    },
+  });
+}
+
+/**
  * Creates all ad generation tools for the chat.
  * One tool per template type, each persisting the artifact to the database.
  * Limit: MAX_AD_TOOL_USES total ad tool calls per request (new counter each time the user sends a message).
@@ -199,6 +224,7 @@ function createAdTool(
 export function createAdTools(context: AdToolsContext) {
   const usage: AdToolUsage = { count: 0 }; // fresh per request (createAdTools is invoked per API request)
   return {
+    get_workspace_brand: createGetWorkspaceBrandTool(context),
     create_ad_instagram_feed_post: createAdTool(InstagramFeedPostSchema, context, usage),
     create_ad_instagram_carousel: createAdTool(InstagramCarouselSchema, context, usage),
     create_ad_instagram_story: createAdTool(InstagramStorySchema, context, usage),

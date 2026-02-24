@@ -8,8 +8,13 @@ import { DataPoint } from "@/components/data-point";
 import dayjs from "dayjs";
 
 export const InstagramStoryArtifact = () => {
-  const { content } = useArtifact();
-  return <InstagramStory content={content as InstagramAdStory} />;
+  const { content, artifact } = useArtifact();
+  return (
+    <InstagramStory
+      content={content as InstagramAdStory}
+      artifactId={artifact?.id}
+    />
+  );
 };
 
 type ArtifactWithStoryContent = { created_at?: string; content: InstagramAdStory };

@@ -4,10 +4,9 @@ import {
   generateAdMediaStorageKey,
   generateDownloadUrl,
 } from "@/lib/storage/r2-client";
-import { DEFAULT_MODEL } from "@/lib/chat";
 
-/** Default model for this AI feature (compliance). Image generation backend uses a dedicated model below. */
-const DEFAULT_IMAGE_FEATURE_MODEL = DEFAULT_MODEL;
+/** Default model for this AI feature (compliance). Kept local to avoid circular import with @/lib/chat. */
+const DEFAULT_IMAGE_FEATURE_MODEL = "claude-haiku-4-5-20251001";
 
 /** Backend model used for actual image generation (Google Gemini). */
 const IMAGE_GENERATION_BACKEND_MODEL = "gemini-2.5-flash-image";

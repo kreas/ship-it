@@ -8,6 +8,50 @@ import { renderAdToHtml } from "../ad-html-templates";
 import { attachContentToIssue } from "./attachments";
 import { requireWorkspaceAccess } from "./workspace";
 import type { AdArtifact } from "../types";
+function isEmptyUrl(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value !== "string") return true;
+  return value.trim() === "";
+}
+
+/**
+ * When profile/company image URL is empty and we have a generated image in slot 0,
+ * substitute it into content and return content media starting at index 1
+ * (so content image indices stay 0-based for the frontend).
+ */
+function mergeProfileMediaIntoContent(
+  content: Record<string, unknown>,
+  resolvedMediaBySlot: ResolvedMediaBySlot
+): { mergedContent: Record<string, unknown>; contentMediaBySlot: ResolvedMediaBySlot } {
+  const profileUrl = resolvedMediaBySlot[0]?.currentImageUrl ?? null;
+  if (!profileUrl) return { mergedContent: content, contentMediaBySlot: resolvedMediaBySlot };
+
+  const profile = content.profile && typeof content.profile === "object" ? (content.profile as Record<string, unknown>) : null;
+  const company = content.company && typeof content.company === "object" ? (content.company as Record<string, unknown>) : null;
+  const needsFill =
+    (profile && (isEmptyUrl(profile.image) || isEmptyUrl(profile.profileImageUrl) || isEmptyUrl(profile.imageUrl))) ||
+    (company && isEmptyUrl(company.logo)) ||
+    isEmptyUrl(content.profileImageUrl);
+  if (!needsFill) return { mergedContent: content, contentMediaBySlot: resolvedMediaBySlot };
+
+  const merged = JSON.parse(JSON.stringify(content)) as Record<string, unknown>;
+  if (merged.profile && typeof merged.profile === "object") {
+    const p = merged.profile as Record<string, unknown>;
+    if (isEmptyUrl(p.image)) p.image = profileUrl;
+    if (isEmptyUrl(p.profileImageUrl)) p.profileImageUrl = profileUrl;
+    if (isEmptyUrl(p.imageUrl)) p.imageUrl = profileUrl;
+  }
+  if (merged.company && typeof merged.company === "object") {
+    const c = merged.company as Record<string, unknown>;
+    if (isEmptyUrl(c.logo)) c.logo = profileUrl;
+  }
+  if (isEmptyUrl(merged.profileImageUrl)) merged.profileImageUrl = profileUrl;
+
+  return {
+    mergedContent: merged,
+    contentMediaBySlot: resolvedMediaBySlot,
+  };
+}
 
 /**
  * Create a new ad artifact
@@ -110,7 +154,26 @@ export async function getAdArtifact(
     }
   }
 
-  return { ...artifact, resolvedMediaUrls, resolvedMediaBySlot };
+  let contentForResponse: string = artifact.content;
+  try {
+    const parsed = typeof artifact.content === "string" ? JSON.parse(artifact.content) : artifact.content;
+    if (parsed && typeof parsed === "object") {
+      const { mergedContent } = mergeProfileMediaIntoContent(
+        parsed as Record<string, unknown>,
+        resolvedMediaBySlot
+      );
+      contentForResponse = JSON.stringify(mergedContent);
+    }
+  } catch {
+    // Keep original content
+  }
+
+  return {
+    ...artifact,
+    content: contentForResponse,
+    resolvedMediaUrls,
+    resolvedMediaBySlot,
+  };
 }
 
 /**
@@ -229,7 +292,7 @@ export async function attachAdArtifactToIssue(
     }
 
     // Resolve media URLs from R2 storage so the HTML includes actual images
-    const resolvedMediaUrls: string[] = [];
+    const resolvedMediaBySlotForHtml: ResolvedMediaBySlot = [];
     if (artifact.mediaAssets) {
       try {
         const assets = JSON.parse(artifact.mediaAssets) as Array<{
@@ -237,20 +300,34 @@ export async function attachAdArtifactToIssue(
           imageUrls?: string[];
         }>;
         for (const asset of assets) {
+          const imageUrls: string[] = [];
           if (asset.storageKey) {
             const url = await generateDownloadUrl(asset.storageKey);
-            resolvedMediaUrls.push(url);
+            imageUrls.push(url);
           }
-          if (asset.imageUrls) {
-            resolvedMediaUrls.push(...asset.imageUrls);
-          }
+          if (asset.imageUrls) imageUrls.push(...asset.imageUrls);
+          resolvedMediaBySlotForHtml.push({
+            imageUrls,
+            videoUrls: [],
+            currentIndex: 0,
+            currentImageUrl: imageUrls[0] ?? null,
+            generatedAt: new Date(),
+            showVideo: false,
+          });
         }
       } catch {
         // Ignore parse errors
       }
     }
+    const { mergedContent: contentForHtml, contentMediaBySlot } = mergeProfileMediaIntoContent(
+      parsedContent as Record<string, unknown>,
+      resolvedMediaBySlotForHtml
+    );
+    // Slot 0 = profile (already in contentForHtml); HTML templates expect mediaUrls[0] = first content image
+    const contentOnlySlots = contentMediaBySlot.slice(1);
+    const contentMediaUrls = contentOnlySlots.map((s) => s.currentImageUrl).filter(Boolean) as string[];
 
-    const html = renderAdToHtml(artifact.platform, artifact.templateType, parsedContent, resolvedMediaUrls);
+    const html = renderAdToHtml(artifact.platform, artifact.templateType, contentForHtml, contentMediaUrls);
     if (!html) {
       return { success: false, error: "Failed to render ad HTML" };
     }
@@ -299,7 +376,7 @@ export async function refreshAdAttachment(artifactId: string): Promise<void> {
   if (!attachment) return;
 
   // Resolve current media URLs
-  const resolvedMediaUrls: string[] = [];
+  const resolvedMediaBySlotForHtml: ResolvedMediaBySlot = [];
   if (artifact.mediaAssets) {
     try {
       const assets = JSON.parse(artifact.mediaAssets) as Array<{
@@ -307,13 +384,20 @@ export async function refreshAdAttachment(artifactId: string): Promise<void> {
         imageUrls?: string[];
       }>;
       for (const asset of assets) {
+        const imageUrls: string[] = [];
         if (asset.storageKey) {
           const url = await generateDownloadUrl(asset.storageKey);
-          resolvedMediaUrls.push(url);
+          imageUrls.push(url);
         }
-        if (asset.imageUrls) {
-          resolvedMediaUrls.push(...asset.imageUrls);
-        }
+        if (asset.imageUrls) imageUrls.push(...asset.imageUrls);
+        resolvedMediaBySlotForHtml.push({
+          imageUrls,
+          videoUrls: [],
+          currentIndex: 0,
+          currentImageUrl: imageUrls[0] ?? null,
+          generatedAt: new Date(),
+          showVideo: false,
+        });
       }
     } catch {
       // Ignore parse errors
@@ -326,8 +410,15 @@ export async function refreshAdAttachment(artifactId: string): Promise<void> {
   } catch {
     parsedContent = artifact.content;
   }
+  const { mergedContent: contentForHtml, contentMediaBySlot } = mergeProfileMediaIntoContent(
+    parsedContent as Record<string, unknown>,
+    resolvedMediaBySlotForHtml
+  );
+  // Slot 0 = profile (already in contentForHtml); HTML templates expect mediaUrls[0] = first content image
+  const contentOnlySlots = contentMediaBySlot.slice(1);
+  const contentMediaUrls = contentOnlySlots.map((s) => s.currentImageUrl).filter(Boolean) as string[];
 
-  const html = renderAdToHtml(artifact.platform, artifact.templateType, parsedContent, resolvedMediaUrls);
+  const html = renderAdToHtml(artifact.platform, artifact.templateType, contentForHtml, contentMediaUrls);
   if (!html) return;
 
   // Overwrite the R2 object at the same storage key

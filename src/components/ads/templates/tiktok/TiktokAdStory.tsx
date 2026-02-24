@@ -22,9 +22,10 @@ export const TiktokAdStorySchema = {
 
 interface TiktokAdStoryProps {
   content: TiktokAdContent;
+  artifactId?: string;
 }
 
-export const TiktokAdStory = ({ content: adContent }: TiktokAdStoryProps) => {
+export const TiktokAdStory = ({ content: adContent, artifactId }: TiktokAdStoryProps) => {
   const {
     profile = { image: '', username: 'BrandName' },
     content = { prompt: '', altText: '' },
@@ -35,13 +36,20 @@ export const TiktokAdStory = ({ content: adContent }: TiktokAdStoryProps) => {
 
   const aspectRatio = '9:16';
   const randomLikes = Math.floor(Math.random() * 100);
-  const profileImage = (profile as { image?: string }).image ?? tiktokBranding.logoPlaceholder;
+  const profileImageRaw = (profile as { image?: string }).image?.trim();
+  const profileImagePrompt = (profile as { imagePrompt?: string }).imagePrompt?.trim();
+  const profileImage =
+    profileImageRaw || (profileImagePrompt ? "" : tiktokBranding.logoPlaceholder);
   const profileUsername = (profile as { username?: string }).username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null }).imageBackgroundColor;
+  const profileAltText = (profile as { imageAltText?: string | null }).imageAltText;
   const companyProfile = {
     image: profileImage,
+    imagePrompt: profileImagePrompt || undefined,
     username: profileUsername,
     imageBackgroundColor: profileBgColor,
+    imageAltText: profileAltText,
+    artifactId,
   };
 
   return (
@@ -61,7 +69,7 @@ export const TiktokAdStory = ({ content: adContent }: TiktokAdStoryProps) => {
           backgroundColor: tiktokColors.backgroundSecondary,
         }}
       >
-        <ArtifactMedia prompt={content.prompt} altText={content.altText} aspectRatio={aspectRatio} mediaIndex={0} />
+        <ArtifactMedia prompt={content.prompt} altText={content.altText} aspectRatio={aspectRatio} mediaIndex={1} />
         <TiktokAdFooter
           className="absolute bottom-0 left-0 right-[62px] z-[2]"
           username={companyProfile.username}

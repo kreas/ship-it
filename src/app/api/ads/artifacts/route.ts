@@ -7,8 +7,6 @@ import {
   updateAdArtifactMedia,
 } from "@/lib/actions/ad-artifacts";
 import { requireWorkspaceAccess } from "@/lib/actions/workspace";
-import { getWorkspaceBrand } from "@/lib/actions/brand";
-import { mergeWorkspaceBrandIntoContent } from "@/lib/ads/merge-workspace-brand";
 
 const postArtifactSchema = z.object({
   workspaceId: z.string().min(1),
@@ -61,36 +59,18 @@ export async function POST(req: Request) {
     const { workspaceId, artifact } = parsed.data;
     await requireWorkspaceAccess(workspaceId, "member");
 
-    const platform = artifact.platform || "unknown";
-    const templateType = artifact.templateType || artifact.type || "unknown";
-    let content = artifact.content;
-    const brand = await getWorkspaceBrand(workspaceId);
-    if (brand) {
-      const contentObj =
-        typeof content === "string" ? (JSON.parse(content) as Record<string, unknown>) : { ...content };
-      const merged = mergeWorkspaceBrandIntoContent(
-        contentObj,
-        {
-          name: brand.name,
-          resolvedLogoUrl: brand.resolvedLogoUrl ?? null,
-          websiteUrl: brand.websiteUrl ?? null,
-          primaryColor: brand.primaryColor ?? null,
-        },
-        platform,
-        templateType
-      );
-      content = JSON.stringify(merged);
-    } else if (typeof content !== "string") {
-      content = JSON.stringify(content);
-    }
+    const content =
+      typeof artifact.content === "string"
+        ? artifact.content
+        : JSON.stringify(artifact.content);
 
     const saved = await createAdArtifact({
       workspaceId,
       chatId: artifact.chatId,
       messageId: artifact.messageId,
-      platform: artifact.platform || "unknown",
-      templateType: artifact.templateType || artifact.type || "unknown",
-      name: artifact.name || "Untitled Ad",
+      platform: artifact.platform ?? "unknown",
+      templateType: artifact.templateType ?? artifact.type ?? "unknown",
+      name: artifact.name ?? "Untitled Ad",
       content,
       mediaAssets: artifact.mediaUrls
         ? JSON.stringify(artifact.mediaUrls)

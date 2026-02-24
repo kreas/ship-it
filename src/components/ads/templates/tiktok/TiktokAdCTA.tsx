@@ -22,9 +22,10 @@ export const TiktokAdCTAToolSchema = {
 
 interface TiktokAdCTAProps {
   content: TiktokAdContent;
+  artifactId?: string;
 }
 
-export const TiktokAdCTA = ({ content: adContent }: TiktokAdCTAProps) => {
+export const TiktokAdCTA = ({ content: adContent, artifactId }: TiktokAdCTAProps) => {
   const {
     profile = { image: '', username: 'BrandName' },
     content = { prompt: '', altText: '' },
@@ -38,10 +39,14 @@ export const TiktokAdCTA = ({ content: adContent }: TiktokAdCTAProps) => {
   const profileImage = (profile as { image?: string }).image ?? tiktokBranding.logoPlaceholder;
   const profileUsername = (profile as { username?: string }).username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null }).imageBackgroundColor;
+  const profileAltText = (profile as { imageAltText?: string | null }).imageAltText;
   const companyProfile = {
     image: profileImage,
+    imagePrompt: profileImagePrompt || undefined,
     username: profileUsername,
     imageBackgroundColor: profileBgColor,
+    imageAltText: profileAltText,
+    artifactId,
   };
 
   return (
@@ -61,7 +66,7 @@ export const TiktokAdCTA = ({ content: adContent }: TiktokAdCTAProps) => {
           backgroundColor: tiktokColors.backgroundSecondary,
         }}
       >
-        <ArtifactMedia prompt={content.prompt} altText={content.altText} aspectRatio={aspectRatio} mediaIndex={0} />
+        <ArtifactMedia prompt={content.prompt} altText={content.altText} aspectRatio={aspectRatio} mediaIndex={1} />
         <TiktokAdFooterCTA
           className="absolute bottom-0 left-0 right-[62px] z-[2]"
           username={companyProfile.username}

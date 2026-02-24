@@ -8,6 +8,12 @@ interface InstagramAdHeaderProps extends InstagramAdProfileType {
   metadataText?: string;
   /** Background color for the profile image (e.g. workspace brand primary color) */
   imageBackgroundColor?: string | null;
+  /** Alt text for the profile image (accessibility). */
+  imageAltText?: string | null;
+  /** Prompt for generating profile image when image is empty. */
+  imagePrompt?: string | null;
+  /** Artifact ID for profile image generation on render. */
+  artifactId?: string;
 }
 
 export function InstagramAdHeader({
@@ -15,6 +21,9 @@ export function InstagramAdHeader({
   username,
   metadataText,
   imageBackgroundColor,
+  imageAltText,
+  imagePrompt,
+  artifactId,
 }: InstagramAdHeaderProps) {
   return (
     <div
@@ -28,9 +37,12 @@ export function InstagramAdHeader({
     >
       <InstagramAdProfile
         image={image}
+        imagePrompt={imagePrompt}
         username={username}
         metadataText={metadataText}
         imageBackgroundColor={imageBackgroundColor}
+        imageAltText={imageAltText}
+        artifactId={artifactId}
       />
       <InstagramAdIcon name="meatball" width={22} height={22} />
     </div>

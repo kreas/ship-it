@@ -12,7 +12,13 @@ import { InstagramAdProfile } from './components/InstagramAdProfile';
 import { InstagramAdCTAEnum, type InstagramAdReel } from './types';
 import { InstagramAdGradient } from './components/InstagramAdGradient';
 
-export function InstagramReel({ content: adContent }: { content: InstagramAdReel }) {
+export function InstagramReel({
+  content: adContent,
+  artifactId,
+}: {
+  content: InstagramAdReel;
+  artifactId?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const {
@@ -20,10 +26,7 @@ export function InstagramReel({ content: adContent }: { content: InstagramAdReel
       prompt: 'A beautiful image of a sunset over a calm ocean',
       altText: 'A beautiful image of a sunset over a calm ocean',
     },
-    profile = {
-      image: 'https://via.placeholder.com/40',
-      username: 'Your Brand',
-    },
+    profile = { username: 'Your Brand' },
     cta = {
       text: InstagramAdCTAEnum.LEARN_MORE,
     },
@@ -33,11 +36,13 @@ export function InstagramReel({ content: adContent }: { content: InstagramAdReel
     comments = 34,
   } = adContent;
 
-  // TODO: get the company profile
-  const companyProfile = {
-    image: instagramBranding.logoPlaceholder,
-    username: profile.username || 'Your Brand',
-  };
+  const profileImageRaw = (profile as { image?: string }).image?.trim();
+  const profileImagePrompt = (profile as { imagePrompt?: string }).imagePrompt?.trim();
+  const profileImage =
+    profileImageRaw || (profileImagePrompt ? "" : instagramBranding.logoPlaceholder);
+  const profileUsername = (profile as { username?: string }).username ?? 'Your Brand';
+  const profileBgColor = (profile as { imageBackgroundColor?: string | null }).imageBackgroundColor;
+  const profileAltText = (profile as { imageAltText?: string | null }).imageAltText;
 
   return (
     <InstagramAdCard style={{ position: 'relative', border: 'none' }}>
@@ -50,9 +55,13 @@ export function InstagramReel({ content: adContent }: { content: InstagramAdReel
       >
         <div className="flex flex-col justify-end flex-1" style={{ gap: instagramLayout.spacing }}>
           <InstagramAdProfile
-            image={companyProfile.image}
-            username={companyProfile.username}
+            image={profileImage}
+            imagePrompt={profileImagePrompt || undefined}
+            username={profileUsername}
             style={{ color: instagramColors.background }}
+            imageBackgroundColor={profileBgColor}
+            imageAltText={profileAltText}
+            artifactId={artifactId}
           />
           <InstagramAdCaption
             name={profile.username}
@@ -81,7 +90,7 @@ export function InstagramReel({ content: adContent }: { content: InstagramAdReel
         </div>
       </div>
       {expanded && <InstagramAdGradient direction="bottom" className="opacity-50" />}
-      <InstagramAdContent aspectRatio={aspectRatio} content={content} />
+      <InstagramAdContent aspectRatio={aspectRatio} content={content} mediaIndex={1} />
     </InstagramAdCard>
   );
 }

@@ -36,7 +36,10 @@ export type InstagramAdContent = {
 
 export interface InstagramAdProfile {
     image: string;
+    imagePrompt?: string;
     username: string;
+    imageBackgroundColor?: string | null;
+    imageAltText?: string | null;
 }
 
 export enum InstagramAdCTAEnum {

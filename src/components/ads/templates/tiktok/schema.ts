@@ -6,9 +6,15 @@ export const TiktokAdContentSchema = z.object({
     altText: z.string().optional().describe('Alternative text for the ad image'),
 });
 
+const profileImageDescription =
+  'Profile image URL (optional). Omit or leave empty and set imagePrompt to generate the profile image when the ad is rendered.';
+
 export const TiktokAdProfileSchema = z.object({
-    image: z.string().describe('Profile image URL. Filled from workspace brand logo when the ad is saved; provide a placeholder if needed.'),
+    image: z.string().optional().describe(profileImageDescription),
+    imagePrompt: z.string().optional().describe('Prompt for generating the profile image when image is omitted. E.g. "Professional minimalist company logo, simple and modern". Used when the ad is rendered.'),
     username: z.string().describe('Profile username (e.g. brand/company name). When workspace has a brand, use the brand name.'),
+    imageBackgroundColor: z.string().nullable().optional().describe('Background color for the profile image (e.g. brand primary color).'),
+    imageAltText: z.string().optional().describe('Alt text for the profile image (accessibility). Defaults to username if omitted.'),
 });
 
 export const TiktokAdCaptionSchema = z.string()

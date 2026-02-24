@@ -5,8 +5,6 @@ const mockCreateAdArtifact = vi.fn();
 const mockGetWorkspaceAdArtifacts = vi.fn();
 const mockGetChatAdArtifacts = vi.fn();
 const mockUpdateAdArtifactMedia = vi.fn();
-const mockGetWorkspaceBrand = vi.fn();
-
 vi.mock("@/lib/actions/workspace", () => ({
   requireWorkspaceAccess: (...args: unknown[]) => mockRequireWorkspaceAccess(...args),
 }));
@@ -18,19 +16,10 @@ vi.mock("@/lib/actions/ad-artifacts", () => ({
   updateAdArtifactMedia: (...args: unknown[]) => mockUpdateAdArtifactMedia(...args),
 }));
 
-vi.mock("@/lib/actions/brand", () => ({
-  getWorkspaceBrand: (...args: unknown[]) => mockGetWorkspaceBrand(...args),
-}));
-
-vi.mock("@/lib/ads/merge-workspace-brand", () => ({
-  mergeWorkspaceBrandIntoContent: (obj: unknown) => obj,
-}));
-
 describe("POST /api/ads/artifacts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireWorkspaceAccess.mockResolvedValue(undefined);
-    mockGetWorkspaceBrand.mockResolvedValue(null);
     mockCreateAdArtifact.mockResolvedValue({ id: "art-1", name: "Ad", platform: "instagram", templateType: "feed-post" });
   });
 

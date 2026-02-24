@@ -33,14 +33,19 @@ export const InstagramFeedPostSchema = {
   }),
 };
 
-export function InstagramFeedPost({ content: adContent }: { content: InstagramAdFeedPost }) {
+export function InstagramFeedPost({
+  content: adContent,
+  artifactId,
+}: {
+  content: InstagramAdFeedPost;
+  artifactId?: string;
+}) {
   const {
     content = {
       prompt: 'A beautiful image of a sunset over a calm ocean',
       altText: 'A beautiful image of a sunset over a calm ocean',
     },
     profile = {
-      image: 'https://via.placeholder.com/40',
       username: 'Your Brand',
     },
     cta = {
@@ -51,19 +56,26 @@ export function InstagramFeedPost({ content: adContent }: { content: InstagramAd
     likes = 15,
   } = adContent;
 
-  const profileImage = (profile as { image?: string }).image ?? instagramBranding.logoPlaceholder;
+  const profileImageRaw = (profile as { image?: string }).image?.trim();
+  const profileImagePrompt = (profile as { imagePrompt?: string }).imagePrompt?.trim();
+  const profileImage =
+    profileImageRaw ||
+    (profileImagePrompt ? "" : instagramBranding.logoPlaceholder);
   const profileUsername = (profile as { username?: string }).username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null }).imageBackgroundColor;
-  const companyProfile = { image: profileImage, username: profileUsername };
+  const profileAltText = (profile as { imageAltText?: string | null }).imageAltText;
 
   return (
     <InstagramAdCard>
       <InstagramAdHeader
-        image={companyProfile.image}
-        username={companyProfile.username}
+        image={profileImage}
+        imagePrompt={profileImagePrompt || undefined}
+        username={profileUsername}
         imageBackgroundColor={profileBgColor}
+        imageAltText={profileAltText}
+        artifactId={artifactId}
       />
-      <InstagramAdContent content={content} aspectRatio={aspectRatio} />
+      <InstagramAdContent content={content} aspectRatio={aspectRatio} mediaIndex={1} />
       <InstagramAdCTA text={cta.text} url={cta.url} type="strip" />
       <div
         className="flex justify-between"
@@ -80,7 +92,7 @@ export function InstagramFeedPost({ content: adContent }: { content: InstagramAd
           paddingRight: instagramLayout.spacingXLarge,
         }}
       >
-        <InstagramAdCaption name={companyProfile.username} content={caption} likes={likes} />
+        <InstagramAdCaption name={profileUsername} content={caption} likes={likes} />
       </div>
     </InstagramAdCard>
   );

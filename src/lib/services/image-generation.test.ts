@@ -26,10 +26,6 @@ vi.mock("@/lib/storage/r2-client", () => ({
   generateDownloadUrl: (...args: unknown[]) => mockGenerateDownloadUrl(...args),
 }));
 
-vi.mock("@/lib/chat", () => ({
-  DEFAULT_MODEL: "claude-haiku-4-5-20251001",
-}));
-
 vi.mock("@google/genai", () => ({
   GoogleGenAI: class MockGoogleGenAI {
     get models() {

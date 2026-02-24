@@ -7,8 +7,13 @@ import type { InstagramAdFeedPost } from "./types";
 import { DataPoint } from "@/components/data-point";
 
 export const InstagramFeedPostArtifact = () => {
-  const { content } = useArtifact();
-  return <InstagramFeedPost content={content as InstagramAdFeedPost} />;
+  const { content, artifact } = useArtifact();
+  return (
+    <InstagramFeedPost
+      content={content as InstagramAdFeedPost}
+      artifactId={artifact?.id}
+    />
+  );
 };
 
 type ArtifactWithFeedPostContent = { created_at?: string; content: InstagramAdFeedPost };

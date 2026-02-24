@@ -29,28 +29,29 @@ export const InstagramStorySchema = {
 
 interface InstagramStoryProps {
   content: InstagramAdStory;
+  artifactId?: string;
 }
 
-export const InstagramStory = ({ content: adContent }: InstagramStoryProps) => {
+export const InstagramStory = ({ content: adContent, artifactId }: InstagramStoryProps) => {
   const {
     content = {
       prompt: 'A beautiful image of a sunset over a calm ocean',
       altText: 'A beautiful image of a sunset over a calm ocean',
     },
-    profile = {
-      image: 'https://via.placeholder.com/40',
-      username: 'Your Brand',
-    },
+    profile = { username: 'Your Brand' },
     cta = {
       text: InstagramAdCTAEnum.LEARN_MORE,
     },
     aspectRatio = '9:16',
   } = adContent;
 
-  const profileImage = (profile as { image?: string }).image ?? instagramBranding.logoPlaceholder;
+  const profileImageRaw = (profile as { image?: string }).image?.trim();
+  const profileImagePrompt = (profile as { imagePrompt?: string }).imagePrompt?.trim();
+  const profileImage =
+    profileImageRaw || (profileImagePrompt ? "" : instagramBranding.logoPlaceholder);
   const profileUsername = (profile as { username?: string }).username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null }).imageBackgroundColor;
-  const companyProfile = { image: profileImage, username: profileUsername };
+  const profileAltText = (profile as { imageAltText?: string | null }).imageAltText;
 
   return (
     <InstagramAdCard className="relative">
@@ -66,10 +67,13 @@ export const InstagramStory = ({ content: adContent }: InstagramStoryProps) => {
         <InstagramAdProgress style={{ marginBottom: instagramLayout.spacingSmall }} />
         <div className="flex items-center justify-between">
           <InstagramAdProfile
-            image={companyProfile.image}
-            username={companyProfile.username}
+            image={profileImage}
+            imagePrompt={profileImagePrompt || undefined}
+            username={profileUsername}
             style={{ color: instagramColors.background }}
             imageBackgroundColor={profileBgColor}
+            imageAltText={profileAltText}
+            artifactId={artifactId}
           />
           <div className="flex items-center" style={{ gap: instagramLayout.spacing }}>
             <InstagramAdIcon name="meatball" color={instagramColors.background} />
@@ -101,7 +105,7 @@ export const InstagramStory = ({ content: adContent }: InstagramStoryProps) => {
         <InstagramAdGradient direction="bottom" className="opacity-25 z-[-1]" />
       </div>
 
-      <InstagramAdContent content={content} aspectRatio={aspectRatio} />
+      <InstagramAdContent content={content} aspectRatio={aspectRatio} mediaIndex={1} />
     </InstagramAdCard>
   );
 };

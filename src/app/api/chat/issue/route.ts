@@ -142,7 +142,8 @@ ${issueContext.description ? `This issue already has a description. **Ask the us
 - **create_skill**: Save a repeatable workflow or instruction set as a reusable skill for this workspace
 - **update_skill**: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
 - Web search, code execution, web fetch: Only use when user explicitly asks you to execute immediately
-${purpose === "marketing" ? AD_TOOLS_PROMPT : ""}
+${purpose === "marketing" ? `${AD_TOOLS_PROMPT}
+- **Auto-attach**: Ads created in issue chat are automatically attached to the issue as HTML preview files. No extra tool call needed.` : ""}
 
 Be conversational and helpful. Ask clarifying questions when needed.`;
 

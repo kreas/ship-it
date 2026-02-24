@@ -409,28 +409,7 @@ Each good task can be done in parallel because it produces its own standalone de
 
 /**
  * Shared ad tools prompt for system prompts.
- * Used by workspace chat and issue chat endpoints.
+ * Used by workspace chat and issue chat. Full tool list and guidelines live in the ad-campaign skill.
  */
 export const AD_TOOLS_PROMPT = `
-**Ad creation tools** (use these when the user asks to create ads or ad mockups):
-- \`create_ad_instagram_feed_post\` — Instagram feed post (1:1, 4:5, or 16:9 image with caption, CTA, and profile)
-- \`create_ad_instagram_carousel\` — Instagram carousel (3-10 images with captions and CTA)
-- \`create_ad_instagram_story\` — Instagram story (9:16 vertical with profile overlay and CTA)
-- \`create_ad_instagram_reel\` — Instagram reel (9:16 vertical with caption, profile, and CTA)
-- \`create_ad_tiktok_story\` — TikTok story ad (9:16 vertical with profile, caption, sound, and CTA)
-- \`create_ad_tiktok_cta\` — TikTok CTA ad (9:16 vertical with prominent CTA image)
-- \`create_ad_linkedin_single_image\` — LinkedIn single image ad (company header, ad copy, image, headline, CTA)
-- \`create_ad_linkedin_carousel\` — LinkedIn carousel ad (2-10 cards with images and headlines)
-- \`create_ad_google_search_ad\` — Google search ad (SERP-style with title, description, suggested searches)
-- \`create_ad_facebook_in_stream_video\` — Facebook in-stream video ad (primary + secondary ad)
-
-**Ad creation guidelines:**
-- **IMPORTANT: Before creating any ads, always call \`load_skill\` with skillName "ad-campaign" to get the full campaign workflow and platform-specific guidelines.**
-- **Profile image and profile/company URL come from the workspace brand.** When the workspace has a brand configured, the ad artifact is saved with the brand's logo as the profile image and the brand's website URL as the company/profile URL. You only need to provide the company/brand name for display; do not invent or ask for profile image URLs or company URLs—they are resolved from the workspace brand when the ad is created.
-- When the user has a brand configured, use the brand's company name, tone, and style in the ad content
-- For image prompts, write descriptive scenes focusing on mood, composition, and lighting — avoid text in images
-- Use one strong, clear image per ad slot unless the user specifically asks for multiple
-- Match the ad copy length to the platform's conventions (e.g., short for Instagram, detailed for LinkedIn)
-- Always provide meaningful CTA text that matches the campaign goal
-- **Auto-attach**: Ads created in issue chat are automatically attached to the issue as HTML preview files. No extra tool call needed.
-- **Updating existing ads**: ONLY pass \`existingArtifactId\` when the user **explicitly** says to modify, change, update, or edit an ad that was created earlier in this conversation (e.g., "change the headline", "update the CTA", "make it shorter"). Get the \`artifactId\` from the previous \`create_ad_*\` tool result. **NEVER** pass \`existingArtifactId\` when the user asks to create, make, generate, or wants a different/new ad — omit the field entirely in that case.`;
+**Ad creation:** When the user asks to create ads or ad mockups, call \`load_skill\` with skillName "ad-campaign" to get the full workflow, tool reference, and implementation guidelines, then use the ad tools as described there.`;

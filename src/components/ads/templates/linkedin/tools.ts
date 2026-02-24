@@ -9,9 +9,12 @@ const CarouselItemSchema = z.object({
   destinationUrl: z.string().url().describe('Landing page URL for this specific card'),
 });
 
+const profileImageUrlDescription =
+  'Company/profile image URL (optional). Omit to generate from prompt when the ad is rendered.';
+
 const CarouselContentSchema = z.object({
-  companyName: z.string().describe('Company name in ad header. When workspace has a brand, use the brand name. Profile image and URL are filled from the workspace brand when the ad is saved.'),
-  profileImageUrl: z.string().optional().describe('URL for company/profile image. Filled from workspace brand logo when the ad is saved; optional placeholder otherwise.'),
+  companyName: z.string().describe('Company name in ad header. When workspace has a brand, use the brand name.'),
+  profileImageUrl: z.string().optional().describe(profileImageUrlDescription),
   followerCount: z.number().optional().describe('Number of followers'),
   adCopy: z.string().describe('Main text content of the ad (appears above the carousel)'),
   carouselItems: z.array(CarouselItemSchema).min(2).max(10).describe('Array of items for the carousel (2-10 items)'),

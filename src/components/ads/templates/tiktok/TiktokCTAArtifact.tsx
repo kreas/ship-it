@@ -5,6 +5,11 @@ import { TiktokAdCTA } from "./TiktokAdCTA";
 import type { TiktokAdContent } from "./types";
 
 export const TiktokCTAArtifact = () => {
-  const { content } = useArtifact();
-  return <TiktokAdCTA content={content as TiktokAdContent} />;
+  const { content, artifact } = useArtifact();
+  return (
+    <TiktokAdCTA
+      content={content as TiktokAdContent}
+      artifactId={artifact?.id}
+    />
+  );
 };

@@ -38,17 +38,23 @@ export function InstagramCarousel({ content: adContent }: InstagramCarouselProps
     likes = 17,
   } = adContent;
 
-  const profileImage = (profile as { image?: string }).image ?? instagramBranding.logoPlaceholder;
+  const profileImageRaw = (profile as { image?: string }).image?.trim();
+  const profileImagePrompt = (profile as { imagePrompt?: string }).imagePrompt?.trim();
+  const profileImage =
+    profileImageRaw || (profileImagePrompt ? "" : instagramBranding.logoPlaceholder);
   const profileUsername = (profile as { username?: string }).username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null }).imageBackgroundColor;
-  const companyProfile = { image: profileImage, username: profileUsername };
+  const profileAltText = (profile as { imageAltText?: string | null }).imageAltText;
 
   return (
     <InstagramAdCard>
       <InstagramAdHeader
-        image={companyProfile.image}
-        username={companyProfile.username}
+        image={profileImage}
+        imagePrompt={profileImagePrompt || undefined}
+        username={profileUsername}
         imageBackgroundColor={profileBgColor}
+        imageAltText={profileAltText}
+        artifactId={artifactId}
       />
       <div className="relative">
         <div
@@ -74,7 +80,7 @@ export function InstagramCarousel({ content: adContent }: InstagramCarouselProps
 
         {content.map((item, index) => (
           <div key={index} style={{ display: index === currentIndex ? 'block' : 'none' }}>
-            <InstagramAdContent aspectRatio={aspectRatio} content={item} mediaIndex={index} />
+            <InstagramAdContent aspectRatio={aspectRatio} content={item} mediaIndex={index + 1} />
           </div>
         ))}
       </div>

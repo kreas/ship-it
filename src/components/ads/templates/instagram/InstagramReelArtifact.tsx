@@ -19,21 +19,24 @@ interface InstagramReelArtifactProps {
 }
 
 export function InstagramReelArtifact({ className }: InstagramReelArtifactProps) {
-  const { artifact } = useArtifact();
-  const { mediaUrl } = useArtifactMedia(0);
+  const { content, artifact } = useArtifact();
+  const { mediaUrl } = useArtifactMedia(1);
+  const adContent = content as InstagramAdReel;
+  const { profile, cta, caption, likes, comments, content: reelContent } = adContent;
 
   const [expanded, setExpanded] = useState(false);
-  const { profile, cta, caption, likes, comments, content: reelContent } = (
-    artifact as unknown as { content: InstagramAdReel }
-  ).content;
 
-  const profileImage = (profile as { image?: string })?.image ?? instagramBranding.logoPlaceholder;
+  const profileImageRaw = (profile as { image?: string })?.image?.trim();
+  const profileImagePrompt = (profile as { imagePrompt?: string })?.imagePrompt?.trim();
+  const profileImage =
+    profileImageRaw || (profileImagePrompt ? "" : instagramBranding.logoPlaceholder);
   const profileUsername = (profile as { username?: string })?.username ?? 'Your Brand';
   const profileBgColor = (profile as { imageBackgroundColor?: string | null })?.imageBackgroundColor;
+  const profileAltText = (profile as { imageAltText?: string | null })?.imageAltText;
 
-  const content = (reelContent as { prompt?: string; altText?: string }) ?? {};
-  const prompt = content.prompt ?? '';
-  const altText = content.altText ?? 'Reel image';
+  const reelContentData = (reelContent as { prompt?: string; altText?: string }) ?? {};
+  const prompt = reelContentData.prompt ?? '';
+  const altText = reelContentData.altText ?? 'Reel image';
 
   return (
     <div className="h-full w-full">
@@ -48,9 +51,12 @@ export function InstagramReelArtifact({ className }: InstagramReelArtifactProps)
           <div className="flex flex-col justify-end flex-1" style={{ gap: instagramLayout.spacing }}>
             <InstagramAdProfile
               image={profileImage}
+              imagePrompt={profileImagePrompt || undefined}
               username={profileUsername}
               style={{ color: instagramColors.background }}
               imageBackgroundColor={profileBgColor}
+              imageAltText={profileAltText}
+              artifactId={artifact?.id}
             />
             <InstagramAdCaption
               name={profileUsername}
@@ -93,7 +99,7 @@ export function InstagramReelArtifact({ className }: InstagramReelArtifactProps)
               prompt={prompt}
               altText={altText}
               aspectRatio="9:16"
-              mediaIndex={0}
+              mediaIndex={1}
             />
           )}
         </div>

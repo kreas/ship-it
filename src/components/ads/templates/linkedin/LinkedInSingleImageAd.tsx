@@ -9,13 +9,16 @@ import AdSocialCounts from './components/AdSocialCounts';
 import { linkedInBranding } from './config';
 import { LinkedInCTA } from './types';
 
+const profileImageUrlDescription =
+  'Company logo URL (optional). Omit and set imagePrompt in profile to generate when the ad is rendered.';
+
 export const LinkedInSingleImageAdSchema = {
   description: 'Generate a LinkedIn Single Image Ad',
   inputSchema: z.object({
     name: z.string().describe('Name of the LinkedIn Single Image Ad'),
     type: z.enum(['ad-template:linkedin-single-image']).describe('Type identifier for this ad format'),
     content: z.object({
-      companyName: z.string().describe('Company name appearing in the ad header. When workspace has a brand, use the brand name. Profile image and URL are filled from the workspace brand when the ad is saved.'),
+      companyName: z.string().describe('Company name appearing in the ad header. When workspace has a brand, use the brand name.'),
       followerCount: z.number().optional().describe('Number of followers, displayed in the header'),
       adCopy: z.string().describe('Main text content of the ad (the post body)'),
       imagePrompt: z.string().describe('Prompt for generating the main ad image'),
@@ -23,6 +26,10 @@ export const LinkedInSingleImageAdSchema = {
       imageAspectRatio: z.enum(['1:1', '16:9']).optional().describe('Aspect ratio of the ad image'),
       headline: z.string().describe('Headline displayed below the image'),
       ctaButtonText: z.nativeEnum(LinkedInCTA).describe('Text for the call-to-action button'),
+      profile: z.object({
+        profileImageUrl: z.string().optional().describe(profileImageUrlDescription),
+        imageBackgroundColor: z.string().nullable().optional().describe('Background color for the company logo area.'),
+      }).optional().describe('Company profile (logo). Omit profileImageUrl to generate from prompt when the ad is rendered.'),
     }),
   }),
 };

@@ -87,3 +87,83 @@ export function mergeWorkspaceBrandIntoContent(
 
   return out;
 }
+
+const AD_PLATFORMS = ["instagram", "google", "linkedin", "tiktok", "facebook"] as const;
+
+/**
+ * Returns the profile/company structure for a given platform so the agent can
+ * fill ad artifact content. Use when building ad content from get_workspace_brand.
+ */
+export function getBrandSnapshotForPlatform(
+  brand: WorkspaceBrandSnapshot,
+  platform: string
+): Record<string, unknown> {
+  const logo = brand.resolvedLogoUrl ?? "";
+  const name = brand.name;
+  const url = brand.websiteUrl ?? "#";
+  const primaryColor = brand.primaryColor ?? null;
+
+  switch (platform) {
+    case "google":
+      return {
+        company: {
+          name,
+          logo,
+          url: url !== "#" ? url : "",
+          imageBackgroundColor: primaryColor,
+        },
+      };
+    case "instagram":
+    case "tiktok":
+      return {
+        profile: {
+          username: name || "Your Brand",
+          image: logo,
+          imageBackgroundColor: primaryColor,
+        },
+      };
+    case "linkedin":
+      return {
+        companyName: name,
+        profile: {
+          profileImageUrl: logo,
+          imageBackgroundColor: primaryColor,
+        },
+      };
+    case "facebook":
+      return {
+        company: name,
+        companyAbbreviation: (name || "").slice(0, 2).toUpperCase(),
+        profile: {
+          imageUrl: logo,
+          imageBackgroundColor: primaryColor,
+        },
+      };
+    default:
+      return {};
+  }
+}
+
+/**
+ * Returns brand snapshot plus per-platform profile/company shapes for ad content.
+ * Used by get_workspace_brand tool so the agent can copy forPlatform[platform] into content.
+ */
+export function getBrandForAdContent(brand: WorkspaceBrandSnapshot): {
+  name: string;
+  resolvedLogoUrl: string | null;
+  websiteUrl: string | null;
+  primaryColor: string | null;
+  forPlatform: Record<string, Record<string, unknown>>;
+} {
+  const forPlatform: Record<string, Record<string, unknown>> = {};
+  for (const platform of AD_PLATFORMS) {
+    forPlatform[platform] = getBrandSnapshotForPlatform(brand, platform);
+  }
+  return {
+    name: brand.name,
+    resolvedLogoUrl: brand.resolvedLogoUrl,
+    websiteUrl: brand.websiteUrl,
+    primaryColor: brand.primaryColor,
+    forPlatform,
+  };
+}
