@@ -11,6 +11,8 @@ import {
   type Transformer,
 } from "@lexical/markdown";
 import {
+  $getRoot,
+  $isParagraphNode,
   DecoratorNode,
   type EditorConfig,
   type LexicalNode,
@@ -109,6 +111,216 @@ export function $isImageNode(
 }
 
 // ---------------------------------------------------------------------------
+// TableDecoratorNode
+// ---------------------------------------------------------------------------
+
+type TableAlignment = "left" | "center" | "right" | null;
+
+function getSerializedArrayField(
+  serializedNode: SerializedLexicalNode,
+  field: string,
+): unknown[] | null {
+  const value = (serializedNode as Record<string, unknown>)[field];
+  return Array.isArray(value) ? value : null;
+}
+
+export class TableDecoratorNode extends DecoratorNode<ReactElement> {
+  __headers: string[];
+  __rows: string[][];
+  __alignments: TableAlignment[];
+
+  static getType(): string {
+    return "markdown-table";
+  }
+
+  static clone(node: TableDecoratorNode): TableDecoratorNode {
+    return new TableDecoratorNode(
+      node.__headers,
+      node.__rows,
+      node.__alignments,
+      node.__key,
+    );
+  }
+
+  constructor(
+    headers: string[],
+    rows: string[][],
+    alignments: TableAlignment[],
+    key?: NodeKey,
+  ) {
+    super(key);
+    this.__headers = headers;
+    this.__rows = rows;
+    this.__alignments = alignments;
+  }
+
+  static importJSON(serializedNode: SerializedLexicalNode): TableDecoratorNode {
+    const headers = getSerializedArrayField(serializedNode, "headers");
+    const rows = getSerializedArrayField(serializedNode, "rows");
+    const alignments = getSerializedArrayField(serializedNode, "alignments");
+    return new TableDecoratorNode(
+      (headers as string[]) ?? [],
+      (rows as string[][]) ?? [],
+      (alignments as TableAlignment[]) ?? [],
+    );
+  }
+
+  exportJSON() {
+    return {
+      type: "markdown-table",
+      version: 1,
+      headers: this.__headers,
+      rows: this.__rows,
+      alignments: this.__alignments,
+    };
+  }
+
+  createDOM(config: EditorConfig): HTMLElement {
+    void config;
+    const div = document.createElement("div");
+    div.className = "my-3 overflow-x-auto";
+    return div;
+  }
+
+  updateDOM(): false {
+    return false;
+  }
+
+  decorate(): ReactElement {
+    const { __headers: headers, __rows: rows, __alignments: alignments } = this;
+
+    const alignStyle = (i: number): React.CSSProperties | undefined => {
+      const a = alignments[i];
+      return a ? { textAlign: a } : undefined;
+    };
+
+    return (
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border">
+            {headers.map((h, i) => (
+              <th
+                key={i}
+                className="px-3 py-2 text-left font-medium text-foreground"
+                style={alignStyle(i)}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} className="border-b border-border last:border-0">
+              {row.map((cell, ci) => (
+                <td
+                  key={ci}
+                  className="px-3 py-2 text-muted-foreground"
+                  style={alignStyle(ci)}
+                >
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Table helpers: parsing & post-processing
+// ---------------------------------------------------------------------------
+
+const TABLE_ROW_RE = /^\|(.+)\|\s*$/;
+const TABLE_DIVIDER_RE = /^\|(\s*:?-+:?\s*\|)+\s*$/;
+
+function parseTableRow(text: string): string[] {
+  const match = TABLE_ROW_RE.exec(text);
+  if (!match) return [];
+  return match[1].split("|").map((c) => c.trim());
+}
+
+function parseAlignments(dividerText: string): TableAlignment[] {
+  const match = TABLE_ROW_RE.exec(dividerText);
+  if (!match) return [];
+  return match[1].split("|").map((c) => {
+    const trimmed = c.trim();
+    const left = trimmed.startsWith(":");
+    const right = trimmed.endsWith(":");
+    if (left && right) return "center";
+    if (right) return "right";
+    if (left) return "left";
+    return null;
+  });
+}
+
+/**
+ * Post-process the Lexical tree after markdown conversion to detect
+ * sequences of paragraph nodes that form GFM tables and replace them
+ * with TableDecoratorNode instances.
+ *
+ * Must be called inside an editor.update() or editorState callback
+ * AFTER $convertFromMarkdownString.
+ */
+export function $postProcessTables(): void {
+  const root = $getRoot();
+  const children = root.getChildren();
+
+  let i = 0;
+  while (i < children.length) {
+    const child = children[i];
+
+    if ($isParagraphNode(child) && TABLE_ROW_RE.test(child.getTextContent())) {
+      // Look ahead to gather all consecutive table-row paragraphs
+      let end = i + 1;
+      while (end < children.length) {
+        const node = children[end];
+        if (
+          $isParagraphNode(node) &&
+          TABLE_ROW_RE.test(node.getTextContent())
+        ) {
+          end++;
+        } else {
+          break;
+        }
+      }
+
+      // Need header + divider at minimum
+      if (end - i >= 2) {
+        const slice = children.slice(i, end);
+        const texts = slice.map((n) => n.getTextContent());
+
+        if (TABLE_DIVIDER_RE.test(texts[1])) {
+          const headers = parseTableRow(texts[0]);
+          const alignments = parseAlignments(texts[1]);
+          const bodyRows = texts.slice(2).map(parseTableRow);
+
+          const tableNode = new TableDecoratorNode(
+            headers,
+            bodyRows,
+            alignments,
+          );
+
+          // Replace first paragraph with the table node
+          slice[0].replace(tableNode);
+          // Remove remaining table-row paragraphs
+          for (let j = 1; j < slice.length; j++) {
+            slice[j].remove();
+          }
+
+          i++;
+          continue;
+        }
+      }
+    }
+
+    i++;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Markdown transformers
 // ---------------------------------------------------------------------------
 
@@ -176,6 +388,7 @@ export const LEXICAL_NODES = [
   LinkNode,
   CodeNode,
   ImageNode,
+  TableDecoratorNode,
 ];
 
 export const LEXICAL_THEME = {
@@ -207,5 +420,6 @@ export const LEXICAL_THEME = {
 export function createEditorStateFromMarkdown(markdown: string) {
   return () => {
     $convertFromMarkdownString(markdown, MARKDOWN_TRANSFORMERS);
+    $postProcessTables();
   };
 }

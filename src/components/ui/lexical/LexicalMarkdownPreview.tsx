@@ -17,6 +17,7 @@ import {
   LEXICAL_NODES,
   LEXICAL_THEME,
   MARKDOWN_TRANSFORMERS,
+  $postProcessTables,
 } from "./shared";
 import { CodeBlockEnhancerPlugin } from "./CodeBlockEnhancerPlugin";
 
@@ -42,6 +43,7 @@ function SyncContentPlugin({ content }: { content: string }) {
         root.clear();
         if (content.trim().length > 0) {
           $convertFromMarkdownString(content, MARKDOWN_TRANSFORMERS);
+          $postProcessTables();
         }
       });
     }, 50);
@@ -78,6 +80,7 @@ export function LexicalMarkdownPreview({
       editorState: () => {
         if (content.trim().length > 0) {
           $convertFromMarkdownString(content, MARKDOWN_TRANSFORMERS);
+          $postProcessTables();
         }
       },
       theme: LEXICAL_THEME,
