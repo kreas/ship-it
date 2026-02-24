@@ -6,7 +6,6 @@ import {
   loadSkillsForPurpose,
   loadSkillsForWorkspace,
   buildContextualSystemPrompt,
-  SUBTASK_INDEPENDENCE_GUIDELINES,
 } from "@/lib/chat";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
 import type { WorkspaceSoul, Brand, WorkspaceMemory } from "@/lib/types";
@@ -112,10 +111,10 @@ function getSystemPrompt(
     ? MARKETING_SYSTEM_PROMPT
     : SOFTWARE_SYSTEM_PROMPT;
 
-  // Build prompt with subtask independence guidelines
+  // Build prompt - subtask guidelines available via get_subtask_guidelines tool
   let prompt = `${basePrompt}
 
-${SUBTASK_INDEPENDENCE_GUIDELINES}`;
+Before suggesting subtasks, call **get_subtask_guidelines** to ensure they are independent and well-structured.`;
 
   // Add current subtasks context if any exist
   if (subtasks && subtasks.length > 0) {

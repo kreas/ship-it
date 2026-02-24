@@ -1,5 +1,6 @@
 import { tool } from "ai";
-import { createTool } from "../index";
+import { z } from "zod";
+import { createTool, SUBTASK_INDEPENDENCE_GUIDELINES } from "../index";
 import {
   updateDescriptionSchema,
   attachContentSchema,
@@ -10,6 +11,10 @@ import {
 import { attachContentToIssue } from "@/lib/actions/attachments";
 import { addAISuggestions, dismissAllAISuggestions } from "@/lib/actions/ai-suggestions";
 import { updateIssue, deleteIssue } from "@/lib/actions/issues";
+import {
+  getKnowledgeContextForIssue,
+  formatKnowledgeContextForPrompt,
+} from "@/lib/ai-search/knowledge-context";
 import type { ToolSet } from "ai";
 import type { Priority } from "@/lib/design-tokens";
 
@@ -150,6 +155,43 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
         } catch (error) {
           console.error("[deleteSubtask] Error:", error);
           return `Failed to delete subtask: ${error instanceof Error ? error.message : "Unknown error"}`;
+        }
+      },
+    }),
+
+    get_subtask_guidelines: tool({
+      description:
+        "Get the rules and examples for creating well-structured subtasks. Call this BEFORE using suggestAITasks to ensure subtasks are independent and properly scoped.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return SUBTASK_INDEPENDENCE_GUIDELINES;
+      },
+    }),
+
+    search_knowledge: tool({
+      description:
+        "Search the workspace knowledge base for relevant documents and context. Use when you need background information, prior research, or reference material related to the issue.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe(
+            "Search query to find relevant knowledge documents"
+          ),
+      }),
+      execute: async ({ query }: { query: string }) => {
+        try {
+          const chunks = await getKnowledgeContextForIssue({
+            issueId: context.issueId,
+            query,
+            semanticLimit: 5,
+          });
+          if (chunks.length === 0) {
+            return "No relevant knowledge documents found.";
+          }
+          return formatKnowledgeContextForPrompt(chunks);
+        } catch (error) {
+          console.error("[search_knowledge] Error:", error);
+          return `Failed to search knowledge: ${error instanceof Error ? error.message : "Unknown error"}`;
         }
       },
     }),

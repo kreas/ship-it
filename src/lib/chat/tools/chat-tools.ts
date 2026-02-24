@@ -1,4 +1,6 @@
-import { createTool } from "../index";
+import { tool } from "ai";
+import { z } from "zod";
+import { createTool, SUBTASK_INDEPENDENCE_GUIDELINES } from "../index";
 import { suggestIssueSchema, suggestSubtasksSchema } from "./schemas";
 import type { ToolSet } from "ai";
 
@@ -20,6 +22,14 @@ export function createChatTools(): ToolSet {
       schema: suggestSubtasksSchema,
       resultMessage: (input) =>
         `${input.replaceExisting === false ? "Added" : "Set"} ${input.subtasks.length} subtask${input.subtasks.length !== 1 ? "s" : ""}`,
+    }),
+    get_subtask_guidelines: tool({
+      description:
+        "Get the rules and examples for creating well-structured subtasks. Call this BEFORE using suggestSubtasks to ensure subtasks are independent and properly scoped.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return SUBTASK_INDEPENDENCE_GUIDELINES;
+      },
     }),
   };
 }
