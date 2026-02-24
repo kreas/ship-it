@@ -96,7 +96,7 @@ export function IssueChatPanel({
       }
       // Immediately invalidate relevant queries (best-effort for fast connections).
       // A second invalidation fires when streaming completes to guarantee freshness.
-      if (toolCall.toolName === "attachContent") {
+      if (toolCall.toolName === "attachContent" || toolCall.toolName === "deleteAttachment") {
         invalidateAttachments();
       }
       if (toolCall.toolName === "suggestAITasks") {

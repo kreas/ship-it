@@ -6,6 +6,7 @@ import {
   attachContentSchema,
   listAttachmentsSchema,
   readAttachmentSchema,
+  deleteAttachmentSchema,
 } from "./schemas";
 
 describe("planIssueSchema", () => {
@@ -269,6 +270,38 @@ describe("readAttachmentSchema", () => {
 
     it("rejects non-string attachmentId", () => {
       const result = readAttachmentSchema.safeParse({ attachmentId: 123 });
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("deleteAttachmentSchema", () => {
+  describe("valid inputs", () => {
+    it("accepts attachmentId with reason", () => {
+      const result = deleteAttachmentSchema.safeParse({
+        attachmentId: "abc-123",
+        reason: "Outdated content",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts attachmentId without reason", () => {
+      const result = deleteAttachmentSchema.safeParse({ attachmentId: "abc-123" });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.reason).toBeUndefined();
+      }
+    });
+  });
+
+  describe("invalid inputs", () => {
+    it("rejects missing attachmentId", () => {
+      const result = deleteAttachmentSchema.safeParse({});
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects non-string attachmentId", () => {
+      const result = deleteAttachmentSchema.safeParse({ attachmentId: 42 });
       expect(result.success).toBe(false);
     });
   });

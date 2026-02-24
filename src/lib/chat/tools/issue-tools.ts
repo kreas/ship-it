@@ -5,11 +5,12 @@ import {
   attachContentSchema,
   listAttachmentsSchema,
   readAttachmentSchema,
+  deleteAttachmentSchema,
   suggestAITasksSchema,
   updateSubtaskSchema,
   deleteSubtaskSchema,
 } from "./schemas";
-import { attachContentToIssue, getIssueAttachmentMetadata, getAttachmentsForIssues, getAttachment } from "@/lib/actions/attachments";
+import { attachContentToIssue, getIssueAttachmentMetadata, getAttachmentsForIssues, getAttachment, deleteAttachment } from "@/lib/actions/attachments";
 import { getIssueSubtasks } from "@/lib/actions/issues";
 import { getContent } from "@/lib/storage/r2-client";
 import { addAISuggestions, dismissAllAISuggestions } from "@/lib/actions/ai-suggestions";
@@ -182,6 +183,27 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
         } catch (error) {
           console.error("[readAttachment] Error:", error);
           return `Failed to read attachment: ${error instanceof Error ? error.message : "Unknown error"}`;
+        }
+      },
+    }),
+
+    deleteAttachment: tool({
+      description:
+        "Delete an attachment from this issue. Use listAttachments first to find the attachment ID. Useful for removing outdated AI-generated outputs before re-attaching updated content.",
+      inputSchema: deleteAttachmentSchema,
+      execute: async ({ attachmentId, reason }: { attachmentId: string; reason?: string }) => {
+        try {
+          const attachment = await getAttachment(attachmentId);
+          if (!attachment) {
+            return "Attachment not found.";
+          }
+
+          const filename = attachment.filename;
+          await deleteAttachment(attachmentId);
+          return `Deleted attachment "${filename}"${reason ? ` (${reason})` : ""}.`;
+        } catch (error) {
+          console.error("[deleteAttachment] Error:", error);
+          return `Failed to delete attachment: ${error instanceof Error ? error.message : "Unknown error"}`;
         }
       },
     }),

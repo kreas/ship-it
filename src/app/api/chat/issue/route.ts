@@ -136,6 +136,7 @@ ${issueContext.description ? `This issue already has a description. **Ask the us
 - **attachContent**: Attach generated content as a file (only when explicitly asked to create something NOW)
 - **listAttachments**: List existing attachments on this issue (set includeSubtasks: true to see subtask outputs too)
 - **readAttachment**: Read the content of a text attachment by ID (use listAttachments first to find the ID)
+- **deleteAttachment**: Delete an attachment by ID (use to remove outdated content before re-attaching updated versions)
 - **create_skill**: Save a repeatable workflow or instruction set as a reusable skill for this workspace
 - **update_skill**: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
 - Web search, code execution, web fetch: Only use when user explicitly asks you to execute immediately
