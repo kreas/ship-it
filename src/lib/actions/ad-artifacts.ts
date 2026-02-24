@@ -1,11 +1,12 @@
 "use server";
 
 import { db } from "../db";
-import { adArtifacts, attachments } from "../db/schema";
+import { adArtifacts, attachments, workspaceChats } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { generateDownloadUrl, deleteObject, uploadContent } from "../storage/r2-client";
 import { renderAdToHtml } from "../ad-html-templates";
 import { attachContentToIssue } from "./attachments";
+import { requireWorkspaceAccess } from "./workspace";
 import type { AdArtifact } from "../types";
 
 /**
@@ -22,6 +23,7 @@ export async function createAdArtifact(input: {
   mediaAssets?: string;
   brandId?: string;
 }): Promise<AdArtifact> {
+  await requireWorkspaceAccess(input.workspaceId, "member");
   try {
     const [artifact] = await db
       .insert(adArtifacts)
@@ -73,6 +75,8 @@ export async function getAdArtifact(
 
   if (!artifact) return null;
 
+  await requireWorkspaceAccess(artifact.workspaceId);
+
   const resolvedMediaUrls: string[] = [];
   const resolvedMediaBySlot: ResolvedMediaBySlot = [];
 
@@ -116,6 +120,7 @@ export async function getAdArtifact(
 export async function getWorkspaceAdArtifacts(
   workspaceId: string
 ): Promise<AdArtifact[]> {
+  await requireWorkspaceAccess(workspaceId);
   return db
     .select()
     .from(adArtifacts)
@@ -128,6 +133,13 @@ export async function getWorkspaceAdArtifacts(
  * Get ad artifacts for a specific chat
  */
 export async function getChatAdArtifacts(chatId: string): Promise<AdArtifact[]> {
+  const chat = await db
+    .select({ workspaceId: workspaceChats.workspaceId })
+    .from(workspaceChats)
+    .where(eq(workspaceChats.id, chatId))
+    .get();
+  if (!chat) return [];
+  await requireWorkspaceAccess(chat.workspaceId);
   return db
     .select()
     .from(adArtifacts)
@@ -143,6 +155,13 @@ export async function updateAdArtifactContent(
   artifactId: string,
   content: string
 ): Promise<AdArtifact | null> {
+  const existing = await db
+    .select({ workspaceId: adArtifacts.workspaceId })
+    .from(adArtifacts)
+    .where(eq(adArtifacts.id, artifactId))
+    .get();
+  if (!existing) return null;
+  await requireWorkspaceAccess(existing.workspaceId, "member");
   const [updated] = await db
     .update(adArtifacts)
     .set({ content, updatedAt: new Date() })
@@ -164,6 +183,13 @@ export async function updateAdArtifactMedia(
   artifactId: string,
   mediaAssets: string
 ): Promise<AdArtifact | null> {
+  const existing = await db
+    .select({ workspaceId: adArtifacts.workspaceId })
+    .from(adArtifacts)
+    .where(eq(adArtifacts.id, artifactId))
+    .get();
+  if (!existing) return null;
+  await requireWorkspaceAccess(existing.workspaceId, "member");
   const [updated] = await db
     .update(adArtifacts)
     .set({
@@ -193,6 +219,8 @@ export async function attachAdArtifactToIssue(
     if (!artifact) {
       return { success: false, error: "Artifact not found" };
     }
+
+    await requireWorkspaceAccess(artifact.workspaceId, "member");
 
     let parsedContent: unknown;
     try {
@@ -261,6 +289,8 @@ export async function refreshAdAttachment(artifactId: string): Promise<void> {
 
   if (!artifact?.issueAttachmentId) return;
 
+  await requireWorkspaceAccess(artifact.workspaceId, "member");
+
   const attachment = await db
     .select()
     .from(attachments)
@@ -323,6 +353,8 @@ export async function deleteAdArtifact(artifactId: string): Promise<void> {
     .get();
 
   if (!artifact) return;
+
+  await requireWorkspaceAccess(artifact.workspaceId, "admin");
 
   // Clean up R2 media assets
   if (artifact.mediaAssets) {
