@@ -113,13 +113,14 @@ async function attachContentFromBackgroundJob(
  * Returns two parts: static (cacheable) and dynamic (per-task).
  * The static part is placed first to maximize cache hits across parallel tasks.
  */
-interface PreviousTaskResult {
+export interface PreviousTaskResult {
   identifier: string;
   title: string;
   summary: string;
 }
 
-function buildSystemPrompt(
+/** @internal Exported for testing */
+export function buildSystemPrompt(
   parentIssue: { identifier: string; title: string; description: string | null } | null,
   subtaskTitle: string,
   subtaskDescription: string | null,
@@ -440,8 +441,38 @@ export const executeAllAITasksSequential = inngest.createFunction(
     // Lower concurrency — each invocation processes multiple subtasks in series
     concurrency: { limit: 3 },
     onFailure: async ({ event, error }) => {
-      const { parentIssueId } = event.data.event.data;
+      const { parentIssueId, subtaskIds } = event.data.event.data;
+      const runId = event.data.run_id;
       console.error(`[AI Tasks Sequential] Function failed for parent ${parentIssueId}:`, error);
+
+      try {
+        // Mark any subtasks still stuck in pending/running as failed
+        for (const subtaskId of subtaskIds) {
+          const subtask = await db.select({ status: issues.aiExecutionStatus }).from(issues).where(eq(issues.id, subtaskId)).get();
+          if (subtask && (subtask.status === "pending" || subtask.status === "running")) {
+            await db
+              .update(issues)
+              .set({
+                aiExecutionStatus: "failed",
+                aiExecutionSummary: `Sequential execution failed: ${error.message}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(issues.id, subtaskId));
+          }
+        }
+
+        // Update job status
+        await db
+          .update(backgroundJobs)
+          .set({
+            status: "failed",
+            completedAt: new Date(),
+            error: error.message,
+          })
+          .where(eq(backgroundJobs.runId, runId));
+      } catch (dbError) {
+        console.error(`[AI Tasks Sequential] Failed to update status:`, dbError);
+      }
     },
   },
   { event: "ai/tasks.executeSequential" },
@@ -493,7 +524,11 @@ export const executeAllAITasksSequential = inngest.createFunction(
       return { parentIssue: parentIssue ?? null, soul, brand };
     });
 
-    // Step 2+: Execute each subtask sequentially, accumulating results
+    // Step 2+: Execute each subtask sequentially, accumulating results.
+    // NOTE on Inngest replay safety: these mutable arrays live outside step.run()
+    // but are safe because on replay, the outer code re-executes and completed
+    // step.run() calls return their memoized results instantly, re-populating
+    // the arrays in order before the next step executes.
     const completedResults: PreviousTaskResult[] = [];
     const results: Array<{ issueId: string; status: string; summary: string }> = [];
 

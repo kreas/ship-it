@@ -220,6 +220,7 @@ export const summarizeEpicSchema = z.object({
 });
 
 export type SummarizeEpicInput = z.infer<typeof summarizeEpicSchema>;
+
 /**
  * Schema for listing attachments on an issue
  */

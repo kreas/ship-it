@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { issues } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { inngest } from "@/lib/inngest/client";
 import { requireWorkspaceAccess } from "./workspace";
 import { getWorkspaceSlug, getWorkspaceIdFromIssue } from "./helpers";
@@ -121,16 +121,14 @@ export async function executeAllAITasks(
     return { runIds: [] };
   }
 
-  // Update all to pending status
-  for (const subtask of pendingSubtasks) {
-    await db
-      .update(issues)
-      .set({
-        aiExecutionStatus: "pending",
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, subtask.id));
-  }
+  // Batch update all to pending status
+  await db
+    .update(issues)
+    .set({
+      aiExecutionStatus: "pending",
+      updatedAt: new Date(),
+    })
+    .where(inArray(issues.id, pendingSubtasks.map((s) => s.id)));
 
   // Send a single sequential execution event
   const result = await inngest.send({

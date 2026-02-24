@@ -9,7 +9,7 @@ import {
   updateSubtaskSchema,
   deleteSubtaskSchema,
 } from "./schemas";
-import { attachContentToIssue, getIssueAttachments, getAttachmentWithUrl } from "@/lib/actions/attachments";
+import { attachContentToIssue, getIssueAttachmentMetadata, getAttachment } from "@/lib/actions/attachments";
 import { getIssueSubtasks } from "@/lib/actions/issues";
 import { getContent } from "@/lib/storage/r2-client";
 import { addAISuggestions, dismissAllAISuggestions } from "@/lib/actions/ai-suggestions";
@@ -76,7 +76,7 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
         includeSubtasks?: boolean;
       }) => {
         try {
-          const issueAttachments = await getIssueAttachments(context.issueId);
+          const issueAttachments = await getIssueAttachmentMetadata(context.issueId);
           const results: Array<{ source: string; attachments: Array<{ id: string; filename: string; mimeType: string; size: number; createdAt: Date }> }> = [];
 
           if (issueAttachments.length > 0) {
@@ -95,7 +95,7 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
           if (includeSubtasks) {
             const subtasks = await getIssueSubtasks(context.issueId);
             for (const subtask of subtasks) {
-              const subtaskAttachments = await getIssueAttachments(subtask.id);
+              const subtaskAttachments = await getIssueAttachmentMetadata(subtask.id);
               if (subtaskAttachments.length > 0) {
                 results.push({
                   source: `Subtask: ${subtask.identifier} - ${subtask.title}`,
@@ -131,13 +131,13 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
       inputSchema: readAttachmentSchema,
       execute: async ({ attachmentId }: { attachmentId: string }) => {
         try {
-          const attachment = await getAttachmentWithUrl(attachmentId);
+          const attachment = await getAttachment(attachmentId);
           if (!attachment) {
             return "Attachment not found.";
           }
 
           // Only read text-based attachments
-          const textTypes = ["text/", "application/json", "application/xml", "application/javascript"];
+          const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/x-yaml", "application/x-sh"];
           const isText = textTypes.some((t) => attachment.mimeType.startsWith(t));
           if (!isText) {
             return `Cannot read binary attachment "${attachment.filename}" (${attachment.mimeType}). Only text-based files can be read.`;

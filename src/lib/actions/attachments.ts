@@ -36,6 +36,39 @@ async function getWorkspaceIdFromAttachment(
 }
 
 /**
+ * Get a single attachment record (no signed URL generation).
+ * Useful when you only need metadata or will read content directly via storageKey.
+ */
+export async function getAttachment(
+  attachmentId: string
+): Promise<Attachment | null> {
+  const result = await getWorkspaceIdFromAttachment(attachmentId);
+  if (!result) return null;
+
+  await requireWorkspaceAccess(result.workspaceId);
+  return result.attachment;
+}
+
+/**
+ * Get all attachment metadata for an issue (no signed URL generation).
+ * Faster than getIssueAttachments when URLs are not needed.
+ */
+export async function getIssueAttachmentMetadata(
+  issueId: string
+): Promise<Attachment[]> {
+  const workspaceId = await getWorkspaceIdFromIssue(issueId);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId);
+  }
+
+  return db
+    .select()
+    .from(attachments)
+    .where(eq(attachments.issueId, issueId))
+    .orderBy(attachments.createdAt);
+}
+
+/**
  * Get all attachments for an issue with signed URLs
  */
 export async function getIssueAttachments(
