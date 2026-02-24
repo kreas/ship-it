@@ -16,6 +16,9 @@ import { LinkedInCarouselAdSchema } from "@/components/ads/templates/linkedin/to
 import { GoogleSearchAdSchema } from "@/components/ads/templates/google/GoogleSearchAd";
 import { FacebookInStreamVideoTool } from "@/components/ads/templates/facebook/tools";
 
+/** Max ad tool invocations per request. Each API request creates a fresh counter (createAdTools is called per request in chat routes). */
+const MAX_AD_TOOL_USES = 5;
+
 interface AdToolsContext {
   workspaceId: string;
   /** Only set when chat is a workspace chat (workspace_chats.id). Omit for issue chat to avoid FK violation. */
@@ -23,6 +26,11 @@ interface AdToolsContext {
   brandId?: string;
   /** When set, ads are automatically attached to this issue on creation. */
   issueId?: string;
+}
+
+/** Shared usage counter for the current request only. Reset when the user sends a new message. */
+interface AdToolUsage {
+  count: number;
 }
 
 /**
@@ -59,6 +67,7 @@ function parseTemplateType(type: string): { platform: string; templateType: stri
 function createAdTool(
   schema: { description: string; inputSchema: z.ZodType },
   context: AdToolsContext,
+  usage: AdToolUsage,
 ) {
   return tool({
     description: schema.description,
@@ -90,6 +99,14 @@ function createAdTool(
       },
     ),
     execute: async (input: { name: string; type: string; content: unknown; existingArtifactId?: string }) => {
+      usage.count += 1;
+      if (usage.count > MAX_AD_TOOL_USES) {
+        return {
+          success: false,
+          error: `Ad tool use limit reached (${MAX_AD_TOOL_USES} per message). Send a new message to create more ads.`,
+        };
+      }
+
       const { platform, templateType } = parseTemplateType(input.type);
 
       try {
@@ -177,18 +194,20 @@ function createAdTool(
 /**
  * Creates all ad generation tools for the chat.
  * One tool per template type, each persisting the artifact to the database.
+ * Limit: MAX_AD_TOOL_USES total ad tool calls per request (new counter each time the user sends a message).
  */
 export function createAdTools(context: AdToolsContext) {
+  const usage: AdToolUsage = { count: 0 }; // fresh per request (createAdTools is invoked per API request)
   return {
-    create_ad_instagram_feed_post: createAdTool(InstagramFeedPostSchema, context),
-    create_ad_instagram_carousel: createAdTool(InstagramCarouselSchema, context),
-    create_ad_instagram_story: createAdTool(InstagramStorySchema, context),
-    create_ad_instagram_reel: createAdTool(InstagramReelSchema, context),
-    create_ad_tiktok_story: createAdTool(TiktokAdStorySchema, context),
-    create_ad_tiktok_cta: createAdTool(TiktokAdCTAToolSchema, context),
-    create_ad_linkedin_single_image: createAdTool(LinkedInSingleImageAdSchema, context),
-    create_ad_linkedin_carousel: createAdTool(LinkedInCarouselAdSchema, context),
-    create_ad_google_search_ad: createAdTool(GoogleSearchAdSchema, context),
-    create_ad_facebook_in_stream_video: createAdTool(FacebookInStreamVideoTool, context),
+    create_ad_instagram_feed_post: createAdTool(InstagramFeedPostSchema, context, usage),
+    create_ad_instagram_carousel: createAdTool(InstagramCarouselSchema, context, usage),
+    create_ad_instagram_story: createAdTool(InstagramStorySchema, context, usage),
+    create_ad_instagram_reel: createAdTool(InstagramReelSchema, context, usage),
+    create_ad_tiktok_story: createAdTool(TiktokAdStorySchema, context, usage),
+    create_ad_tiktok_cta: createAdTool(TiktokAdCTAToolSchema, context, usage),
+    create_ad_linkedin_single_image: createAdTool(LinkedInSingleImageAdSchema, context, usage),
+    create_ad_linkedin_carousel: createAdTool(LinkedInCarouselAdSchema, context, usage),
+    create_ad_google_search_ad: createAdTool(GoogleSearchAdSchema, context, usage),
+    create_ad_facebook_in_stream_video: createAdTool(FacebookInStreamVideoTool, context, usage),
   };
 }
