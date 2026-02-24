@@ -111,6 +111,58 @@ export function $isImageNode(
 }
 
 // ---------------------------------------------------------------------------
+// HorizontalRuleNode
+// ---------------------------------------------------------------------------
+
+export class HorizontalRuleNode extends DecoratorNode<ReactElement> {
+  static getType(): string {
+    return "horizontal-rule";
+  }
+
+  static clone(node: HorizontalRuleNode): HorizontalRuleNode {
+    return new HorizontalRuleNode(node.__key);
+  }
+
+  static importJSON(): HorizontalRuleNode {
+    return new HorizontalRuleNode();
+  }
+
+  exportJSON() {
+    return { type: "horizontal-rule", version: 1 };
+  }
+
+  createDOM(config: EditorConfig): HTMLElement {
+    void config;
+    const div = document.createElement("div");
+    div.className = "my-4";
+    return div;
+  }
+
+  updateDOM(): false {
+    return false;
+  }
+
+  decorate(): ReactElement {
+    return <hr className="border-border" />;
+  }
+}
+
+const HR_ELEMENT_TRANSFORMER: ElementTransformer = {
+  type: "element",
+  dependencies: [HorizontalRuleNode],
+  regExp: /^(?:---|\*\*\*|___)$/,
+  export: (node) => {
+    if (node instanceof HorizontalRuleNode) {
+      return "---";
+    }
+    return null;
+  },
+  replace: (parentNode) => {
+    parentNode.replace(new HorizontalRuleNode());
+  },
+};
+
+// ---------------------------------------------------------------------------
 // TableDecoratorNode
 // ---------------------------------------------------------------------------
 
@@ -372,6 +424,7 @@ export const IMAGE_MARKDOWN_TRANSFORMER: TextMatchTransformer = {
 
 export const MARKDOWN_TRANSFORMERS: Transformer[] = [
   IMAGE_ELEMENT_TRANSFORMER,
+  HR_ELEMENT_TRANSFORMER,
   ...TRANSFORMERS,
   IMAGE_MARKDOWN_TRANSFORMER,
 ];
@@ -388,6 +441,7 @@ export const LEXICAL_NODES = [
   LinkNode,
   CodeNode,
   ImageNode,
+  HorizontalRuleNode,
   TableDecoratorNode,
 ];
 
