@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { X, Copy, Check, Download, FileText } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { X, Copy, Check, Download, FileDown, FileText } from "lucide-react";
+import { printElementAsPdf } from "@/lib/print-to-pdf";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
 import { useChatContext } from "./ChatContext";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 export function AttachmentPreviewPanel() {
   const { selectedAttachment, closeAttachment } = useChatContext();
   const [copied, setCopied] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
     if (!selectedAttachment) return;
@@ -85,6 +87,26 @@ export function AttachmentPreviewPanel() {
             <Download className="w-3.5 h-3.5" />
           </button>
 
+          {isMarkdown && (
+            <button
+              onClick={() => {
+                if (contentRef.current) {
+                  printElementAsPdf(
+                    contentRef.current,
+                    selectedAttachment.filename
+                  );
+                }
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium",
+                "bg-muted hover:bg-muted/80 transition-colors"
+              )}
+              title="Save as PDF"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             onClick={closeAttachment}
             className={cn(
@@ -99,7 +121,7 @@ export function AttachmentPreviewPanel() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 scrollbar-thin">
+      <div ref={contentRef} className="flex-1 overflow-auto p-4 scrollbar-thin">
         {isMarkdown ? (
           <MarkdownContent content={selectedAttachment.content} />
         ) : (
