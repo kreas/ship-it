@@ -1,23 +1,65 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
 import {
   createAdArtifact,
   getWorkspaceAdArtifacts,
   getChatAdArtifacts,
   updateAdArtifactMedia,
 } from "@/lib/actions/ad-artifacts";
+import { requireWorkspaceAccess } from "@/lib/actions/workspace";
 import { getWorkspaceBrand } from "@/lib/actions/brand";
 import { mergeWorkspaceBrandIntoContent } from "@/lib/ads/merge-workspace-brand";
+
+const postArtifactSchema = z.object({
+  workspaceId: z.string().min(1),
+  artifact: z.object({
+    chatId: z.string().optional(),
+    messageId: z.string().optional(),
+    platform: z.string().optional(),
+    templateType: z.string().optional(),
+    type: z.string().optional(),
+    name: z.string().optional(),
+    content: z.union([z.string(), z.record(z.unknown())]),
+    mediaUrls: z.array(z.unknown()).optional(),
+    brandId: z.string().optional(),
+  }),
+});
+
+const getQuerySchema = z
+  .object({
+    workspaceId: z.string().min(1).optional(),
+    chatId: z.string().min(1).optional(),
+  })
+  .refine((data) => data.workspaceId ?? data.chatId, {
+    message: "workspaceId or chatId is required",
+  });
+
+const patchArtifactSchema = z.object({
+  artifactId: z.string().min(1),
+  mediaUrls: z.array(z.unknown()),
+});
+
+function isAccessDenied(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.includes("Access denied") || error.message.includes("not a member"))
+  );
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { workspaceId, artifact } = body;
+    const parsed = postArtifactSchema.safeParse(body);
 
-    if (!workspaceId || !artifact) {
-      return Response.json(
-        { error: "workspaceId and artifact are required" },
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { workspaceId, artifact } = parsed.data;
+    await requireWorkspaceAccess(workspaceId, "member");
 
     const platform = artifact.platform || "unknown";
     const templateType = artifact.templateType || artifact.type || "unknown";
@@ -56,10 +98,13 @@ export async function POST(req: Request) {
       brandId: artifact.brandId,
     });
 
-    return Response.json({ artifact: saved });
+    return NextResponse.json({ artifact: saved });
   } catch (error) {
+    if (isAccessDenied(error)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
     console.error("[ads/artifacts POST] Error:", error);
-    return Response.json(
+    return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to save artifact" },
       { status: 500 }
     );
@@ -69,26 +114,35 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const workspaceId = searchParams.get("workspaceId");
-    const chatId = searchParams.get("chatId");
+    const query = {
+      workspaceId: searchParams.get("workspaceId") ?? undefined,
+      chatId: searchParams.get("chatId") ?? undefined,
+    };
+    const parsed = getQuerySchema.safeParse(query);
 
-    if (chatId) {
-      const artifacts = await getChatAdArtifacts(chatId);
-      return Response.json({ artifacts });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
+
+    const { workspaceId, chatId } = parsed.data;
 
     if (workspaceId) {
+      await requireWorkspaceAccess(workspaceId, "member");
       const artifacts = await getWorkspaceAdArtifacts(workspaceId);
-      return Response.json({ artifacts });
+      return NextResponse.json({ artifacts });
     }
 
-    return Response.json(
-      { error: "workspaceId or chatId is required" },
-      { status: 400 }
-    );
+    const artifacts = await getChatAdArtifacts(chatId!);
+    return NextResponse.json({ artifacts });
   } catch (error) {
+    if (isAccessDenied(error)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
     console.error("[ads/artifacts GET] Error:", error);
-    return Response.json(
+    return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch artifacts" },
       { status: 500 }
     );
@@ -97,14 +151,17 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { artifactId, mediaUrls } = await req.json();
+    const body = await req.json();
+    const parsed = patchArtifactSchema.safeParse(body);
 
-    if (!artifactId || !mediaUrls) {
-      return Response.json(
-        { error: "artifactId and mediaUrls are required" },
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { artifactId, mediaUrls } = parsed.data;
 
     const updated = await updateAdArtifactMedia(
       artifactId,
@@ -112,13 +169,16 @@ export async function PATCH(req: Request) {
     );
 
     if (!updated) {
-      return Response.json({ error: "Artifact not found" }, { status: 404 });
+      return NextResponse.json({ error: "Artifact not found" }, { status: 404 });
     }
 
-    return Response.json({ artifact: updated });
+    return NextResponse.json({ artifact: updated });
   } catch (error) {
+    if (isAccessDenied(error)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
     console.error("[ads/artifacts PATCH] Error:", error);
-    return Response.json(
+    return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update artifact" },
       { status: 500 }
     );
