@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     }
     console.error("[ads/artifacts POST] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to save artifact" },
+      { error: "Failed to save artifact" },
       { status: 500 }
     );
   }
@@ -143,7 +143,7 @@ export async function GET(req: Request) {
     }
     console.error("[ads/artifacts GET] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch artifacts" },
+      { error: "Failed to fetch artifacts" },
       { status: 500 }
     );
   }
@@ -179,7 +179,7 @@ export async function PATCH(req: Request) {
     }
     console.error("[ads/artifacts PATCH] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update artifact" },
+      { error: "Failed to update artifact" },
       { status: 500 }
     );
   }
