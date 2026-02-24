@@ -3,8 +3,8 @@
 import React from 'react';
 import { Loader2, Paperclip } from 'lucide-react';
 import { useArtifact } from '@/components/ads/hooks/useArtifact';
-import { ArtifactControlsRegenerate } from './ArtifactControlsRegenerate';
-import { ArtifactControlsImageToVideo } from './ArtifactControlsImageToVideo';
+// import { ArtifactControlsRegenerate } from './ArtifactControlsRegenerate';
+// import { ArtifactControlsImageToVideo } from './ArtifactControlsImageToVideo';
 import { ArtifactControlsAssets } from './ArtifactControlsAssets';
 
 const headerButtonClass =
@@ -55,7 +55,8 @@ const ArtifactControlsBar: React.FC<ArtifactControlsBarProps> = ({
             >
               {name}
             </span>
-            {showMediaCount && (imageCount > 0 || videoCount > 0) && (
+            {/* Temporarily hidden — restore to re-enable */}
+            {/* {showMediaCount && (imageCount > 0 || videoCount > 0) && (
               <span
                 className={
                   isHeader
@@ -65,17 +66,18 @@ const ArtifactControlsBar: React.FC<ArtifactControlsBarProps> = ({
               >
                 {imageCount} images, {videoCount} videos
               </span>
-            )}
+            )} */}
           </div>
         )}
-        {isHeader && !showTitle && showMediaCount && (imageCount > 0 || videoCount > 0) && (
+        {/* Temporarily hidden — restore to re-enable */}
+        {/* {isHeader && !showTitle && showMediaCount && (imageCount > 0 || videoCount > 0) && (
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded whitespace-nowrap">
             {imageCount} images, {videoCount} videos
           </span>
-        )}
+        )} */}
         <div className={isHeader ? "flex items-center gap-1" : "flex items-center gap-3"}>
-          <ArtifactControlsRegenerate compact={isHeader} />
-          <ArtifactControlsImageToVideo compact={isHeader} />
+          {/* <ArtifactControlsRegenerate compact={isHeader} />
+          <ArtifactControlsImageToVideo compact={isHeader} /> */}
           {isHeader && onSaveAsAttachment != null && (
             <button
             type="button"
@@ -91,7 +93,8 @@ const ArtifactControlsBar: React.FC<ArtifactControlsBarProps> = ({
               )}
             </button>
           )}
-          <ArtifactControlsAssets compact={isHeader} />
+          {/* Temporarily hidden — restore to re-enable */}
+          {/* <ArtifactControlsAssets compact={isHeader} /> */}
         </div>
       </div>
     </div>

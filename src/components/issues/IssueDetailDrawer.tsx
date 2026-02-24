@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useSendToAI } from "@/lib/hooks";
 import { useBoardContext } from "@/components/board/context/BoardProvider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { AdArtifactFullView } from "@/components/ads/AdArtifactFullView";
+import { AdArtifactDialog } from "@/components/ads/AdArtifactDialog";
 import { IssueChatPanel } from "./IssueChatPanel";
 import { IssueDetailForm } from "./IssueDetailForm";
 import type { Comment } from "@/lib/types";
@@ -164,13 +164,12 @@ export function IssueDetailDrawer({
               onCommentsLoad={handleCommentsLoad}
             />
             {selectedArtifactId && (
-              <div className="absolute inset-0 z-10 bg-background">
-                <AdArtifactFullView
-                  artifactId={selectedArtifactId}
-                  onClose={closeArtifact}
-                  issueId={issue.id}
-                />
-              </div>
+              <AdArtifactDialog
+                open={true}
+                onOpenChange={(open) => { if (!open) closeArtifact(); }}
+                artifactId={selectedArtifactId}
+                issueId={issue.id}
+              />
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-const SKIP_KEYS = new Set(["image", "prompt"]);
+const SKIP_KEYS = new Set(["prompt"]);
 const TEXTAREA_KEYS = new Set(["caption", "description", "headline", "body", "text"]);
 
 function camelToTitle(key: string): string {

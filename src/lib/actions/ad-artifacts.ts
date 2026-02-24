@@ -5,8 +5,10 @@ import { adArtifacts, attachments, workspaceChats } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { generateDownloadUrl, deleteObject, uploadContent } from "../storage/r2-client";
 import { renderAdToHtml } from "../ad-html-templates";
+import { revalidatePath } from "next/cache";
 import { attachContentToIssue } from "./attachments";
 import { requireWorkspaceAccess } from "./workspace";
+import { getWorkspaceSlug } from "./helpers";
 import type { AdArtifact } from "../types";
 function isEmptyUrl(value: unknown): boolean {
   if (value == null) return true;
@@ -430,6 +432,10 @@ export async function refreshAdAttachment(artifactId: string): Promise<void> {
     .update(attachments)
     .set({ size })
     .where(eq(attachments.id, attachment.id));
+
+  // Revalidate so the issue drawer picks up the updated attachment
+  const slug = await getWorkspaceSlug(artifact.workspaceId);
+  revalidatePath(slug ? `/w/${slug}` : "/");
 }
 
 /**

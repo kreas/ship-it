@@ -184,6 +184,7 @@ export default function GeneratedImage({
               <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
+            /* Temporarily hidden — restore to re-enable regenerate overlay
             isHovered && (
               <button
                 onClick={handleRegenerate}
@@ -194,6 +195,8 @@ export default function GeneratedImage({
                 <span className="text-white block text-sm">Regenerate</span>
               </button>
             )
+            */
+            null
           )}
         </>
       )}

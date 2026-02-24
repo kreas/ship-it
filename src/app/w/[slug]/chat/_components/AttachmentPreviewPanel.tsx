@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { X, Copy, Check, Download, FileText } from "lucide-react";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
-import { AdArtifactFullView } from "@/components/ads/AdArtifactFullView";
+import { AdArtifactDialog } from "@/components/ads/AdArtifactDialog";
 import { useChatContext } from "./ChatContext";
 import { cn } from "@/lib/utils";
 
@@ -45,14 +45,22 @@ export function AttachmentPreviewPanel() {
 
   // If an ad artifact is selected (by id), render the full ad view
   if (selectedArtifactId) {
-    return <AdArtifactFullView artifactId={selectedArtifactId} onClose={closeArtifact} onCollapseToInline={collapseArtifactToInline} />;
+    return (
+      <AdArtifactDialog
+        open={true}
+        onOpenChange={(open) => { if (!open) closeArtifact(); }}
+        artifactId={selectedArtifactId}
+        onCollapseToInline={collapseArtifactToInline}
+      />
+    );
   }
   // If the open attachment is an artifact export, show the artifact view so the ad renders
   if (selectedAttachment && attachmentArtifactId) {
     return (
-      <AdArtifactFullView
+      <AdArtifactDialog
+        open={true}
+        onOpenChange={(open) => { if (!open) closeAttachment(); }}
         artifactId={attachmentArtifactId}
-        onClose={closeAttachment}
       />
     );
   }
