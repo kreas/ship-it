@@ -43,7 +43,6 @@ export async function createAdArtifact(input: {
     return artifact;
   } catch (error) {
     console.error("Failed to create ad artifact:", error);
-    console.error("Input was:", JSON.stringify(input, null, 2));
     throw error;
   }
 }
