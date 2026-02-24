@@ -70,6 +70,7 @@ import {
   MARKDOWN_TRANSFORMERS,
   LEXICAL_NODES,
   LEXICAL_THEME,
+  $postProcessTables,
 } from "./lexical/shared";
 
 interface LexicalMarkdownEditorProps {
@@ -143,6 +144,7 @@ function SyncMarkdownPlugin({ value }: { value: string }) {
         root.append($createParagraphNode());
       } else {
         $convertFromMarkdownString(value, MARKDOWN_TRANSFORMERS);
+        $postProcessTables();
       }
       lastSyncedRef.current = value;
     });
@@ -443,6 +445,7 @@ export function LexicalMarkdownEditor({
       editorState: () => {
         if (value.trim().length > 0) {
           $convertFromMarkdownString(value, MARKDOWN_TRANSFORMERS);
+          $postProcessTables();
           return;
         }
 
