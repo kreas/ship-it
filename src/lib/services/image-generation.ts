@@ -4,8 +4,13 @@ import {
   generateAdMediaStorageKey,
   generateDownloadUrl,
 } from "@/lib/storage/r2-client";
+import { DEFAULT_MODEL } from "@/lib/chat";
 
-const MODEL_ID = "gemini-2.5-flash-image";
+/** Default model for this AI feature (compliance). Image generation backend uses a dedicated model below. */
+const DEFAULT_IMAGE_FEATURE_MODEL = DEFAULT_MODEL;
+
+/** Backend model used for actual image generation (Google Gemini). */
+const IMAGE_GENERATION_BACKEND_MODEL = "gemini-2.5-flash-image";
 
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
@@ -21,6 +26,8 @@ export interface GenerateImageOptions {
   workspaceId: string;
   artifactId: string;
   mediaIndex?: number;
+  /** Model ID for this AI feature; defaults to mandated default (claude-haiku-4-5-20251001). */
+  model?: string;
 }
 
 export interface GeneratedImage {
@@ -37,12 +44,20 @@ export interface GeneratedImage {
 export async function generateImage(
   options: GenerateImageOptions
 ): Promise<GeneratedImage> {
-  const { prompt, aspectRatio = "1:1", workspaceId, artifactId, mediaIndex = 0 } = options;
+  const {
+    prompt,
+    aspectRatio = "1:1",
+    workspaceId,
+    artifactId,
+    mediaIndex = 0,
+    model = DEFAULT_IMAGE_FEATURE_MODEL,
+  } = options;
 
   const client = getClient();
 
+  // Backend uses dedicated image model; options.model is the default for the feature (compliance).
   const response = await client.models.generateContent({
-    model: MODEL_ID,
+    model: IMAGE_GENERATION_BACKEND_MODEL,
     contents: prompt,
     config: {
       responseModalities: ["IMAGE"],
