@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Upload, Plus, Loader2, AlertCircle } from "lucide-react";
+import { Upload, Plus, Loader2, AlertCircle, Grid2x2, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AttachmentItem } from "./AttachmentItem";
+import { AttachmentTableRow } from "./AttachmentTableRow";
 import { AttachmentPreview } from "./AttachmentPreview";
 import {
   useIssueAttachments,
@@ -17,12 +18,15 @@ import {
 } from "@/lib/storage/file-validation";
 import type { AttachmentWithUrl, IssueWithLabels } from "@/lib/types";
 
+type AttachmentView = "table" | "grid";
+
 interface AttachmentListProps {
   issue: IssueWithLabels;
   className?: string;
 }
 
 export function AttachmentList({ issue, className }: AttachmentListProps) {
+  const [view, setView] = useState<AttachmentView>("table");
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewAttachment, setPreviewAttachment] =
@@ -122,7 +126,72 @@ export function AttachmentList({ issue, className }: AttachmentListProps) {
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div
+      className={cn("space-y-2", className)}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={`${getAllowedMimeTypesString()},${getAllowedExtensions()}`}
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Header row: label + actions */}
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-medium text-muted-foreground">
+          Attachments
+        </label>
+        <div className="flex items-center gap-0.5">
+          {uploadMutation.isPending ? (
+            <div className="p-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <button
+              onClick={openFilePicker}
+              className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+              title="Add attachment"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {attachments.length > 0 && (
+            <>
+              <button
+                onClick={() => setView("table")}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  view === "table"
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Table view"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setView("grid")}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  view === "grid"
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Grid view"
+              >
+                <Grid2x2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Error message */}
       {error && (
         <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-2">
@@ -137,8 +206,43 @@ export function AttachmentList({ issue, className }: AttachmentListProps) {
         </div>
       )}
 
-      {/* Attachment grid */}
-      {attachments.length > 0 && (
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="flex items-center justify-center gap-2 py-3 border-2 border-dashed border-primary bg-primary/5 rounded-md text-sm text-primary">
+          <Upload className="w-4 h-4" />
+          <span>Drop files here</span>
+        </div>
+      )}
+
+      {/* Attachment table view */}
+      {attachments.length > 0 && view === "table" && !isDragging && (
+        <div className="border border-border rounded-md overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border bg-muted/50 text-muted-foreground">
+                <th className="text-left font-medium px-2 py-1.5">Name</th>
+                <th className="text-left font-medium px-2 py-1.5 w-20">Size</th>
+                <th className="text-left font-medium px-2 py-1.5 w-20">Date</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {attachments.map((attachment) => (
+                <AttachmentTableRow
+                  key={attachment.id}
+                  attachment={attachment}
+                  onPreview={() => setPreviewAttachment(attachment)}
+                  onDelete={() => handleDelete(attachment.id)}
+                  isDeleting={deletingId === attachment.id}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Attachment grid view */}
+      {attachments.length > 0 && view === "grid" && !isDragging && (
         <div className="grid grid-cols-3 gap-2">
           {attachments.map((attachment) => (
             <AttachmentItem
@@ -151,63 +255,6 @@ export function AttachmentList({ issue, className }: AttachmentListProps) {
           ))}
         </div>
       )}
-
-      {/* Drop zone / Upload button */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={cn(
-          "relative border-2 border-dashed rounded-md transition-colors",
-          isDragging
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-muted-foreground/50",
-          uploadMutation.isPending && "pointer-events-none"
-        )}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={`${getAllowedMimeTypesString()},${getAllowedExtensions()}`}
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-
-        {uploadMutation.isPending ? (
-          <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Uploading...</span>
-          </div>
-        ) : (
-          <button
-            onClick={openFilePicker}
-            className={cn(
-              "flex items-center justify-center gap-2 w-full py-4 text-sm",
-              isDragging
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {isDragging ? (
-              <>
-                <Upload className="w-4 h-4" />
-                <span>Drop files here</span>
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                <span>Add attachment</span>
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* File type hint */}
-      <p className="text-[10px] text-muted-foreground text-center">
-        Images, PDFs, and documents up to 10MB
-      </p>
 
       {/* Loading state */}
       {isLoading && attachments.length === 0 && (
