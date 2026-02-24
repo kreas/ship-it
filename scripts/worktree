@@ -2,24 +2,27 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: scripts/worktree.sh <name> [--no-claude]"
+  echo "Usage: scripts/worktree <name> [--no-claude] [--fresh-db]"
   echo ""
   echo "Creates a git worktree at .worktrees/<name> with branch feature/<name>,"
-  echo "copies .env.local, installs dependencies, runs migrations, and launches claude."
+  echo "copies .env.local and local.db, installs dependencies, and launches claude."
   echo ""
   echo "If the worktree already exists, cd into it and launch claude."
   echo ""
   echo "Options:"
   echo "  --no-claude   Skip launching claude (prints cd command instead)"
+  echo "  --fresh-db    Start with an empty database instead of copying main's"
   exit 1
 }
 
 name=""
 launch_claude=true
+fresh_db=false
 
 for arg in "$@"; do
   case "$arg" in
     --no-claude) launch_claude=false ;;
+    --fresh-db) fresh_db=true ;;
     --help|-h) usage ;;
     -*) echo "Unknown option: $arg"; usage ;;
     *) name="$arg" ;;
@@ -37,15 +40,32 @@ branch="feature/$name"
 if [ -d "$worktree_dir" ]; then
   echo "Worktree already exists at .worktrees/$name"
 else
+  echo "Updating main branch..."
+  git fetch origin main
+  git rebase origin/main main
+
   echo "Creating worktree .worktrees/$name on branch $branch..."
-  git worktree add -B "$branch" "$worktree_dir"
+  git worktree add -B "$branch" "$worktree_dir" main
   cp "$repo_root/.env.local" "$worktree_dir/"
+
+  if [ "$fresh_db" = true ]; then
+    echo "Starting with fresh database..."
+  elif [ -f "$repo_root/local.db" ]; then
+    echo "Copying database from main worktree..."
+    cp "$repo_root/local.db" "$worktree_dir/"
+  else
+    echo "No local.db found in main worktree, starting fresh..."
+    fresh_db=true
+  fi
 
   cd "$worktree_dir"
   echo "Installing dependencies..."
   pnpm install
-  echo "Running migrations..."
-  pnpm db:migrate
+
+  if [ "$fresh_db" = true ]; then
+    echo "Running migrations..."
+    pnpm db:migrate
+  fi
 fi
 
 if [ "$launch_claude" = true ]; then
