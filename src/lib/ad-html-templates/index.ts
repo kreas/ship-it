@@ -63,12 +63,15 @@ export function htmlWrapper(title: string, body: string): string {
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; display: flex; justify-content: center; padding: 24px; }
+  html, body { min-height: 100vh; height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111; padding: 24px; position: relative; }
+  #ad-viewport { position: absolute; inset: 24px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+  #ad-root { flex-shrink: 0; transform-origin: center center; }
   img { max-width: 100%; display: block; }
 </style>
 </head>
 <body>
-${body}
+<div id="ad-viewport"><div id="ad-root">${body}</div></div>
 </body>
 </html>`;
 }

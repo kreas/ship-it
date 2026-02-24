@@ -262,11 +262,11 @@ export function AttachmentPreview({
                 </div>
               ) : (
                 <iframe
-                  srcDoc={htmlContent || ""}
+                  srcDoc={`<style>body{background:#111 !important;}</style>${htmlContent || ""}`}
                   sandbox="allow-same-origin"
                   title={attachment.filename}
                   className="w-full h-full border-0"
-                  style={{ background: "#fff" }}
+                  style={{ background: "#111" }}
                 />
               )}
             </div>
