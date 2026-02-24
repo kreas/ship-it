@@ -164,7 +164,7 @@ export function AdArtifactInline({
   const enableGenerate = templateEntry?.needsImageGeneration ?? false;
 
   return (
-    <div className="mt-3 mb-3 max-w-fit">
+    <div className="mt-3 mb-3 max-w-fit mx-auto">
       <ArtifactProvider
         artifact={artifact.data}
         name={artifact.data.name}
