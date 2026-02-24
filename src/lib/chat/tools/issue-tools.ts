@@ -9,7 +9,7 @@ import {
   updateSubtaskSchema,
   deleteSubtaskSchema,
 } from "./schemas";
-import { attachContentToIssue, getIssueAttachmentMetadata, getAttachment } from "@/lib/actions/attachments";
+import { attachContentToIssue, getIssueAttachmentMetadata, getAttachmentsForIssues, getAttachment } from "@/lib/actions/attachments";
 import { getIssueSubtasks } from "@/lib/actions/issues";
 import { getContent } from "@/lib/storage/r2-client";
 import { addAISuggestions, dismissAllAISuggestions } from "@/lib/actions/ai-suggestions";
@@ -76,38 +76,47 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
         includeSubtasks?: boolean;
       }) => {
         try {
-          const issueAttachments = await getIssueAttachmentMetadata(context.issueId);
-          const results: Array<{ source: string; attachments: Array<{ id: string; filename: string; mimeType: string; size: number; createdAt: Date }> }> = [];
-
-          if (issueAttachments.length > 0) {
-            results.push({
-              source: "This issue",
-              attachments: issueAttachments.map((a) => ({
-                id: a.id,
-                filename: a.filename,
-                mimeType: a.mimeType,
-                size: a.size,
-                createdAt: a.createdAt,
-              })),
-            });
-          }
+          type AttachmentEntry = { id: string; filename: string; mimeType: string; size: number; createdAt: Date };
+          const results: Array<{ source: string; attachments: AttachmentEntry[] }> = [];
 
           if (includeSubtasks) {
+            // Batch: fetch subtasks + all attachments in two queries (no N+1)
             const subtasks = await getIssueSubtasks(context.issueId);
+            const allIssueIds = [context.issueId, ...subtasks.map((s) => s.id)];
+            const allAttachments = await getAttachmentsForIssues(allIssueIds);
+
+            // Group by issueId
+            const byIssue = new Map<string, AttachmentEntry[]>();
+            for (const a of allAttachments) {
+              const list = byIssue.get(a.issueId) ?? [];
+              list.push({ id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size, createdAt: a.createdAt });
+              byIssue.set(a.issueId, list);
+            }
+
+            const issueGroup = byIssue.get(context.issueId);
+            if (issueGroup) {
+              results.push({ source: "This issue", attachments: issueGroup });
+            }
+
             for (const subtask of subtasks) {
-              const subtaskAttachments = await getIssueAttachmentMetadata(subtask.id);
-              if (subtaskAttachments.length > 0) {
-                results.push({
-                  source: `Subtask: ${subtask.identifier} - ${subtask.title}`,
-                  attachments: subtaskAttachments.map((a) => ({
-                    id: a.id,
-                    filename: a.filename,
-                    mimeType: a.mimeType,
-                    size: a.size,
-                    createdAt: a.createdAt,
-                  })),
-                });
+              const group = byIssue.get(subtask.id);
+              if (group) {
+                results.push({ source: `Subtask: ${subtask.identifier} - ${subtask.title}`, attachments: group });
               }
+            }
+          } else {
+            const issueAttachments = await getIssueAttachmentMetadata(context.issueId);
+            if (issueAttachments.length > 0) {
+              results.push({
+                source: "This issue",
+                attachments: issueAttachments.map((a) => ({
+                  id: a.id,
+                  filename: a.filename,
+                  mimeType: a.mimeType,
+                  size: a.size,
+                  createdAt: a.createdAt,
+                })),
+              });
             }
           }
 
@@ -137,7 +146,21 @@ export function createIssueTools(context: IssueToolsContext): ToolSet {
           }
 
           // Only read text-based attachments
-          const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/x-yaml", "application/x-sh"];
+          const textTypes = [
+            "text/",
+            "application/json",
+            "application/xml",
+            "application/javascript",
+            "application/x-javascript",
+            "application/x-yaml",
+            "application/x-sh",
+            "application/x-shellscript",
+            "application/x-python",
+            "application/x-ruby",
+            "application/x-php",
+            "application/x-csh",
+            "application/xhtml+xml",
+          ];
           const isText = textTypes.some((t) => attachment.mimeType.startsWith(t));
           if (!isText) {
             return `Cannot read binary attachment "${attachment.filename}" (${attachment.mimeType}). Only text-based files can be read.`;

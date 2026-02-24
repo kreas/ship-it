@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "../db";
 import { attachments, issues, activities } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getCurrentUserId } from "../auth";
 import { requireWorkspaceAccess } from "./workspace";
 import { getWorkspaceSlug, getWorkspaceIdFromIssue } from "./helpers";
@@ -65,6 +65,28 @@ export async function getIssueAttachmentMetadata(
     .select()
     .from(attachments)
     .where(eq(attachments.issueId, issueId))
+    .orderBy(attachments.createdAt);
+}
+
+/**
+ * Get attachment metadata for multiple issues in a single query (no signed URLs).
+ * Auth check is performed once against the first issue's workspace.
+ */
+export async function getAttachmentsForIssues(
+  issueIds: string[]
+): Promise<Attachment[]> {
+  if (issueIds.length === 0) return [];
+
+  // Auth check against the first issue's workspace
+  const workspaceId = await getWorkspaceIdFromIssue(issueIds[0]);
+  if (workspaceId) {
+    await requireWorkspaceAccess(workspaceId);
+  }
+
+  return db
+    .select()
+    .from(attachments)
+    .where(inArray(attachments.issueId, issueIds))
     .orderBy(attachments.createdAt);
 }
 

@@ -79,7 +79,7 @@ export async function executeAITask(
  */
 export async function executeAllAITasks(
   parentIssueId: string
-): Promise<{ runIds: string[] }> {
+): Promise<{ runId: string | null }> {
   // Get parent issue
   const parentIssue = await db
     .select()
@@ -112,13 +112,15 @@ export async function executeAllAITasks(
     )
     .orderBy(issues.position);
 
-  // Filter to only those with null, pending, or failed status
+  // Filter to only those with null or pending status.
+  // Failed tasks are excluded — they can be retried individually via the play button
+  // to avoid breaking the sequential dependency chain.
   const pendingSubtasks = aiSubtasks.filter(
-    (s) => s.aiExecutionStatus === null || s.aiExecutionStatus === "pending" || s.aiExecutionStatus === "failed"
+    (s) => s.aiExecutionStatus === null || s.aiExecutionStatus === "pending"
   );
 
   if (pendingSubtasks.length === 0) {
-    return { runIds: [] };
+    return { runId: null };
   }
 
   // Batch update all to pending status
@@ -144,7 +146,7 @@ export async function executeAllAITasks(
   const slug = await getWorkspaceSlug(workspaceId);
   revalidatePath(slug ? `/w/${slug}` : "/");
 
-  return { runIds: result.ids };
+  return { runId: result.ids[0] };
 }
 
 /**
