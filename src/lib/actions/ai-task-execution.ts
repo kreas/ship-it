@@ -72,9 +72,10 @@ export async function executeAITask(
 }
 
 /**
- * Execute all pending AI subtasks for a parent issue (parallel execution)
+ * Execute all pending AI subtasks for a parent issue (sequential execution).
+ * Subtasks run in position order so each can reference outputs from prior subtasks.
  * @param parentIssueId - The ID of the parent issue
- * @returns Array of Inngest run IDs
+ * @returns The Inngest run ID for the sequential execution
  */
 export async function executeAllAITasks(
   parentIssueId: string
@@ -99,7 +100,7 @@ export async function executeAllAITasks(
   // Verify user has access
   await requireWorkspaceAccess(workspaceId, "member");
 
-  // Get all AI subtasks that are pending or null status
+  // Get all AI subtasks ordered by position (execution order)
   const aiSubtasks = await db
     .select()
     .from(issues)
@@ -108,11 +109,12 @@ export async function executeAllAITasks(
         eq(issues.parentIssueId, parentIssueId),
         eq(issues.aiAssignable, true)
       )
-    );
+    )
+    .orderBy(issues.position);
 
-  // Filter to only those with null or pending status
+  // Filter to only those with null, pending, or failed status
   const pendingSubtasks = aiSubtasks.filter(
-    (s) => s.aiExecutionStatus === null || s.aiExecutionStatus === "pending"
+    (s) => s.aiExecutionStatus === null || s.aiExecutionStatus === "pending" || s.aiExecutionStatus === "failed"
   );
 
   if (pendingSubtasks.length === 0) {
@@ -120,28 +122,25 @@ export async function executeAllAITasks(
   }
 
   // Update all to pending status
-  const subtaskIds = pendingSubtasks.map((s) => s.id);
-  for (const id of subtaskIds) {
+  for (const subtask of pendingSubtasks) {
     await db
       .update(issues)
       .set({
         aiExecutionStatus: "pending",
         updatedAt: new Date(),
       })
-      .where(eq(issues.id, id));
+      .where(eq(issues.id, subtask.id));
   }
 
-  // Send events to Inngest (parallel execution)
-  const events = pendingSubtasks.map((subtask) => ({
-    name: "ai/task.execute" as const,
+  // Send a single sequential execution event
+  const result = await inngest.send({
+    name: "ai/tasks.executeSequential",
     data: {
-      issueId: subtask.id,
-      workspaceId,
       parentIssueId,
+      workspaceId,
+      subtaskIds: pendingSubtasks.map((s) => s.id),
     },
-  }));
-
-  const result = await inngest.send(events);
+  });
 
   // Revalidate workspace path
   const slug = await getWorkspaceSlug(workspaceId);
