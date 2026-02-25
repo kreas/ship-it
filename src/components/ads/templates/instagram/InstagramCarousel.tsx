@@ -17,7 +17,7 @@ interface InstagramCarouselProps {
   artifactId: string;
 }
 
-export function InstagramCarousel({ content: adContent }: InstagramCarouselProps) {
+export function InstagramCarousel({ content: adContent, artifactId }: InstagramCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const {
     content = [
