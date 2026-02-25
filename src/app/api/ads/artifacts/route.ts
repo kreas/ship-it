@@ -17,7 +17,7 @@ const postArtifactSchema = z.object({
     templateType: z.string().optional(),
     type: z.string().optional(),
     name: z.string().optional(),
-    content: z.union([z.string(), z.record(z.unknown())]),
+    content: z.union([z.string(), z.record(z.string(), z.unknown())]),
     mediaUrls: z.array(z.unknown()).optional(),
     brandId: z.string().optional(),
   }),
