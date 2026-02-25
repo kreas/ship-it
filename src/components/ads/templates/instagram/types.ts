@@ -35,7 +35,7 @@ export type InstagramAdContent = {
 }
 
 export interface InstagramAdProfile {
-    image: string;
+    image?: string | null;
     imagePrompt?: string | null;
     username: string;
     imageBackgroundColor?: string | null;
