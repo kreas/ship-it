@@ -8,6 +8,7 @@ import {
   researchBrandGuidelines,
   generateBrandSummary,
   executeAITask,
+  executeAllAITasksSequential,
   generateAudienceMembers,
   generateSoul,
 } from "@/lib/inngest/functions";
@@ -22,6 +23,7 @@ export const { GET, POST, PUT } = serve({
     researchBrandGuidelines,
     generateBrandSummary,
     executeAITask,
+    executeAllAITasksSequential,
     generateAudienceMembers,
     generateSoul,
   ],
