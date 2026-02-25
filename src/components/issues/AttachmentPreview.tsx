@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Download,
+  FileDown,
   ZoomIn,
   ZoomOut,
   RotateCw,
   File,
 } from "lucide-react";
+import { printElementAsPdf } from "@/lib/print-to-pdf";
 import { stripCiteTags } from "@/lib/utils";
 import {
   Dialog,
@@ -57,6 +59,7 @@ export function AttachmentPreview({
   const [rotation, setRotation] = useState(0);
   const [markdownContent, setMarkdownContent] = useState<string | null>(null);
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
+  const markdownRef = useRef<HTMLDivElement>(null);
 
   const isImage = attachment ? isImageType(attachment.mimeType) : false;
   const isPdf = attachment ? isPdfType(attachment.mimeType) : false;
@@ -187,6 +190,21 @@ export function AttachmentPreview({
                 </>
               )}
 
+              {isMarkdown && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    if (markdownRef.current) {
+                      printElementAsPdf(markdownRef.current, attachment.filename);
+                    }
+                  }}
+                  disabled={isLoadingMarkdown}
+                  title="Save as PDF"
+                >
+                  <FileDown className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -242,7 +260,7 @@ export function AttachmentPreview({
                   </div>
                 </div>
               ) : (
-                <div className="max-w-4xl mx-auto bg-background rounded-lg border border-border p-8">
+                <div ref={markdownRef} className="max-w-4xl mx-auto bg-background rounded-lg border border-border p-8">
                   <LexicalMarkdownPreview
                     content={stripCiteTags(markdownContent || "")}
                   />

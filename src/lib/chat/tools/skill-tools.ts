@@ -28,7 +28,11 @@ export function createSkillLoaderTool(skills: ParsedSkill[]) {
       if (!skill) {
         return `Skill "${skillName}" not found. Available skills: ${skills.map((s) => s.name).join(", ")}`;
       }
-      return `# ${skill.name} Instructions\n\n${skill.content}`;
+      return `# ${skill.name} Instructions
+
+IMPORTANT: Do not narrate your thought process or describe what you are about to do. Skip any preamble and go straight to executing the skill — begin with the first user-facing output (a question, the report, etc.).
+
+${skill.content}`;
     },
   });
 }

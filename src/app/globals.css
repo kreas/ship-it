@@ -328,3 +328,96 @@
   }
 }
 
+/* Print-to-PDF: hide everything except .print-container */
+@media print {
+  /* Hide the entire app */
+  body > *:not(.print-container) {
+    display: none !important;
+  }
+
+  /* Show only the print container */
+  .print-container {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    z-index: 99999;
+    background: white !important;
+    color: black !important;
+    padding: 2rem;
+  }
+
+  /* Force light colors for all content inside */
+  .print-container * {
+    color: black !important;
+    border-color: #d1d5db !important;
+  }
+
+  /* Preserve code block styling */
+  .print-container pre,
+  .print-container code {
+    background: #f3f4f6 !important;
+    color: #1f2937 !important;
+  }
+
+  .print-container pre {
+    border: 1px solid #d1d5db !important;
+    padding: 0.75rem !important;
+    border-radius: 0.375rem !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    page-break-inside: avoid;
+  }
+
+  /* Table styling */
+  .print-container table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  .print-container th,
+  .print-container td {
+    border: 1px solid #d1d5db !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  .print-container th {
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Page break rules */
+  .print-container h1,
+  .print-container h2,
+  .print-container h3,
+  .print-container h4 {
+    page-break-after: avoid;
+  }
+
+  .print-container img,
+  .print-container table,
+  .print-container figure {
+    page-break-inside: avoid;
+  }
+
+  /* Links: show URL after text for reference */
+  .print-container a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.75em;
+    color: #6b7280 !important;
+    word-break: break-all;
+  }
+
+  /* Horizontal rules */
+  .print-container hr {
+    border-top: 1px solid #d1d5db !important;
+  }
+
+  /* Strip card-like wrapper styling (border, rounded corners, extra padding) */
+  .print-container > * {
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
