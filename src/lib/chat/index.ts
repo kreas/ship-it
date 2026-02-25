@@ -22,6 +22,7 @@ export {
   loadSkillsForPurpose,
   loadSkillsForWorkspace,
   loadAllSkills,
+  WORKSPACE_SKILL_MANIFEST,
 } from "./skills";
 export type { ParsedSkill, SkillManifest } from "./skills";
 
@@ -405,3 +406,10 @@ Each good task can be done in parallel because it produces its own standalone de
 - Keep titles concise and action-oriented (under 60 characters)
 - Never include timelines or phases ("Week 1", "Phase 2") - just the task itself
 - Each subtask should produce a concrete, reviewable deliverable`;
+
+/**
+ * Shared ad tools prompt for system prompts.
+ * Used by workspace chat and issue chat. Full tool list and guidelines live in the ad-campaign skill.
+ */
+export const AD_TOOLS_PROMPT = `
+**Ad creation:** When the user asks to create ads or ad mockups, call \`load_skill\` with skillName "ad-campaign" to get the full workflow, tool reference, and implementation guidelines, then use the ad tools as described there.`;

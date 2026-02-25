@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useSendToAI } from "@/lib/hooks";
 import { useBoardContext } from "@/components/board/context/BoardProvider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { AdArtifactDialog } from "@/components/ads/AdArtifactDialog";
 import { IssueChatPanel } from "./IssueChatPanel";
 import { IssueDetailForm } from "./IssueDetailForm";
 import type { Comment } from "@/lib/types";
@@ -30,6 +31,15 @@ export function IssueDetailDrawer({
     string | undefined
   >(undefined);
   const [highlightDescription, setHighlightDescription] = useState(false);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+
+  const viewArtifact = useCallback((artifactId: string) => {
+    setSelectedArtifactId(artifactId);
+  }, []);
+
+  const closeArtifact = useCallback(() => {
+    setSelectedArtifactId(null);
+  }, []);
 
   const handleCommentsLoad = useCallback((loadedComments: Comment[]) => {
     setComments(loadedComments);
@@ -65,6 +75,7 @@ export function IssueDetailDrawer({
     onOpenChange(false);
     setIsDeleting(false);
     setExternalDescription(undefined);
+    setSelectedArtifactId(null);
   };
 
   if (!issue) return null;
@@ -140,17 +151,26 @@ export function IssueDetailDrawer({
               issue={issue}
               comments={comments}
               onUpdateDescription={handleUpdateDescription}
+              onViewArtifact={viewArtifact}
             />
           </div>
 
-          {/* Right: Issue Form */}
-          <div className="w-[45%]">
+          {/* Right: Issue Form OR Ad Preview overlay */}
+          <div className="w-[45%] relative">
             <IssueDetailForm
               issue={issue}
               externalDescription={externalDescription}
               highlightDescription={highlightDescription}
               onCommentsLoad={handleCommentsLoad}
             />
+            {selectedArtifactId && (
+              <AdArtifactDialog
+                open={true}
+                onOpenChange={(open) => { if (!open) closeArtifact(); }}
+                artifactId={selectedArtifactId}
+                issueId={issue.id}
+              />
+            )}
           </div>
         </div>
       </SheetContent>
