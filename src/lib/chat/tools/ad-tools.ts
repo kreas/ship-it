@@ -97,7 +97,7 @@ function createAdTool(
             ...((clean.properties as Record<string, unknown>) ?? {}),
             existingArtifactId: {
               type: "string",
-              description: "ID of an existing ad artifact to update in place. Get this from a previous create_ad_* tool result in the conversation. Omit when creating a new ad.",
+              description: "ID of an existing ad artifact to update in place. ONLY pass this for pure text/copy changes (e.g. 'change the headline', 'update the CTA', 'make the copy shorter'). NEVER pass this when the change involves the image in any way ('change the image', 'update the image', 'another image', 'different visual', 'try a different image') — image changes require a new artifact so the image regenerates from scratch. Also omit when creating any new ad.",
             },
           },
         };

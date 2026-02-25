@@ -147,12 +147,14 @@ export default function FacebookInStreamVideo({ content }: FacebookInStreamVideo
         </CardHeader>
         <CardContent className="p-0">
           <p className="px-4 pb-4 text-[#1c1e21]">{content.primaryText}</p>
-          <ArtifactMedia
-            prompt={content.image}
-            altText={companyName}
-            aspectRatio="1:1"
-            mediaIndex={0}
-          />
+          <div className="min-h-64">
+            <ArtifactMedia
+              prompt={content.image}
+              altText={companyName}
+              aspectRatio="1:1"
+              mediaIndex={1}
+            />
+          </div>
           <div className="p-4 space-y-3">
             <EngagementMetrics />
             <div className="flex items-center border-t border-b border-gray-200 py-1">
