@@ -56,6 +56,11 @@ export type Events = {
       workspaceName: string;
     };
   };
+  "stripe/auto-reload-tokens": {
+    data: {
+      userId: string;
+    };
+  };
 };
 
 export const inngest = new Inngest({

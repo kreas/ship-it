@@ -1,0 +1,1 @@
+ALTER TABLE `subscriptions` ADD `manual_top_up_tokens_added` integer DEFAULT 0 NOT NULL;

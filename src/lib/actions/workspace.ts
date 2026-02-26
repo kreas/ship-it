@@ -13,7 +13,7 @@ import {
   issues,
   knowledgeFolders,
 } from "../db/schema";
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray, count } from "drizzle-orm";
 import type {
   Workspace,
   WorkspaceMember,
@@ -23,6 +23,7 @@ import type {
 } from "../types";
 import { getCurrentUser } from "../auth";
 import { syncUserFromWorkOS } from "./users";
+import { ensureSubscription } from "./subscription";
 import {
   PURPOSE_CONFIG,
   type WorkspacePurpose,
@@ -146,6 +147,21 @@ export async function createWorkspace(
   const user = await requireActiveUser();
   const now = new Date();
 
+  // Enforce workspace limit
+  const subscription = await ensureSubscription(user.id);
+  if (subscription.workspaceLimit !== null) {
+    const owned = await db
+      .select({ count: count() })
+      .from(workspaces)
+      .where(eq(workspaces.ownerId, user.id))
+      .get();
+    if ((owned?.count ?? 0) >= subscription.workspaceLimit) {
+      throw new Error(
+        `Your ${subscription.plan} plan allows max ${subscription.workspaceLimit} workspace(s). Upgrade to create more.`
+      );
+    }
+  }
+
   // Generate unique slug
   let slug = generateSlug(name);
   let slugSuffix = 0;
@@ -247,6 +263,21 @@ export async function createCustomWorkspace(
 ): Promise<Workspace> {
   const user = await requireActiveUser();
   const now = new Date();
+
+  // Enforce workspace limit
+  const subscription = await ensureSubscription(user.id);
+  if (subscription.workspaceLimit !== null) {
+    const owned = await db
+      .select({ count: count() })
+      .from(workspaces)
+      .where(eq(workspaces.ownerId, user.id))
+      .get();
+    if ((owned?.count ?? 0) >= subscription.workspaceLimit) {
+      throw new Error(
+        `Your ${subscription.plan} plan allows max ${subscription.workspaceLimit} workspace(s). Upgrade to create more.`
+      );
+    }
+  }
 
   // Validate columns
   if (customColumns.length < 2 || customColumns.length > 8) {

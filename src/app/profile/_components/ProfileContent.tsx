@@ -11,17 +11,21 @@ import { ProfileInfoSection } from "./ProfileInfoSection";
 import { AIPreferencesSection } from "./AIPreferencesSection";
 import { WorkspacesSection } from "./WorkspacesSection";
 import { InvitationsSection } from "./InvitationsSection";
-import { PlanTierSection } from "./PlanTierSection";
+import { BillingSection } from "./BillingSection";
 import type { UserProfileWithWorkspaces } from "@/lib/types";
+import type { Subscription, SubscriptionPlan, Invoice } from "@/lib/actions/subscription";
 
 const TABS = ["profile", "billing"] as const;
 type Tab = (typeof TABS)[number];
 
 interface ProfileContentProps {
   profile: UserProfileWithWorkspaces;
+  subscription: Subscription;
+  plans: SubscriptionPlan[];
+  invoices: Invoice[];
 }
 
-export function ProfileContent({ profile }: ProfileContentProps) {
+export function ProfileContent({ profile, subscription, plans, invoices }: ProfileContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawTab = searchParams.get("tab");
@@ -72,7 +76,11 @@ export function ProfileContent({ profile }: ProfileContentProps) {
 
             <TabsContent value="billing">
               <div className="rounded-lg border border-border bg-card mt-3 p-6">
-                <PlanTierSection />
+                <BillingSection
+                  subscription={subscription}
+                  plans={plans}
+                  invoices={invoices}
+                />
               </div>
             </TabsContent>
           </Tabs>
