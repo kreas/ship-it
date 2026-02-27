@@ -7,6 +7,19 @@ import type { Stripe } from "stripe";
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
+/** Only process subscriptions for products with metadata.type === "ws_subscription". */
+async function isWsSubscription(subscription: Stripe.Subscription): Promise<boolean> {
+  const productId = subscription.items?.data?.[0]?.price?.product;
+  if (!productId) return false;
+  const id = typeof productId === "string" ? productId : productId.id;
+  try {
+    const product = await stripe.products.retrieve(id);
+    return product.metadata?.type === "ws_subscription";
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -100,6 +113,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, eventId
 async function handleSubscriptionUpserted(subscription: Stripe.Subscription, eventId: string) {
   const userId = subscription.metadata?.userId;
   if (!userId) return;
+  if (!(await isWsSubscription(subscription))) return;
 
   const item = subscription.items.data[0];
   const priceId = item?.price?.id;
@@ -208,6 +222,7 @@ async function handleSubscriptionUpserted(subscription: Stripe.Subscription, eve
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription, eventId: string) {
   const userId = subscription.metadata?.userId;
   if (!userId) return;
+  if (!(await isWsSubscription(subscription))) return;
 
   const existing = await db
     .select()
@@ -271,12 +286,13 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, eventId: s
   const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = stripeSub.metadata?.userId;
   if (!userId) return;
+  if (!(await isWsSubscription(stripeSub))) return;
 
   const existing = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
-    .get();
+  .select()
+  .from(subscriptions)
+  .where(eq(subscriptions.userId, userId))
+  .get();
 
   if (!existing) return;
 
@@ -316,9 +332,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
   const userId = stripeSub.metadata?.userId;
   if (!userId) return;
+  if (!(await isWsSubscription(stripeSub))) return;
 
   await db
-    .update(subscriptions)
-    .set({ status: "past_due", updatedAt: new Date() })
-    .where(eq(subscriptions.userId, userId));
+  .update(subscriptions)
+  .set({ status: "past_due", updatedAt: new Date() })
+  .where(eq(subscriptions.userId, userId));
 }
