@@ -3,7 +3,8 @@
  * For client-safe utilities, import from ./token-usage-formatters instead.
  */
 import { db } from "./db";
-import { tokenUsage } from "./db/schema";
+import { tokenUsage, workspaces } from "./db/schema";
+import { eq } from "drizzle-orm";
 
 // Re-export client-safe functions for backwards compatibility
 export {
@@ -58,5 +59,17 @@ export async function recordTokenUsage(params: {
     costCents,
     source,
   });
+
+  // Deduct from the workspace owner's token balance
+  const ws = await db
+    .select({ ownerId: workspaces.ownerId })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .get();
+
+  if (ws) {
+    const { deductTokens } = await import("./actions/subscription");
+    await deductTokens(ws.ownerId, totalTokens);
+  }
 }
 

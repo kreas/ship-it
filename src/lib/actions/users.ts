@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "../auth";
 import type { User, UpdateUserProfileInput, UserProfileWithWorkspaces } from "../types";
+import { ensureSubscription } from "./subscription";
 
 export interface WorkOSUserData {
   id: string;
@@ -88,6 +89,9 @@ export async function syncUserFromWorkOS(
   };
 
   await db.insert(users).values(newUser);
+
+  // Auto-enroll new users on free plan
+  await ensureSubscription(newUser.id);
 
   return newUser;
 }

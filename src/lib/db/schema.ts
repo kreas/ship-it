@@ -516,6 +516,64 @@ export const issueKnowledgeDocuments = sqliteTable(
   })
 );
 
+// Subscriptions - per-user billing plan and token balance
+export const subscriptions = sqliteTable("subscriptions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+
+  // Stripe identifiers
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripePriceId: text("stripe_price_id"),
+
+  // Plan info (denormalized from Stripe metadata for fast reads)
+  plan: text("plan").notNull().default("free"), // "free" | "basic" | "pro"
+  status: text("status").notNull().default("active"), // "active" | "canceled" | "past_due" | "trialing"
+  workspaceLimit: integer("workspace_limit").default(1), // null = unlimited
+  monthlyTokenQuota: integer("monthly_token_quota").default(0),
+
+  // Token balance (shared pool across all owner's workspaces)
+  tokensRemaining: integer("tokens_remaining").notNull().default(0),
+  tokensResetAt: integer("tokens_reset_at", { mode: "timestamp" }),
+
+  // Auto-reload config
+  autoReloadEnabled: integer("auto_reload_enabled", { mode: "boolean" }).notNull().default(false),
+  autoReloadAmount: integer("auto_reload_amount"),
+  autoReloadThreshold: integer("auto_reload_threshold"),
+  maxMonthlyAutoReload: integer("max_monthly_auto_reload"),
+  monthlyAutoReloadedSoFar: integer("monthly_auto_reloaded_so_far").notNull().default(0),
+  monthlyAutoReloadResetAt: integer("monthly_auto_reload_reset_at", { mode: "timestamp" }),
+  manualTopUpTokensAdded: integer("manual_top_up_tokens_added").notNull().default(0),
+
+  // Billing period
+  currentPeriodStart: integer("current_period_start", { mode: "timestamp" }),
+  currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
+  cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
+
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Subscription Events - audit trail for plan changes and token credits
+export const subscriptionEvents = sqliteTable("subscription_events", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // Plan: "plan_created" | "plan_changed" | "plan_deleted" | "cancellation_scheduled" | "cancellation_reversed"
+  // Tokens: "tokens_reset" | "tokens_topped_up" | "tokens_auto_reloaded"
+  type: text("type").notNull(),
+  // Plan change details (null for token events)
+  fromPlan: text("from_plan"),
+  toPlan: text("to_plan"),
+  // Token credit details (null for plan events)
+  tokensAdded: integer("tokens_added"),
+  tokensBalance: integer("tokens_balance"), // balance immediately after the event
+  // Source reference (Stripe event ID or PaymentIntent ID)
+  stripeEventId: text("stripe_event_id"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // Knowledge assets (images embedded in markdown docs)
 export const knowledgeAssets = sqliteTable("knowledge_assets", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
