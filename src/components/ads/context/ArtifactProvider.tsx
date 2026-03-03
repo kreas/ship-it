@@ -281,20 +281,34 @@ export const ArtifactProvider: React.FC<ArtifactProviderProps> = ({
       const saveData = getArtifactSaveData();
 
       try {
-        const response = await fetch('/api/ads/artifacts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workspaceId,
-            artifact: { ...saveData.artifact, id: currentArtifactId, mediaUrls: saveData.mediaUrls },
-          }),
-        });
+        if (currentArtifactId) {
+          // Update existing artifact's media
+          const response = await fetch('/api/ads/artifacts', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              artifactId: currentArtifactId,
+              mediaUrls: saveData.mediaUrls,
+            }),
+          });
+          if (!response.ok) throw new Error('Failed to update artifact');
+        } else {
+          // Create new artifact
+          const response = await fetch('/api/ads/artifacts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceId,
+              artifact: { ...saveData.artifact, id: currentArtifactId, mediaUrls: saveData.mediaUrls },
+            }),
+          });
 
-        if (!response.ok) throw new Error('Failed to save artifact');
+          if (!response.ok) throw new Error('Failed to save artifact');
 
-        const results = await response.json();
-        if (results.artifact?.id) {
-          setCurrentArtifactId(results.artifact.id);
+          const results = await response.json();
+          if (results.artifact?.id) {
+            setCurrentArtifactId(results.artifact.id);
+          }
         }
       } catch (error) {
         ArtifactSaveService.exportArtifactData(saveData);

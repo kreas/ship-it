@@ -403,6 +403,9 @@ export function AdArtifactFullView({ artifactId, onClose, onCollapseToInline, is
     );
   }
 
+  const templateEntry = getTemplateEntry(artifact.type);
+  const enableGenerate = templateEntry?.needsImageGeneration ?? false;
+
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
       <ArtifactProvider
@@ -411,7 +414,7 @@ export function AdArtifactFullView({ artifactId, onClose, onCollapseToInline, is
         artifactId={artifact.data.id}
         workspaceId={artifact.workspaceId}
         mediaUrls={artifact.resolvedMediaBySlot}
-        enableGenerate={true}
+        enableGenerate={enableGenerate}
         onRegenerate={() => {}}
         onSave={() => {}}
       >

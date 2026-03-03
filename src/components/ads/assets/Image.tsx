@@ -45,8 +45,21 @@ export default function GeneratedImage({
   const hasAttemptedGeneration = useRef(false);
   const hasAttemptedRegenerate = useRef(false);
 
-  // Load existing artifact image if available
+  // When parent provides existing image URL, use it and never auto-trigger generation
   useEffect(() => {
+    if (imageUrl) {
+      hasAttemptedGeneration.current = true;
+      setGeneratedImage(imageUrl);
+    }
+  }, [imageUrl]);
+
+  // Load existing artifact image if available (only when no imageUrl from parent)
+  useEffect(() => {
+    if (imageUrl) {
+      setIsInitialized(true);
+      return;
+    }
+
     async function loadArtifact() {
       if (!artifactId) {
         setIsInitialized(true);
@@ -72,7 +85,7 @@ export default function GeneratedImage({
     }
 
     loadArtifact();
-  }, [artifactId]);
+  }, [artifactId, imageUrl]);
 
   const generateImage = useMemo(
     () =>
