@@ -24,9 +24,11 @@ interface AdArtifactInlineProps {
   workspaceId: string;
   onExpand?: () => void;
   onAttach?: () => Promise<void>;
+  showPreview?: boolean;
 }
 
 export function AdArtifactInline({
+  showPreview,
   artifactId,
   name,
   platform,
@@ -149,7 +151,7 @@ export function AdArtifactInline({
     );
   }
 
-  if (error || !artifact) {
+  if (error || !artifact || showPreview) {
     return (
       <AdArtifactPreview
         name={name}

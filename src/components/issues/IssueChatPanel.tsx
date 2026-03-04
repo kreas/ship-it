@@ -160,7 +160,7 @@ export function IssueChatPanel({
       }}
       onClearHistory={chat.handleClearHistory}
       welcomeMessage={welcomeMessage}
-      renderToolCall={(toolName, result, index) => {
+      renderToolCall={(toolName, result, index, _part, messageId, messageIndex) => {
         // Handle custom tool (updateDescription)
         if (toolName === "updateDescription") {
           return (
@@ -235,6 +235,15 @@ export function IssueChatPanel({
             templateType: string;
           };
           if (adResult.success) {
+            // True if this message is the last one (in the chat) that contains a create_ad_ tool call with this artifactId
+            const lastMessageIndexWithArtifact = chat.messages.findLastIndex((msg) =>
+              (msg.parts ?? []).some(
+                (p) =>
+                  p.type?.startsWith("tool-create_ad_") &&
+                  (p as { output?: { artifactId?: string } }).output?.artifactId === adResult.artifactId
+              )
+            );
+
             return (
               <AdArtifactInline
                 key={index}
@@ -243,6 +252,7 @@ export function IssueChatPanel({
                 platform={adResult.platform}
                 templateType={adResult.templateType}
                 workspaceId={workspaceId ?? ""}
+                showPreview={messageIndex !== lastMessageIndexWithArtifact}
                 onExpand={() => onViewArtifact?.(adResult.artifactId)}
                 onAttach={async () => {
                   await attachAdArtifactToIssue(adResult.artifactId, issue.id);
