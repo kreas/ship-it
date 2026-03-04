@@ -34,6 +34,13 @@ export type Events = {
       parentIssueId: string; // For attaching output
     };
   };
+  "ai/tasks.executeSequential": {
+    data: {
+      parentIssueId: string; // The parent issue whose subtasks to execute
+      workspaceId: string;
+      subtaskIds: string[]; // Ordered list of subtask IDs to execute
+    };
+  };
   "audience/members.generate": {
     data: {
       audienceId: string;

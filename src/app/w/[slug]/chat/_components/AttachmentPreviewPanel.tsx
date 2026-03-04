@@ -1,14 +1,70 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { X, Copy, Check, Download, FileDown, FileText } from "lucide-react";
 import { printElementAsPdf } from "@/lib/print-to-pdf";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
+import { AdArtifactDialog } from "@/components/ads/AdArtifactDialog";
 import { useChatContext } from "./ChatContext";
 import { cn } from "@/lib/utils";
 
+/** Detect if attachment content is an artifact export (from "Save as attachment") */
+function parseArtifactExportAttachment(
+  content: string,
+  mimeType: string
+): { id: string } | null {
+  if (mimeType !== "application/json") return null;
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "id" in parsed &&
+      typeof (parsed as { id: unknown }).id === "string" &&
+      "platform" in parsed &&
+      "templateType" in parsed &&
+      "content" in parsed
+    ) {
+      return { id: (parsed as { id: string }).id };
+    }
+  } catch {
+    // not valid JSON or wrong shape
+  }
+  return null;
+}
+
 export function AttachmentPreviewPanel() {
-  const { selectedAttachment, closeAttachment } = useChatContext();
+  const { selectedAttachment, closeAttachment, selectedArtifactId, closeArtifact, collapseArtifactToInline } = useChatContext();
+
+  const attachmentArtifactId = useMemo(() => {
+    if (!selectedAttachment) return null;
+    return parseArtifactExportAttachment(
+      selectedAttachment.content,
+      selectedAttachment.mimeType
+    )?.id ?? null;
+  }, [selectedAttachment]);
+
+  // If an ad artifact is selected (by id), render the full ad view
+  if (selectedArtifactId) {
+    return (
+      <AdArtifactDialog
+        open={true}
+        onOpenChange={(open) => { if (!open) closeArtifact(); }}
+        artifactId={selectedArtifactId}
+        onCollapseToInline={collapseArtifactToInline}
+      />
+    );
+  }
+  // If the open attachment is an artifact export, show the artifact view so the ad renders
+  if (selectedAttachment && attachmentArtifactId) {
+    return (
+      <AdArtifactDialog
+        open={true}
+        onOpenChange={(open) => { if (!open) closeAttachment(); }}
+        artifactId={attachmentArtifactId}
+      />
+    );
+  }
   const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 

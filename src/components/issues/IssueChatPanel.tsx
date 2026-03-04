@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { Sparkles, Trash2, Paperclip } from "lucide-react";
 import { useChatCore } from "@/lib/hooks";
 import { ChatContainer } from "@/components/ai-elements/ChatContainer";
 import { ToolResultDisplay } from "@/components/ai-elements/ToolResultDisplay";
+import { AdArtifactInline } from "@/components/ads/AdArtifactInline";
+import { attachAdArtifactToIssue } from "@/lib/actions/ad-artifacts";
 import {
   useIssueChatMessages,
   useSaveChatMessage,
@@ -42,12 +44,14 @@ interface IssueChatPanelProps {
   issue: IssueWithLabels;
   comments: Comment[];
   onUpdateDescription: (description: string) => void;
+  onViewArtifact?: (artifactId: string) => void;
 }
 
 export function IssueChatPanel({
   issue,
   comments,
   onUpdateDescription,
+  onViewArtifact,
 }: IssueChatPanelProps) {
   const { workspaceId, workspacePurpose } = useBoardContext();
 
@@ -94,20 +98,16 @@ export function IssueChatPanel({
         const args = toolCall.input as { description: string };
         onUpdateDescription(args.description);
       }
-      if (toolCall.toolName === "attachContent") {
-        // Refresh attachments after AI attaches content
-        // Small delay to ensure server-side processing is complete
-        setTimeout(() => invalidateAttachments(), 500);
+      // Immediately invalidate relevant queries (best-effort for fast connections).
+      // A second invalidation fires when streaming completes to guarantee freshness.
+      if (toolCall.toolName === "attachContent" || toolCall.toolName === "deleteAttachment") {
+        invalidateAttachments();
       }
       if (toolCall.toolName === "suggestAITasks") {
-        // Refresh AI suggestions after AI creates new suggestions
-        // Small delay to ensure server-side processing is complete
-        setTimeout(() => invalidateAISuggestions(), 500);
+        invalidateAISuggestions();
       }
       if (toolCall.toolName === "updateSubtask" || toolCall.toolName === "deleteSubtask") {
-        // Refresh subtasks after AI updates or deletes a subtask
-        // Small delay to ensure server-side processing is complete
-        setTimeout(() => invalidateSubtasks(), 500);
+        invalidateSubtasks();
       }
     },
     persistence: {
@@ -125,6 +125,20 @@ export function IssueChatPanel({
       },
     },
   });
+
+  // Re-invalidate all data queries when streaming completes.
+  // Server-side tool executes (suggestAITasks, attachContent, etc.) are guaranteed
+  // to have finished by the time the stream ends, so this catches any data the
+  // immediate onToolCall invalidations missed due to network latency.
+  const prevLoadingRef = useRef(false);
+  useEffect(() => {
+    if (prevLoadingRef.current && !chat.isLoading) {
+      invalidateAISuggestions();
+      invalidateSubtasks();
+      invalidateAttachments();
+    }
+    prevLoadingRef.current = chat.isLoading;
+  }, [chat.isLoading, invalidateAISuggestions, invalidateSubtasks, invalidateAttachments]);
 
   // Build welcome message with issue title
   const welcomeMessage = `I'm here to help you refine **${issue.title}**. I can see the current description, status, and any comments.\n\nHow can I help? For example:\n- "Add acceptance criteria"\n- "Suggest improvements to the description"\n- "Break this down into smaller tasks"`;
@@ -146,7 +160,7 @@ export function IssueChatPanel({
       }}
       onClearHistory={chat.handleClearHistory}
       welcomeMessage={welcomeMessage}
-      renderToolCall={(toolName, result, index) => {
+      renderToolCall={(toolName, result, index, _part, messageId, messageIndex) => {
         // Handle custom tool (updateDescription)
         if (toolName === "updateDescription") {
           return (
@@ -210,6 +224,43 @@ export function IssueChatPanel({
               <span>{resultStr || "Subtask deleted"}</span>
             </div>
           );
+        }
+        // Handle ad creation tools
+        if (toolName.startsWith("create_ad_") && result) {
+          const adResult = result as {
+            success: boolean;
+            artifactId: string;
+            name: string;
+            platform: string;
+            templateType: string;
+          };
+          if (adResult.success) {
+            // True if this message is the last one (in the chat) that contains a create_ad_ tool call with this artifactId
+            const lastMessageIndexWithArtifact = chat.messages.findLastIndex((msg) =>
+              (msg.parts ?? []).some(
+                (p) =>
+                  p.type?.startsWith("tool-create_ad_") &&
+                  (p as { output?: { artifactId?: string } }).output?.artifactId === adResult.artifactId
+              )
+            );
+
+            return (
+              <AdArtifactInline
+                key={index}
+                artifactId={adResult.artifactId}
+                name={adResult.name}
+                platform={adResult.platform}
+                templateType={adResult.templateType}
+                workspaceId={workspaceId ?? ""}
+                showPreview={messageIndex !== lastMessageIndexWithArtifact}
+                onExpand={() => onViewArtifact?.(adResult.artifactId)}
+                onAttach={async () => {
+                  await attachAdArtifactToIssue(adResult.artifactId, issue.id);
+                  invalidateAttachments();
+                }}
+              />
+            );
+          }
         }
         // Handle built-in tools
         return <ToolResultDisplay key={index} toolName={toolName} result={result} />;
