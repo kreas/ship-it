@@ -324,12 +324,7 @@ export function IssueDetailForm({
           )}
 
           {/* Attachments */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-2">
-              Attachments
-            </label>
-            <AttachmentList issue={issue} />
-          </div>
+          <AttachmentList issue={issue} />
 
           {/* Tabs: Comments / Activity */}
           <div className="border-t border-border pt-4">
