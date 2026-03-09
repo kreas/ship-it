@@ -44,7 +44,7 @@ interface IssueChatPanelProps {
   issue: IssueWithLabels;
   comments: Comment[];
   onUpdateDescription: (description: string) => void;
-  onViewArtifact?: (artifactId: string) => void;
+  onViewArtifact?: (artifactId: string, version?: number) => void;
 }
 
 export function IssueChatPanel({
@@ -252,8 +252,9 @@ export function IssueChatPanel({
                 platform={adResult.platform}
                 templateType={adResult.templateType}
                 workspaceId={workspaceId ?? ""}
+                messageId={messageId}
                 showPreview={messageIndex !== lastMessageIndexWithArtifact}
-                onExpand={() => onViewArtifact?.(adResult.artifactId)}
+                onExpand={(version) => onViewArtifact?.(adResult.artifactId, version)}
                 onAttach={async () => {
                   await attachAdArtifactToIssue(adResult.artifactId, issue.id);
                   invalidateAttachments();

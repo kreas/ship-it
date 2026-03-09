@@ -425,12 +425,25 @@ export const adArtifacts = sqliteTable("ad_artifacts", {
   templateType: text("template_type").notNull(), // "feed-post" | "carousel" | "story" | "reel" | etc.
   name: text("name").notNull(),
   content: text("content").notNull(), // JSON string of template-specific content
-  mediaAssets: text("media_assets"), // JSON array of ArtifactMediaUrls
   issueAttachmentId: text("issue_attachment_id"),
   issueId: text("issue_id").references(() => issues.id, { onDelete: "set null" }),
   brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
+  currentVersion: integer("current_version").default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Ad Artifact Versions - snapshots created after each Inngest image-generation run
+export const adArtifactVersions = sqliteTable("ad_artifact_versions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  artifactId: text("artifact_id")
+    .notNull()
+    .references(() => adArtifacts.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(), // 1-based
+  content: text("content").notNull(), // JSON snapshot of ad text/copy at time of generation
+  mediaAssets: text("media_assets"), // JSON snapshot of MediaSlot[] with storageKeys
+  messageId: text("message_id"), // nullable — linked when client polling resolves
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 // AI Suggestions - ghost subtasks suggested by AI for issues

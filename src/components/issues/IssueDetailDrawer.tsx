@@ -31,14 +31,14 @@ export function IssueDetailDrawer({
     string | undefined
   >(undefined);
   const [highlightDescription, setHighlightDescription] = useState(false);
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [selectedArtifact, setSelectedArtifact] = useState<{ id: string; version?: number } | null>(null);
 
-  const viewArtifact = useCallback((artifactId: string) => {
-    setSelectedArtifactId(artifactId);
+  const viewArtifact = useCallback((artifactId: string, version?: number) => {
+    setSelectedArtifact({ id: artifactId, version });
   }, []);
 
   const closeArtifact = useCallback(() => {
-    setSelectedArtifactId(null);
+    setSelectedArtifact(null);
   }, []);
 
   const handleCommentsLoad = useCallback((loadedComments: Comment[]) => {
@@ -75,7 +75,7 @@ export function IssueDetailDrawer({
     onOpenChange(false);
     setIsDeleting(false);
     setExternalDescription(undefined);
-    setSelectedArtifactId(null);
+    setSelectedArtifact(null);
   };
 
   if (!issue) return null;
@@ -163,11 +163,12 @@ export function IssueDetailDrawer({
               highlightDescription={highlightDescription}
               onCommentsLoad={handleCommentsLoad}
             />
-            {selectedArtifactId && (
+            {selectedArtifact && (
               <AdArtifactDialog
                 open={true}
                 onOpenChange={(open) => { if (!open) closeArtifact(); }}
-                artifactId={selectedArtifactId}
+                artifactId={selectedArtifact.id}
+                initialVersion={selectedArtifact.version}
                 issueId={issue.id}
               />
             )}

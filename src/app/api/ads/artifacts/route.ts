@@ -72,9 +72,6 @@ export async function POST(req: Request) {
       templateType: artifact.templateType ?? artifact.type ?? "unknown",
       name: artifact.name ?? "Untitled Ad",
       content,
-      mediaAssets: artifact.mediaUrls
-        ? JSON.stringify(artifact.mediaUrls)
-        : undefined,
       brandId: artifact.brandId,
     });
 

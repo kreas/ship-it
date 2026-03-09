@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "../db";
-import { adArtifacts, attachments, workspaceChats } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { adArtifacts, adArtifactVersions, attachments, workspaceChats } from "../db/schema";
+import { eq, desc, and } from "drizzle-orm";
 import { generateDownloadUrl, deleteObject, uploadContent, getObjectBinary } from "../storage/r2-client";
 import { renderAdToHtml } from "../ad-html-templates";
 import { revalidatePath } from "next/cache";
@@ -80,7 +80,6 @@ export async function createAdArtifact(input: {
   templateType: string;
   name: string;
   content: string;
-  mediaAssets?: string;
   brandId?: string;
   issueId?: string;
 }): Promise<AdArtifact> {
@@ -96,7 +95,6 @@ export async function createAdArtifact(input: {
         templateType: input.templateType,
         name: input.name,
         content: input.content,
-        mediaAssets: input.mediaAssets ?? null,
         brandId: input.brandId ?? null,
         issueId: input.issueId ?? null,
       })
@@ -179,15 +177,28 @@ async function resolveSlotToUrls(slot: MediaSlot): Promise<{
   return { imageUrls, currentImageUrl, currentPrompt };
 }
 
+export type AdArtifactVersionSummary = {
+  id: string;
+  version: number;
+  messageId: string | null;
+  createdAt: Date | null;
+};
+
 /**
  * Get a single ad artifact with fresh signed URLs for media.
  * resolvedMediaBySlot can be passed as initialMediaUrls to ArtifactProvider so generated images show on reload.
  * Each slot includes currentPrompt for the current version so the client can generate when url is missing.
+ * Also returns currentVersion and version history for per-message version pinning.
  */
 export async function getAdArtifact(
   artifactId: string
 ): Promise<
-  (AdArtifact & { resolvedMediaUrls: string[]; resolvedMediaBySlot: ResolvedMediaBySlot }) | null
+  (AdArtifact & {
+    resolvedMediaUrls: string[];
+    resolvedMediaBySlot: ResolvedMediaBySlot;
+    currentVersion: number;
+    versions: AdArtifactVersionSummary[];
+  }) | null
 > {
   const artifact = await db
     .select()
@@ -202,7 +213,15 @@ export async function getAdArtifact(
   const resolvedMediaUrls: string[] = [];
   const resolvedMediaBySlot: ResolvedMediaBySlot = [];
 
-  const slots = parseMediaAssetsToSlots(artifact.mediaAssets);
+  const currentVersionRow = await db
+    .select({ mediaAssets: adArtifactVersions.mediaAssets })
+    .from(adArtifactVersions)
+    .where(and(
+      eq(adArtifactVersions.artifactId, artifactId),
+      eq(adArtifactVersions.version, artifact.currentVersion ?? 0)
+    ))
+    .get();
+  const slots = parseMediaAssetsToSlots(currentVersionRow?.mediaAssets ?? null);
   for (const slot of slots) {
     const { imageUrls, currentImageUrl, currentPrompt } = await resolveSlotToUrls(slot);
     resolvedMediaUrls.push(...imageUrls.filter(Boolean));
@@ -231,12 +250,193 @@ export async function getAdArtifact(
     // Keep original content
   }
 
+  const versions = await db
+    .select({
+      id: adArtifactVersions.id,
+      version: adArtifactVersions.version,
+      messageId: adArtifactVersions.messageId,
+      createdAt: adArtifactVersions.createdAt,
+    })
+    .from(adArtifactVersions)
+    .where(eq(adArtifactVersions.artifactId, artifactId))
+    .orderBy(adArtifactVersions.version)
+    .all();
+
   return {
     ...artifact,
     content: contentForResponse,
     resolvedMediaUrls,
     resolvedMediaBySlot,
+    currentVersion: artifact.currentVersion ?? 0,
+    versions,
   };
+}
+
+/**
+ * Link a specific version of an ad artifact to a chat message.
+ * Called by the client after polling detects a new version has been created.
+ */
+export async function linkArtifactVersionToMessage(
+  artifactId: string,
+  version: number,
+  messageId: string
+): Promise<void> {
+  const artifact = await db
+    .select({ workspaceId: adArtifacts.workspaceId })
+    .from(adArtifacts)
+    .where(eq(adArtifacts.id, artifactId))
+    .get();
+  if (!artifact) return;
+  await requireWorkspaceAccess(artifact.workspaceId);
+
+  await db
+    .update(adArtifactVersions)
+    .set({ messageId })
+    .where(
+      and(
+        eq(adArtifactVersions.artifactId, artifactId),
+        eq(adArtifactVersions.version, version)
+      )
+    );
+}
+
+/**
+ * Fetch a specific version snapshot with resolved media URLs.
+ * Used by the inline component and expanded dialog to display pinned historical versions.
+ */
+export async function getAdArtifactVersion(
+  artifactId: string,
+  version: number
+): Promise<{ content: string; resolvedMediaBySlot: ResolvedMediaBySlot } | null> {
+  const artifact = await db
+    .select({ workspaceId: adArtifacts.workspaceId })
+    .from(adArtifacts)
+    .where(eq(adArtifacts.id, artifactId))
+    .get();
+  if (!artifact) return null;
+  await requireWorkspaceAccess(artifact.workspaceId);
+
+  const versionRow = await db
+    .select()
+    .from(adArtifactVersions)
+    .where(
+      and(
+        eq(adArtifactVersions.artifactId, artifactId),
+        eq(adArtifactVersions.version, version)
+      )
+    )
+    .get();
+  if (!versionRow) return null;
+
+  const slots = parseMediaAssetsToSlots(versionRow.mediaAssets ?? null);
+  const resolvedMediaBySlot: ResolvedMediaBySlot = [];
+  for (const slot of slots) {
+    const { imageUrls, currentImageUrl, currentPrompt } = await resolveSlotToUrls(slot);
+    resolvedMediaBySlot.push({
+      imageUrls,
+      videoUrls: [],
+      currentIndex: slot.currentIndex,
+      currentImageUrl,
+      generatedAt: new Date(),
+      showVideo: false,
+      currentPrompt,
+    });
+  }
+
+  let content = versionRow.content;
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const { mergedContent } = mergeProfileMediaIntoContent(parsed, resolvedMediaBySlot);
+    content = JSON.stringify(mergedContent);
+  } catch {
+    // keep original
+  }
+
+  return { content, resolvedMediaBySlot };
+}
+
+/**
+ * Rollback an ad artifact to a previous version.
+ * Restores content, mediaAssets, and currentVersion from the snapshot.
+ * Overwrites the existing HTML attachment with the rolled-back content.
+ */
+export async function rollbackAdArtifactVersion(
+  artifactId: string,
+  targetVersion: number
+): Promise<{ success: boolean; error?: string }> {
+  const artifact = await db
+    .select()
+    .from(adArtifacts)
+    .where(eq(adArtifacts.id, artifactId))
+    .get();
+  if (!artifact) return { success: false, error: "Artifact not found" };
+
+  await requireWorkspaceAccess(artifact.workspaceId, "member");
+
+  const versionRow = await db
+    .select()
+    .from(adArtifactVersions)
+    .where(
+      and(
+        eq(adArtifactVersions.artifactId, artifactId),
+        eq(adArtifactVersions.version, targetVersion)
+      )
+    )
+    .get();
+  if (!versionRow) return { success: false, error: `Version ${targetVersion} not found` };
+
+  await db
+    .update(adArtifacts)
+    .set({
+      content: versionRow.content,
+      currentVersion: targetVersion,
+      updatedAt: new Date(),
+    })
+    .where(eq(adArtifacts.id, artifactId));
+
+  // Regenerate HTML attachment inline if one exists
+  if (artifact.issueAttachmentId) {
+    const attachment = await db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.id, artifact.issueAttachmentId))
+      .get();
+
+    if (attachment) {
+      const dataUrls = await resolveMediaToBase64DataUrls(versionRow.mediaAssets ?? null);
+      const resolvedMediaBySlotForHtml: ResolvedMediaBySlot = dataUrls.map((url) => ({
+        imageUrls: url ? [url] : [],
+        videoUrls: [],
+        currentIndex: 0,
+        currentImageUrl: url || null,
+        generatedAt: new Date(),
+        showVideo: false,
+      }));
+
+      let parsedContent: unknown;
+      try {
+        parsedContent = JSON.parse(versionRow.content);
+      } catch {
+        parsedContent = versionRow.content;
+      }
+
+      const { mergedContent: contentForHtml, contentMediaBySlot } = mergeProfileMediaIntoContent(
+        parsedContent as Record<string, unknown>,
+        resolvedMediaBySlotForHtml
+      );
+      const contentOnlySlots = contentMediaBySlot.slice(1);
+      const contentMediaUrls = contentOnlySlots.map((s) => s.currentImageUrl).filter(Boolean) as string[];
+
+      const html = renderAdToHtml(artifact.platform, artifact.templateType, contentForHtml, contentMediaUrls);
+      if (html) {
+        await uploadContent(attachment.storageKey, html, "text/html");
+        const size = Buffer.byteLength(html, "utf-8");
+        await db.update(attachments).set({ size }).where(eq(attachments.id, attachment.id));
+      }
+    }
+  }
+
+  return { success: true };
 }
 
 /**
@@ -274,62 +474,6 @@ export async function getChatAdArtifacts(chatId: string): Promise<AdArtifact[]> 
 }
 
 /**
- * Update an existing artifact with new image version(s). Each media asset (slot) has its own
- * currentIndex; we only append a new version and bump currentIndex for slots whose prompt
- * changed, so each asset's version advances independently.
- */
-export async function updateAdArtifactWithNewImageVersion(
-  artifactId: string,
-  content: string
-): Promise<AdArtifact | null> {
-  const existing = await db
-    .select()
-    .from(adArtifacts)
-    .where(eq(adArtifacts.id, artifactId))
-    .get();
-  if (!existing) return null;
-  await requireWorkspaceAccess(existing.workspaceId, "member");
-
-  let parsedContent: Record<string, unknown>;
-  try {
-    parsedContent = JSON.parse(content) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-
-  const prompts = getPromptsFromContent(existing.platform, existing.templateType, parsedContent);
-  if (prompts.length === 0) return null;
-
-  const slots = parseMediaAssetsToSlots(existing.mediaAssets);
-
-  // Ensure we have at least as many slots as prompts (e.g. profile + content)
-  while (slots.length < prompts.length) {
-    slots.push({ currentIndex: 0, versions: [] });
-  }
-
-  for (let i = 0; i < prompts.length; i++) {
-    const slot = slots[i]!;
-    const newPrompt = (prompts[i] ?? "").trim();
-    const currentVersion = slot.versions[slot.currentIndex];
-    const currentPrompt = (currentVersion?.prompt ?? "").trim();
-    // Only append a new version for this media asset when its prompt changed
-    if (newPrompt !== currentPrompt) {
-      slot.versions.push({ prompt: newPrompt || undefined });
-      slot.currentIndex = slot.versions.length - 1;
-    }
-  }
-
-  const mediaAssetsJson = JSON.stringify(slots);
-  const [updated] = await db
-    .update(adArtifacts)
-    .set({ mediaAssets: mediaAssetsJson, updatedAt: new Date() })
-    .where(eq(adArtifacts.id, artifactId))
-    .returning();
-
-  return updated ?? null;
-}
-
-/**
  * Update ad artifact content (copy/text fields)
  */
 export async function updateAdArtifactContent(
@@ -349,11 +493,6 @@ export async function updateAdArtifactContent(
     .where(eq(adArtifacts.id, artifactId))
     .returning();
 
-  if (updated) {
-    // Fire-and-forget: re-render HTML attachment only when all media are ready
-    refreshAdAttachmentIfMediaReady(artifactId).catch(() => {});
-  }
-
   return updated ?? null;
 }
 
@@ -369,7 +508,7 @@ export async function updateAdArtifactMedia(
   const row = await db
     .select({
       workspaceId: adArtifacts.workspaceId,
-      mediaAssets: adArtifacts.mediaAssets,
+      currentVersion: adArtifacts.currentVersion,
     })
     .from(adArtifacts)
     .where(eq(adArtifacts.id, artifactId))
@@ -377,9 +516,20 @@ export async function updateAdArtifactMedia(
   if (!row) return null;
   await requireWorkspaceAccess(row.workspaceId, "member");
 
+  const currentVersion = row.currentVersion ?? 0;
+
+  const currentVersionRow = await db
+    .select({ mediaAssets: adArtifactVersions.mediaAssets })
+    .from(adArtifactVersions)
+    .where(and(
+      eq(adArtifactVersions.artifactId, artifactId),
+      eq(adArtifactVersions.version, currentVersion)
+    ))
+    .get();
+
   let payload = mediaAssets;
   if (isClientMediaShape(mediaAssets)) {
-    const existingSlots = parseMediaAssetsToSlots(row.mediaAssets);
+    const existingSlots = parseMediaAssetsToSlots(currentVersionRow?.mediaAssets ?? null);
     let clientMedia: ClientMediaPayload;
     try {
       clientMedia = JSON.parse(mediaAssets) as ClientMediaPayload;
@@ -390,12 +540,18 @@ export async function updateAdArtifactMedia(
     payload = JSON.stringify(merged);
   }
 
+  await db
+    .update(adArtifactVersions)
+    .set({ mediaAssets: payload })
+    .where(and(
+      eq(adArtifactVersions.artifactId, artifactId),
+      eq(adArtifactVersions.version, currentVersion)
+    ));
+
+  // Return artifact row for API compatibility
   const [updated] = await db
     .update(adArtifacts)
-    .set({
-      mediaAssets: payload,
-      updatedAt: new Date(),
-    })
+    .set({ updatedAt: new Date() })
     .where(eq(adArtifacts.id, artifactId))
     .returning();
 
@@ -424,7 +580,17 @@ export async function attachAdArtifactToIssue(
 
     await requireWorkspaceAccess(artifact.workspaceId, "member");
 
-    const slots = parseMediaAssetsToSlots(artifact.mediaAssets);
+    const currentVersionRow = await db
+      .select({ mediaAssets: adArtifactVersions.mediaAssets })
+      .from(adArtifactVersions)
+      .where(and(
+        eq(adArtifactVersions.artifactId, artifact.id),
+        eq(adArtifactVersions.version, artifact.currentVersion ?? 0)
+      ))
+      .get();
+    const mediaAssetsStr = currentVersionRow?.mediaAssets ?? null;
+
+    const slots = parseMediaAssetsToSlots(mediaAssetsStr);
     if (!allCurrentMediaReady(slots)) {
       return {
         success: false,
@@ -432,7 +598,7 @@ export async function attachAdArtifactToIssue(
       };
     }
 
-    const dataUrls = await resolveMediaToBase64DataUrls(artifact.mediaAssets);
+    const dataUrls = await resolveMediaToBase64DataUrls(mediaAssetsStr);
     const resolvedMediaBySlotForHtml: ResolvedMediaBySlot = dataUrls.map((url) => ({
       imageUrls: url ? [url] : [],
       videoUrls: [],
@@ -505,10 +671,20 @@ export async function refreshAdAttachment(artifactId: string): Promise<void> {
 
   if (!attachment) return;
 
-  const slots = parseMediaAssetsToSlots(artifact.mediaAssets);
+  const currentVersionRow = await db
+    .select({ mediaAssets: adArtifactVersions.mediaAssets })
+    .from(adArtifactVersions)
+    .where(and(
+      eq(adArtifactVersions.artifactId, artifact.id),
+      eq(adArtifactVersions.version, artifact.currentVersion ?? 0)
+    ))
+    .get();
+  const mediaAssetsStr = currentVersionRow?.mediaAssets ?? null;
+
+  const slots = parseMediaAssetsToSlots(mediaAssetsStr);
   if (!allCurrentMediaReady(slots)) return;
 
-  const dataUrls = await resolveMediaToBase64DataUrls(artifact.mediaAssets);
+  const dataUrls = await resolveMediaToBase64DataUrls(mediaAssetsStr);
   const resolvedMediaBySlotForHtml: ResolvedMediaBySlot = dataUrls.map((url) => ({
     imageUrls: url ? [url] : [],
     videoUrls: [],
@@ -560,7 +736,17 @@ export async function refreshAdAttachmentIfMediaReady(artifactId: string): Promi
 
   if (!artifact) return;
 
-  const slots = parseMediaAssetsToSlots(artifact.mediaAssets);
+  const currentVersionRow = await db
+    .select({ mediaAssets: adArtifactVersions.mediaAssets })
+    .from(adArtifactVersions)
+    .where(and(
+      eq(adArtifactVersions.artifactId, artifactId),
+      eq(adArtifactVersions.version, artifact.currentVersion ?? 0)
+    ))
+    .get();
+  const mediaAssetsStr = currentVersionRow?.mediaAssets ?? null;
+
+  const slots = parseMediaAssetsToSlots(mediaAssetsStr);
   if (!allCurrentMediaReady(slots)) return;
 
   if (artifact.issueAttachmentId) {
@@ -595,12 +781,19 @@ export async function deleteAdArtifact(artifactId: string): Promise<void> {
 
   await requireWorkspaceAccess(artifact.workspaceId, "admin");
 
-  // Clean up R2 media assets (versioned or legacy)
-  const slots = parseMediaAssetsToSlots(artifact.mediaAssets);
-  for (const slot of slots) {
-    for (const v of slot.versions) {
-      if (v.storageKey) {
-        await deleteObject(v.storageKey).catch(() => {});
+  // Clean up R2 media assets from all version rows
+  const allVersions = await db
+    .select({ mediaAssets: adArtifactVersions.mediaAssets })
+    .from(adArtifactVersions)
+    .where(eq(adArtifactVersions.artifactId, artifactId))
+    .all();
+  for (const v of allVersions) {
+    const slots = parseMediaAssetsToSlots(v.mediaAssets ?? null);
+    for (const slot of slots) {
+      for (const ver of slot.versions) {
+        if (ver.storageKey) {
+          await deleteObject(ver.storageKey).catch(() => {});
+        }
       }
     }
   }

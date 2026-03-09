@@ -34,7 +34,7 @@ export const ArtifactMedia = ({
   } = useArtifactMedia(mediaIndex);
 
   const size = getSizeForAspectRatio(aspectRatio);
-  const effectivePrompt = (currentPrompt ?? prompt).trim() || prompt;
+  const effectivePrompt = (currentPrompt ?? prompt ?? '').trim() || (prompt ?? '');
 
   return (
     <div className="w-full h-full">

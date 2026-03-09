@@ -13,7 +13,7 @@ import { createSkillTools } from "@/lib/chat/tools/skill-creator-tool";
 import { getLastUserMessageText } from "@/lib/memory-utils";
 import { createAdTools } from "@/lib/chat/tools/ad-tools";
 
-export const maxDuration = 30;
+export const maxDuration = 120;
 
 const SOFTWARE_SYSTEM_PROMPT = `You are a helpful AI assistant for a software development workspace. You can help with:
 

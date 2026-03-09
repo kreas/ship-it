@@ -11,6 +11,7 @@ import {
   executeAllAITasksSequential,
   generateAudienceMembers,
   generateSoul,
+  generateAdImages,
 } from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
@@ -26,5 +27,6 @@ export const { GET, POST, PUT } = serve({
     executeAllAITasksSequential,
     generateAudienceMembers,
     generateSoul,
+    generateAdImages,
   ],
 });

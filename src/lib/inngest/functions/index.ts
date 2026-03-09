@@ -9,3 +9,4 @@ export { generateBrandSummary } from "./brand-summary-generation";
 export { executeAITask, executeAllAITasksSequential } from "./ai-task-execution";
 export { generateAudienceMembers } from "./audience-generation";
 export { generateSoul } from "./soul-generation";
+export { generateAdImages } from "./ad-image-generation";

@@ -34,7 +34,7 @@ function parseArtifactExportAttachment(
 }
 
 export function AttachmentPreviewPanel() {
-  const { selectedAttachment, closeAttachment, selectedArtifactId, closeArtifact, collapseArtifactToInline } = useChatContext();
+  const { selectedAttachment, closeAttachment, selectedArtifactId, selectedArtifactVersion, closeArtifact, collapseArtifactToInline } = useChatContext();
 
   const attachmentArtifactId = useMemo(() => {
     if (!selectedAttachment) return null;
@@ -51,6 +51,7 @@ export function AttachmentPreviewPanel() {
         open={true}
         onOpenChange={(open) => { if (!open) closeArtifact(); }}
         artifactId={selectedArtifactId}
+        initialVersion={selectedArtifactVersion}
         onCollapseToInline={collapseArtifactToInline}
       />
     );

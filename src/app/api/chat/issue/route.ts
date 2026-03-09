@@ -22,7 +22,7 @@ import {
   getKnowledgeContextForIssue,
 } from "@/lib/ai-search/knowledge-context";
 
-export const maxDuration = 30;
+export const maxDuration = 120;
 
 interface SubtaskContext {
   id: string;

@@ -137,6 +137,7 @@ export function getPromptsFromContent(
 /** Check if every slot has media for its current version (storageKey or imageUrl). */
 export function allCurrentMediaReady(slots: MediaSlot[]): boolean {
   for (const slot of slots) {
+    if (slot.versions.length === 0) continue; // slot unused (e.g. profile URL provided by brand)
     const v = slot.versions[slot.currentIndex];
     if (!v) return false;
     const hasMedia = !!(v.storageKey || (v.imageUrl && v.imageUrl.trim()));
@@ -183,6 +184,99 @@ export function mergeClientMediaIntoSlots(
     });
   }
   return merged;
+}
+
+/** Default prompt used when profile has no image URL and no explicit imagePrompt. */
+const DEFAULT_PROFILE_PROMPT =
+  "Professional minimalist company logo icon, simple and modern, suitable for social media profile picture, neutral background";
+
+/**
+ * Like getPromptsFromContent but fills the profile slot with a default prompt when:
+ * - Not Facebook in-stream
+ * - Profile/company section exists with no image URL
+ * - No explicit imagePrompt was provided
+ * Mirrors the client-side fallback in ProfileImageOrGenerate.tsx.
+ */
+export function getEffectivePromptsFromContent(
+  platform: string,
+  templateType: string,
+  content: Record<string, unknown>
+): string[] {
+  const prompts = getPromptsFromContent(platform, templateType, content);
+  const isFacebookInStream = platform === "facebook" && templateType === "in-stream-video";
+
+  if (!isFacebookInStream && prompts.length > 0 && !prompts[0]?.trim()) {
+    const profile =
+      content.profile && typeof content.profile === "object"
+        ? (content.profile as Record<string, unknown>)
+        : null;
+    const company =
+      content.company && typeof content.company === "object"
+        ? (content.company as Record<string, unknown>)
+        : null;
+
+    if (profile || company) {
+      const hasUrl = !!(
+        (profile?.image && typeof profile.image === "string" && profile.image.trim()) ||
+        (profile?.profileImageUrl &&
+          typeof profile.profileImageUrl === "string" &&
+          profile.profileImageUrl.trim()) ||
+        (profile?.imageUrl &&
+          typeof profile.imageUrl === "string" &&
+          profile.imageUrl.trim()) ||
+        (company?.logo && typeof company.logo === "string" && company.logo.trim())
+      );
+      if (!hasUrl) {
+        prompts[0] = DEFAULT_PROFILE_PROMPT;
+      }
+    }
+  }
+
+  return prompts;
+}
+
+/**
+ * Get aspect ratios for each media slot, parallel to getPromptsFromContent.
+ * Returns ratios in slot order: [profileRatio, ...contentRatios].
+ */
+export function getAspectRatiosFromContent(
+  platform: string,
+  templateType: string,
+  content: Record<string, unknown>
+): string[] {
+  const ratios: string[] = [];
+  const isFacebookInStream = platform === "facebook" && templateType === "in-stream-video";
+
+  if (!isFacebookInStream) {
+    ratios.push("1:1"); // slot 0: profile
+  }
+
+  if (platform === "instagram") {
+    if (templateType === "feed-post") {
+      ratios.push((content.aspectRatio as string) || "1:1");
+    } else if (templateType === "story" || templateType === "reel") {
+      ratios.push("9:16");
+    } else if (templateType === "carousel") {
+      const slides = content.content as Array<unknown> | undefined;
+      const count = Array.isArray(slides) ? slides.length : 1;
+      for (let i = 0; i < count; i++) ratios.push("1:1");
+    }
+  } else if (platform === "tiktok") {
+    ratios.push("9:16");
+  } else if (platform === "linkedin") {
+    if (templateType === "single-image") {
+      ratios.push((content.imageAspectRatio as string) || "1:1");
+    } else if (templateType === "carousel") {
+      const slides = content.slides as Array<unknown> | undefined;
+      const count = Array.isArray(slides) ? slides.length : 1;
+      for (let i = 0; i < count; i++) ratios.push("1:1");
+    }
+  } else if (platform === "facebook" && templateType === "in-stream-video") {
+    ratios.push("1:1"); // slot 0: secondary ad image
+    ratios.push("1:1"); // slot 1: primary ad image
+  }
+
+  return ratios;
 }
 
 /**

@@ -63,6 +63,11 @@ export type Events = {
       workspaceName: string;
     };
   };
+  "ad/images.generate": {
+    data: {
+      artifactId: string;
+    };
+  };
 };
 
 export const inngest = new Inngest({

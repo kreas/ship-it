@@ -5,8 +5,8 @@ import { updateAdArtifactMedia, refreshAdAttachmentIfMediaReady } from "@/lib/ac
 import { parseMediaAssetsToSlots } from "@/lib/actions/ad-artifacts-utils";
 import { requireWorkspaceAccess } from "@/lib/actions/workspace";
 import { db } from "@/lib/db";
-import { adArtifacts } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { adArtifacts, adArtifactVersions } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 export const maxDuration = 60;
 
@@ -44,19 +44,30 @@ export async function POST(req: Request) {
     const { prompt, aspectRatio, workspaceId, artifactId, mediaIndex = 0 } = parsed.data;
 
     let effectiveWorkspaceId: string;
-    let artifactRow: { workspaceId: string; mediaAssets: string | null } | null = null;
+    let artifactRow: { workspaceId: string; currentVersion: number | null; mediaAssets: string | null } | null = null;
 
     if (artifactId) {
       const row = await db
-        .select({ workspaceId: adArtifacts.workspaceId, mediaAssets: adArtifacts.mediaAssets })
+        .select({ workspaceId: adArtifacts.workspaceId, currentVersion: adArtifacts.currentVersion })
         .from(adArtifacts)
         .where(eq(adArtifacts.id, artifactId))
         .get();
       if (!row) {
         return NextResponse.json({ error: "Artifact not found" }, { status: 404 });
       }
-      artifactRow = row;
       await requireWorkspaceAccess(row.workspaceId, "member");
+      const currentVersion = row.currentVersion ?? 0;
+      const versionRow = currentVersion > 0
+        ? await db
+            .select({ mediaAssets: adArtifactVersions.mediaAssets })
+            .from(adArtifactVersions)
+            .where(and(
+              eq(adArtifactVersions.artifactId, artifactId),
+              eq(adArtifactVersions.version, currentVersion)
+            ))
+            .get()
+        : null;
+      artifactRow = { workspaceId: row.workspaceId, currentVersion: row.currentVersion, mediaAssets: versionRow?.mediaAssets ?? null };
       effectiveWorkspaceId = row.workspaceId;
     } else {
       await requireWorkspaceAccess(workspaceId!, "member");

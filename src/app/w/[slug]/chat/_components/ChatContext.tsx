@@ -41,7 +41,8 @@ interface ChatContextValue {
 
   // Ad artifact preview
   selectedArtifactId: string | null;
-  viewArtifact: (artifactId: string) => void;
+  selectedArtifactVersion: number | undefined;
+  viewArtifact: (artifactId: string, version?: number) => void;
   closeArtifact: () => void;
 
   // Inline expanded artifact (collapsed from panel back to inline)
@@ -85,6 +86,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   // Ad artifact preview state
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [selectedArtifactVersion, setSelectedArtifactVersion] = useState<number | undefined>(undefined);
   const [expandedInlineArtifactId, setExpandedInlineArtifactId] = useState<string | null>(null);
 
   // Load workspace data and soul on mount
@@ -227,8 +229,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
   }, [selectedChatId, updateUrl]);
 
   const viewArtifact = useCallback(
-    (artifactId: string) => {
+    (artifactId: string, version?: number) => {
       setSelectedArtifactId(artifactId);
+      setSelectedArtifactVersion(version);
       setExpandedInlineArtifactId(null);
       setSelectedAttachment(null); // Close any open attachment
     },
@@ -237,6 +240,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   const closeArtifact = useCallback(() => {
     setSelectedArtifactId(null);
+    setSelectedArtifactVersion(undefined);
   }, []);
 
   const collapseArtifactToInline = useCallback(() => {
@@ -271,6 +275,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     closeAttachment,
     isPreviewOpen,
     selectedArtifactId,
+    selectedArtifactVersion,
     viewArtifact,
     closeArtifact,
     expandedInlineArtifactId,

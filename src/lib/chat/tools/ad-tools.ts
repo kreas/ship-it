@@ -2,13 +2,15 @@ import { tool, jsonSchema } from "ai";
 import { z } from "zod";
 import {
   createAdArtifact,
-  refreshAdAttachmentIfMediaReady,
   updateAdArtifactContent,
-  updateAdArtifactWithNewImageVersion,
+  rollbackAdArtifactVersion,
 } from "@/lib/actions/ad-artifacts";
-import { getPromptsFromContent } from "@/lib/actions/ad-artifacts-utils";
+import { db } from "@/lib/db";
+import { adArtifacts, adArtifactVersions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { getWorkspaceBrand } from "@/lib/actions/brand";
 import { getBrandForAdContent } from "@/lib/ads/merge-workspace-brand";
+import { inngest } from "@/lib/inngest/client";
 
 // Import schemas from each platform's template files
 import { InstagramFeedPostSchema } from "@/components/ads/templates/instagram/InstagramFeedPost";
@@ -24,6 +26,22 @@ import { FacebookInStreamVideoTool } from "@/components/ads/templates/facebook/t
 
 /** Max ad tool invocations per request. Each API request creates a fresh counter (createAdTools is called per request in chat routes). */
 const MAX_AD_TOOL_USES = 5;
+
+const POLL_INTERVAL_MS = 2000;
+const MAX_WAIT_MS = 100_000; // 100s
+
+async function waitForArtifactReady(artifactId: string, expectedVersion: number): Promise<void> {
+  const deadline = Date.now() + MAX_WAIT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    const row = await db
+      .select({ currentVersion: adArtifacts.currentVersion })
+      .from(adArtifacts)
+      .where(eq(adArtifacts.id, artifactId))
+      .get();
+    if ((row?.currentVersion ?? 0) >= expectedVersion) return;
+  }
+}
 
 interface AdToolsContext {
   workspaceId: string;
@@ -120,7 +138,15 @@ function createAdTool(
         // UPDATE existing artifact in place (text and/or new image version)
         if (input.existingArtifactId) {
           const contentStr = JSON.stringify(input.content);
-          const contentObj = input.content as Record<string, unknown>;
+
+          // Read current version before update so we know what version to wait for
+          const currentRow = await db
+            .select({ currentVersion: adArtifacts.currentVersion })
+            .from(adArtifacts)
+            .where(eq(adArtifacts.id, input.existingArtifactId))
+            .get();
+          const expectedVersion = (currentRow?.currentVersion ?? 0) + 1;
+
           const updatedContent = await updateAdArtifactContent(
             input.existingArtifactId,
             contentStr
@@ -128,15 +154,9 @@ function createAdTool(
           if (!updatedContent) {
             return { success: false, error: "Artifact not found or update failed" };
           }
-          // Add new image version(s) from content so the client auto-generates with new prompt(s)
-          const prompts = getPromptsFromContent(
-            updatedContent.platform,
-            updatedContent.templateType,
-            contentObj
-          );
-          if (prompts.some((p) => p?.trim())) {
-            await updateAdArtifactWithNewImageVersion(input.existingArtifactId, contentStr);
-          }
+
+          await inngest.send({ name: "ad/images.generate", data: { artifactId: updatedContent.id } });
+          await waitForArtifactReady(updatedContent.id, expectedVersion);
           return {
             success: true,
             updated: true,
@@ -161,11 +181,11 @@ function createAdTool(
           issueId: context.issueId,
         });
 
-        // Auto-create attachment immediately (no-media ads like Google Search) or
-        // once all images are ready (media ads). Fire-and-forget.
-        if (context.issueId) {
-          refreshAdAttachmentIfMediaReady(artifact.id).catch(() => {});
-        }
+        // Trigger server-side image generation via Inngest.
+        // For no-image ads (e.g. Google Search), the Inngest function will skip generation
+        // and create the attachment directly. For image ads, images are generated in the background.
+        await inngest.send({ name: "ad/images.generate", data: { artifactId: artifact.id } });
+        await waitForArtifactReady(artifact.id, 1);
 
         return {
           success: true,
@@ -238,5 +258,46 @@ export function createAdTools(context: AdToolsContext) {
     create_ad_linkedin_carousel: createAdTool(LinkedInCarouselAdSchema, context, usage),
     create_ad_google_search_ad: createAdTool(GoogleSearchAdSchema, context, usage),
     create_ad_facebook_in_stream_video: createAdTool(FacebookInStreamVideoTool, context, usage),
+    get_ad_versions: tool({
+      description:
+        "Get the version history of an existing ad artifact. Use this to see what versions exist before rolling back or building on a specific version.",
+      inputSchema: z.object({ artifactId: z.string() }),
+      execute: async ({ artifactId }) => {
+        const artifact = await db
+          .select({ workspaceId: adArtifacts.workspaceId, currentVersion: adArtifacts.currentVersion })
+          .from(adArtifacts)
+          .where(eq(adArtifacts.id, artifactId))
+          .get();
+        if (!artifact) return { success: false, error: "Artifact not found" };
+
+        const versions = await db
+          .select({
+            version: adArtifactVersions.version,
+            messageId: adArtifactVersions.messageId,
+            createdAt: adArtifactVersions.createdAt,
+          })
+          .from(adArtifactVersions)
+          .where(eq(adArtifactVersions.artifactId, artifactId))
+          .orderBy(adArtifactVersions.version)
+          .all();
+
+        return {
+          success: true,
+          currentVersion: artifact.currentVersion ?? 0,
+          versions,
+        };
+      },
+    }),
+    rollback_ad_to_version: tool({
+      description:
+        "Rollback an ad artifact to a previous version. This restores the content and images from that version and makes it the current version.",
+      inputSchema: z.object({
+        artifactId: z.string(),
+        targetVersion: z.number().int().positive(),
+      }),
+      execute: async ({ artifactId, targetVersion }) => {
+        return rollbackAdArtifactVersion(artifactId, targetVersion);
+      },
+    }),
   };
 }

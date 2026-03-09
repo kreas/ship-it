@@ -249,7 +249,6 @@ export async function saveArtifactAsChatAttachment(
       platform: artifact.platform,
       templateType: artifact.templateType,
       content: artifact.content,
-      mediaAssets: artifact.mediaAssets,
       brandId: artifact.brandId,
       createdAt: artifact.createdAt,
       updatedAt: artifact.updatedAt,

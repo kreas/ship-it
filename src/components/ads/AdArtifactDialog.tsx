@@ -7,7 +7,7 @@ import { ArtifactProvider } from "@/components/ads/context/ArtifactProvider";
 import ArtifactControlsBar from "@/components/ads/components/ArtifactControlsBar";
 import { AdContentEditForm } from "@/components/ads/components/AdContentEditForm";
 import { getTemplateEntry } from "@/components/ads/schemas";
-import { getAdArtifact } from "@/lib/actions/ad-artifacts";
+import { getAdArtifact, getAdArtifactVersion } from "@/lib/actions/ad-artifacts";
 import { saveArtifactAsChatAttachment } from "@/lib/actions/workspace-chat";
 import { attachAdArtifactToIssue } from "@/lib/actions/ad-artifacts";
 import { ChatContext } from "@/app/w/[slug]/chat/_components/ChatContext";
@@ -207,10 +207,11 @@ interface AdArtifactDialogProps {
   onOpenChange: (open: boolean) => void;
   artifactId: string;
   issueId?: string;
+  initialVersion?: number;
   onCollapseToInline?: () => void;
 }
 
-export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, onCollapseToInline }: AdArtifactDialogProps) {
+export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, initialVersion, onCollapseToInline }: AdArtifactDialogProps) {
   const chatContext = useContext(ChatContext);
   const selectedChatId = chatContext?.selectedChatId ?? null;
   const viewAttachment = chatContext?.viewAttachment;
@@ -313,6 +314,7 @@ export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, onCo
       setError(null);
 
       try {
+        // Fetch artifact metadata (always needed for platform/templateType/name/workspaceId)
         const result = await getAdArtifact(artifactId);
         if (cancelled || !result) {
           if (!cancelled) setError("Artifact not found");
@@ -322,12 +324,23 @@ export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, onCo
         const templateType = `ad-template:${result.platform}-${result.templateType}`;
         const entry = getTemplateEntry(templateType);
 
-        // Parse the stored content JSON
+        // Determine content + media: use pinned version if provided
+        let content = result.content;
+        let resolvedMediaBySlot = result.resolvedMediaBySlot ?? [];
+
+        if (initialVersion !== undefined && initialVersion !== result.currentVersion) {
+          const versionData = await getAdArtifactVersion(artifactId, initialVersion);
+          if (versionData) {
+            content = versionData.content;
+            resolvedMediaBySlot = versionData.resolvedMediaBySlot;
+          }
+        }
+
         let parsedContent: unknown;
         try {
-          parsedContent = JSON.parse(result.content);
+          parsedContent = JSON.parse(content);
         } catch {
-          parsedContent = result.content;
+          parsedContent = content;
         }
 
         const artifactData: Artifact = {
@@ -344,10 +357,9 @@ export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, onCo
             type: templateType,
             workspaceId: result.workspaceId,
             resolvedMediaUrls: result.resolvedMediaUrls,
-            resolvedMediaBySlot: result.resolvedMediaBySlot ?? [],
+            resolvedMediaBySlot,
           });
 
-          // Lazy-load the template component
           if (entry) {
             const mod = await entry.component();
             if (!cancelled) {
@@ -368,7 +380,7 @@ export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, onCo
 
     load();
     return () => { cancelled = true; };
-  }, [artifactId, open]);
+  }, [artifactId, open, initialVersion]);
 
   if (isLoading) {
     return (
@@ -418,7 +430,7 @@ export function AdArtifactDialog({ open, onOpenChange, artifactId, issueId, onCo
           artifactId={artifact.data.id}
           workspaceId={artifact.workspaceId}
           mediaUrls={artifact.resolvedMediaBySlot}
-          enableGenerate={true}
+          enableGenerate={false}
           onRegenerate={() => {}}
           onSave={() => {}}
         >

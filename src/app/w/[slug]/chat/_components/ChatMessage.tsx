@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, User, FileText, Check } from "lucide-react";
+import { Bot, User, FileText } from "lucide-react";
 import { MarkdownContent } from "@/components/ai-elements/MarkdownContent";
 import { ToolResultDisplay } from "@/components/ai-elements/ToolResultDisplay";
 import {
@@ -37,6 +37,7 @@ interface CreateAdResult {
 
 interface ChatMessageProps {
   message: UIMessage;
+  allMessages?: UIMessage[];
 }
 
 function FileAttachmentCard({
@@ -90,7 +91,7 @@ function FileAttachmentCard({
   );
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, allMessages }: ChatMessageProps) {
   const { workspace, viewAttachment, viewArtifact } = useChatContext();
   const isUser = message.role === "user";
 
@@ -178,24 +179,18 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 return null;
               }
 
-              // Handle ad creation tools
+              // Handle ad creation/update tools
               if (toolName.startsWith("create_ad_") && toolPart.output) {
                 const result = toolPart.output as CreateAdResult;
                 if (result.success) {
-                  if (result.updated) {
-                    return (
-                      <div key={index} className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Check className="w-3 h-3 text-green-500" />
-                        <span>Updated <span className="font-medium text-foreground">{result.name}</span></span>
-                        <button
-                          onClick={() => viewArtifact(result.artifactId)}
-                          className="underline hover:text-foreground transition-colors"
-                        >
-                          View
-                        </button>
-                      </div>
-                    );
-                  }
+                  const lastMessageWithArtifact = (allMessages ?? []).findLast((msg) =>
+                    (msg.parts ?? []).some(
+                      (p) =>
+                        p.type?.startsWith("tool-create_ad_") &&
+                        (p as { output?: { artifactId?: string } }).output?.artifactId === result.artifactId
+                    )
+                  );
+                  const showPreview = allMessages != null && message.id !== lastMessageWithArtifact?.id;
                   return (
                     <AdArtifactInline
                       key={index}
@@ -204,7 +199,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
                       platform={result.platform}
                       templateType={result.templateType}
                       workspaceId={workspace?.id ?? ""}
-                      onExpand={() => viewArtifact(result.artifactId)}
+                      messageId={message.id}
+                      showPreview={showPreview}
+                      onExpand={(version) => viewArtifact(result.artifactId, version)}
                     />
                   );
                 }
