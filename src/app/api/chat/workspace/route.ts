@@ -1,6 +1,6 @@
 import { type UIMessage, tool } from "ai";
 import { z } from "zod";
-import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt, createMemoryTools } from "@/lib/chat";
+import { createChatResponse, loadSkillsForWorkspace, buildContextualSystemPrompt, createMemoryTools, createSocialTools } from "@/lib/chat";
 import {
   createChatAttachment,
   getChatAttachment,
@@ -31,6 +31,9 @@ const SOFTWARE_SYSTEM_PROMPT = `You are a helpful AI assistant for a software de
 - Read file: Read the contents of a previously created file attachment
 - Create skill: Save a repeatable workflow or instruction set as a reusable skill for this workspace
 - Update skill: Modify an existing skill (requires user confirmation since it affects all users)
+- Social platforms: Check connection status and fetch content from connected social accounts (Instagram, Facebook, TikTok, X/Twitter, LinkedIn)
+  - Use the platform name tool (e.g., 'instagram') to discover what actions are available
+  - Always check connection status FIRST before trying to fetch posts
 
 When you generate substantial content like documentation, guides, code files, or analysis reports, use the createFile tool to save it as an attachment so the user can easily access and download it.
 
@@ -59,6 +62,9 @@ const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing 
 - Read file: Read the contents of a previously created file attachment
 - Create skill: Save a repeatable workflow or instruction set as a reusable skill for this workspace
 - Update skill: Modify an existing skill (requires user confirmation since it affects all users)
+- Social platforms: Check connection status and fetch content from connected social accounts (Instagram, Facebook, TikTok, X/Twitter, LinkedIn)
+  - Use the platform name tool (e.g., 'instagram') to discover what actions are available
+  - Always check connection status FIRST before trying to fetch posts
 
 When you generate substantial content like marketing briefs, reports, or copy documents, use the createFile tool to save it as an attachment so the user can easily access and download it.
 
@@ -223,11 +229,12 @@ export async function POST(req: Request) {
     ? await loadSkillsForWorkspace(workspaceId, purpose)
     : [];
 
-  // Create tools - attachment tools if chatId, memory tools and skill tools if workspaceId
+  // Create tools - attachment tools if chatId, memory/social tools if workspaceId
   const attachmentTools = chatId ? createWorkspaceChatTools(chatId) : {};
   const memoryTools = workspaceId ? createMemoryTools({ workspaceId }) : {};
   const skillTools = createSkillTools(workspaceId);
-  const tools = { ...attachmentTools, ...memoryTools, ...skillTools };
+  const socialTools = workspaceId ? createSocialTools({ workspaceId }) : {};
+  const tools = { ...attachmentTools, ...memoryTools, ...skillTools, ...socialTools };
 
   return createChatResponse(messages, {
     system: getSystemPrompt(purpose, soul, brand, memories),

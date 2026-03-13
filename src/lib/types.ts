@@ -29,6 +29,8 @@ import type {
   knowledgeAssets,
   inviteCodes,
   inviteCodeClaims,
+  socialAccounts,
+  socialPosts,
 } from "./db/schema";
 import type { Status, Priority, CommunicationStyle } from "./design-tokens";
 
@@ -62,6 +64,13 @@ export type KnowledgeAsset = typeof knowledgeAssets.$inferSelect;
 export type InviteCode = typeof inviteCodes.$inferSelect;
 export type InviteCodeClaim = typeof inviteCodeClaims.$inferSelect;
 export type UserStatus = "waitlisted" | "active";
+
+// Social platform types
+export type SocialAccount = typeof socialAccounts.$inferSelect;
+export type SocialPost = typeof socialPosts.$inferSelect;
+export type SocialPlatform = "instagram" | "facebook" | "linkedin" | "x" | "tiktok";
+export type SocialConnectionStatus = "connected" | "expired" | "revoked" | "error";
+export type SocialPostType = "image" | "video" | "carousel" | "reel" | "story" | "text";
 
 // Workspace invitations
 export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;

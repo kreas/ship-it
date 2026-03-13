@@ -4,6 +4,7 @@ export { createPlanningTools } from "./planning-tools";
 export { createChatTools } from "./chat-tools";
 export { createSkillLoaderTool } from "./skill-tools";
 export { createMemoryTools, type MemoryToolsContext } from "./memory-tools";
+export { createSocialTools, type SocialToolsContext } from "./social-tools";
 
 // Schemas (for client-side type inference)
 export {

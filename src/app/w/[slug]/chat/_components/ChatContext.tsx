@@ -16,6 +16,7 @@ import { getChatAttachment } from "@/lib/actions/workspace-chat";
 import { getSoul } from "@/lib/actions/soul";
 import type { Workspace, WorkspaceChat, WorkspaceChatAttachment, WorkspaceSoul } from "@/lib/types";
 import type { WorkspacePurpose } from "@/lib/design-tokens";
+import { toast } from "sonner";
 
 interface ChatContextValue {
   // Workspace
@@ -167,6 +168,28 @@ export function ChatProvider({ children }: ChatProviderProps) {
         setIsLoadingAttachment(false);
       });
   }, [attachmentIdFromUrl]);
+
+  // Detect OAuth success/error from redirect
+  useEffect(() => {
+    const oauthSuccess = searchParams.get("oauth_success");
+    const oauthError = searchParams.get("oauth_error");
+
+    if (oauthSuccess || oauthError) {
+      if (oauthSuccess) {
+        toast.success(`${oauthSuccess.charAt(0).toUpperCase() + oauthSuccess.slice(1)} connected successfully`);
+      } else if (oauthError) {
+        toast.error(`Connection failed: ${oauthError}`);
+      }
+
+      // Clean up OAuth params from URL
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete("oauth_success");
+      newParams.delete("oauth_error");
+      const queryString = newParams.toString();
+      const cleanUrl = `/w/${params.slug}/chat${queryString ? `?${queryString}` : ""}`;
+      router.replace(cleanUrl, { scroll: false });
+    }
+  }, [searchParams, router, params.slug]);
 
   // Actions
   const selectChat = useCallback(
