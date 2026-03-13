@@ -5,6 +5,7 @@ import {
   getPlatformAdapter,
   getSupportedPlatforms,
 } from "@/lib/social/adapters";
+import { generatePkce } from "@/lib/social/pkce";
 
 export async function GET(
   request: Request,
@@ -25,14 +26,27 @@ export async function GET(
     return new Response("workspaceId is required", { status: 400 });
   }
 
-  // Seal state for tamper protection (includes userId, workspaceId, platform, returnUrl)
-  const state = await sealData(
-    { userId: user.id, workspaceId, platform, returnUrl },
-    { password: process.env.SOCIAL_TOKEN_ENCRYPTION_SECRET! }
-  );
+  const statePayload: {
+    userId: string;
+    workspaceId: string;
+    platform: string;
+    returnUrl: string;
+    codeVerifier?: string;
+  } = { userId: user.id, workspaceId, platform, returnUrl };
+
+  let pkce: { codeChallenge: string; codeChallengeMethod: "S256" } | undefined;
+  if (platform === "tiktok") {
+    const { codeVerifier, codeChallenge, codeChallengeMethod } = generatePkce();
+    statePayload.codeVerifier = codeVerifier;
+    pkce = { codeChallenge, codeChallengeMethod };
+  }
+
+  const state = await sealData(statePayload, {
+    password: process.env.SOCIAL_TOKEN_ENCRYPTION_SECRET!,
+  });
 
   const adapter = getPlatformAdapter(platform);
-  const authUrl = adapter.getAuthorizationUrl(state);
+  const authUrl = adapter.getAuthorizationUrl(state, pkce);
 
   return redirect(authUrl);
 }

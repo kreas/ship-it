@@ -5,6 +5,7 @@ import type {
   PlatformPost,
   ListPostsOptions,
   ListPostsResult,
+  PkceOptions,
 } from "./types";
 
 const TIKTOK_AUTH_BASE = "https://www.tiktok.com/v2/auth/authorize/";
@@ -31,21 +32,14 @@ export class TikTokAdapter implements PlatformAdapter {
   platform = "tiktok";
 
   /**
-   * NOTE: TikTok requires PKCE. The code_verifier is embedded in the sealed
-   * OAuth state by the OAuth route. This adapter cannot store it itself, so
-   * getAuthorizationUrl appends code_challenge to the URL, and the caller
-   * must ensure the state already contains the code_verifier.
-   *
-   * For the standard flow, we generate PKCE here and store the verifier
-   * as a URL fragment hint — the OAuth route will need to extract it.
-   * In practice the code_verifier should be stored in the sealed state.
+   * TikTok requires PKCE: code_challenge and code_challenge_method on the
+   * authorize URL, and code_verifier when exchanging the code. The OAuth
+   * route generates PKCE, stores code_verifier in sealed state, and passes
+   * pkce here so we can add code_challenge to the URL.
    */
-  getAuthorizationUrl(state: string): string {
+  getAuthorizationUrl(state: string, pkce?: PkceOptions): string {
     const { clientKey, redirectUri } = getConfig();
 
-    // For simplicity, we generate a deterministic code_challenge from the state.
-    // The actual PKCE flow is handled by exchangeCodeWithVerifier.
-    // TikTok's PKCE is optional for server-side apps with a client_secret.
     const params = new URLSearchParams({
       client_key: clientKey,
       redirect_uri: redirectUri,
@@ -54,22 +48,32 @@ export class TikTokAdapter implements PlatformAdapter {
       state,
     });
 
+    if (pkce) {
+      params.set("code_challenge", pkce.codeChallenge);
+      params.set("code_challenge_method", pkce.codeChallengeMethod);
+    }
+
     return `${TIKTOK_AUTH_BASE}?${params}`;
   }
 
-  async exchangeCode(code: string): Promise<OAuthTokens> {
+  async exchangeCode(code: string, codeVerifier?: string): Promise<OAuthTokens> {
     const { clientKey, clientSecret, redirectUri } = getConfig();
+
+    const body = new URLSearchParams({
+      client_key: clientKey,
+      client_secret: clientSecret,
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+    });
+    if (codeVerifier) {
+      body.set("code_verifier", codeVerifier);
+    }
 
     const response = await fetch(`${TIKTOK_API_BASE}/oauth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_key: clientKey,
-        client_secret: clientSecret,
-        code,
-        grant_type: "authorization_code",
-        redirect_uri: redirectUri,
-      }),
+      body,
     });
 
     if (!response.ok) {

@@ -1,6 +1,7 @@
 import type {
   PlatformAdapter,
   OAuthTokens,
+  PkceOptions,
   PlatformUserProfile,
   PlatformPost,
   ListPostsOptions,
@@ -41,7 +42,7 @@ function getApiHeaders(accessToken: string): Record<string, string> {
 export class LinkedInAdapter implements PlatformAdapter {
   platform = "linkedin";
 
-  getAuthorizationUrl(state: string): string {
+  getAuthorizationUrl(state: string, _pkce?: PkceOptions): string {
     const { clientId, redirectUri } = getConfig();
 
     const params = new URLSearchParams({
@@ -55,7 +56,7 @@ export class LinkedInAdapter implements PlatformAdapter {
     return `${LINKEDIN_AUTH_BASE}?${params}`;
   }
 
-  async exchangeCode(code: string): Promise<OAuthTokens> {
+  async exchangeCode(code: string, _codeVerifier?: string): Promise<OAuthTokens> {
     const { clientId, clientSecret, redirectUri } = getConfig();
 
     const response = await fetch(LINKEDIN_TOKEN_URL, {

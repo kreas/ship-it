@@ -2,7 +2,7 @@
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, Columns3, Tag, Users, UsersRound, Sparkles, Plug, Heart, BarChart3, Palette, Activity, Brain } from "lucide-react";
+import { ArrowLeft, Building2, Columns3, Tag, Users, UsersRound, Sparkles, Plug, Heart, BarChart3, Palette, Activity, Brain, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsProvider, useSettingsContext } from "./context";
 
@@ -124,6 +124,12 @@ function SettingsSidebar() {
               icon={<Plug className="w-4 h-4" />}
               label="Integrations"
               isActive={pathname === `${baseSettingsPath}/integrations`}
+            />
+            <NavItem
+              href={`${baseSettingsPath}/social`}
+              icon={<Share2 className="w-4 h-4" />}
+              label="Social Platforms"
+              isActive={pathname === `${baseSettingsPath}/social`}
             />
             <NavItem
               href={`${baseSettingsPath}/usage`}

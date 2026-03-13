@@ -1,6 +1,7 @@
 import type {
   PlatformAdapter,
   OAuthTokens,
+  PkceOptions,
   PlatformUserProfile,
   PlatformPost,
   ListPostsOptions,
@@ -34,7 +35,7 @@ function getConfig() {
 export class FacebookAdapter implements PlatformAdapter {
   platform = "facebook";
 
-  getAuthorizationUrl(state: string): string {
+  getAuthorizationUrl(state: string, _pkce?: PkceOptions): string {
     const { clientId, redirectUri } = getConfig();
 
     const params = new URLSearchParams({
@@ -48,7 +49,7 @@ export class FacebookAdapter implements PlatformAdapter {
     return `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?${params}`;
   }
 
-  async exchangeCode(code: string): Promise<OAuthTokens> {
+  async exchangeCode(code: string, _codeVerifier?: string): Promise<OAuthTokens> {
     const { clientId, clientSecret, redirectUri } = getConfig();
 
     // Exchange code for short-lived token

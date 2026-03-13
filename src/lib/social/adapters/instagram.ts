@@ -1,6 +1,7 @@
 import type {
   PlatformAdapter,
   OAuthTokens,
+  PkceOptions,
   PlatformUserProfile,
   PlatformPost,
   ListPostsOptions,
@@ -63,7 +64,7 @@ function mapMediaType(
 export class InstagramAdapter implements PlatformAdapter {
   platform = "instagram";
 
-  getAuthorizationUrl(state: string): string {
+  getAuthorizationUrl(state: string, _pkce?: PkceOptions): string {
     const { clientId, redirectUri } = getConfig();
 
     const params = new URLSearchParams({
@@ -77,7 +78,7 @@ export class InstagramAdapter implements PlatformAdapter {
     return `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?${params}`;
   }
 
-  async exchangeCode(code: string): Promise<OAuthTokens> {
+  async exchangeCode(code: string, _codeVerifier?: string): Promise<OAuthTokens> {
     const { clientId, clientSecret, redirectUri } = getConfig();
 
     // Step 1: Exchange code for short-lived token

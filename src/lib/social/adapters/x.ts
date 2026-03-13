@@ -1,6 +1,7 @@
 import type {
   PlatformAdapter,
   OAuthTokens,
+  PkceOptions,
   PlatformUserProfile,
   PlatformPost,
   ListPostsOptions,
@@ -40,7 +41,7 @@ export class XAdapter implements PlatformAdapter {
   /** User ID cached from getUserProfile for listPosts */
   private cachedUserId: string | null = null;
 
-  getAuthorizationUrl(state: string): string {
+  getAuthorizationUrl(state: string, _pkce?: PkceOptions): string {
     const { clientId, redirectUri } = getConfig();
 
     const params = new URLSearchParams({
@@ -58,7 +59,7 @@ export class XAdapter implements PlatformAdapter {
     return `${X_AUTH_BASE}?${params}`;
   }
 
-  async exchangeCode(code: string): Promise<OAuthTokens> {
+  async exchangeCode(code: string, _codeVerifier?: string): Promise<OAuthTokens> {
     const { redirectUri } = getConfig();
 
     const response = await fetch(X_TOKEN_URL, {

@@ -46,14 +46,20 @@ export interface ListPostsResult {
   hasMore: boolean;
 }
 
+/** Optional PKCE params for platforms that require code_challenge on the authorize URL */
+export interface PkceOptions {
+  codeChallenge: string;
+  codeChallengeMethod: "S256";
+}
+
 export interface PlatformAdapter {
   platform: string;
 
   /** Build the OAuth authorization URL the user is redirected to */
-  getAuthorizationUrl(state: string): string;
+  getAuthorizationUrl(state: string, pkce?: PkceOptions): string;
 
-  /** Exchange the OAuth code for tokens */
-  exchangeCode(code: string): Promise<OAuthTokens>;
+  /** Exchange the OAuth code for tokens (codeVerifier required when PKCE was used) */
+  exchangeCode(code: string, codeVerifier?: string): Promise<OAuthTokens>;
 
   /** Refresh an expired access token */
   refreshAccessToken(refreshToken: string): Promise<OAuthTokens>;

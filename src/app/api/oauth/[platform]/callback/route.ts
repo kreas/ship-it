@@ -13,6 +13,8 @@ interface OAuthState {
   workspaceId: string;
   platform: string;
   returnUrl: string;
+  /** Present when PKCE was used (e.g. TikTok); required for token exchange */
+  codeVerifier?: string;
 }
 
 export async function GET(
@@ -53,8 +55,8 @@ export async function GET(
   try {
     const adapter = getPlatformAdapter(platform);
 
-    // Exchange authorization code for tokens
-    const tokens = await adapter.exchangeCode(code);
+    // Exchange authorization code for tokens (pass code_verifier when PKCE was used, e.g. TikTok)
+    const tokens = await adapter.exchangeCode(code, stateData.codeVerifier);
 
     // Get user profile from the platform
     const profile = await adapter.getUserProfile(tokens.accessToken);
