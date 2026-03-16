@@ -38,6 +38,13 @@ vi.mock("@/lib/actions/social-accounts", () => ({
     mockUpdateSocialAccountTokens(...args),
 }));
 
+// Mock workspace auth
+const mockRequireWorkspaceAccess = vi.fn();
+vi.mock("@/lib/actions/workspace", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mockRequireWorkspaceAccess(...args),
+}));
+
 const { GET } = await import("./route");
 
 function createRequest(params: Record<string, string> = {}) {
@@ -59,6 +66,12 @@ describe("OAuth callback route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SOCIAL_TOKEN_ENCRYPTION_SECRET = "test-secret-at-least-32-chars-long!!";
+    // Default: authenticated user matches state userId
+    mockRequireWorkspaceAccess.mockResolvedValue({
+      user: { id: "user-1" },
+      member: { role: "member" },
+      workspace: { id: "ws-1" },
+    });
   });
 
   describe("error handling", () => {
@@ -186,6 +199,29 @@ describe("OAuth callback route", () => {
         })
       );
       expect(mockCreateSocialAccount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("authorization", () => {
+    it("redirects when authenticated user differs from state userId", async () => {
+      mockUnsealData.mockResolvedValue(validState); // userId: "user-1"
+      mockRequireWorkspaceAccess.mockResolvedValue({
+        user: { id: "different-user" }, // mismatch
+        member: { role: "member" },
+        workspace: { id: "ws-1" },
+      });
+
+      const req = createRequest({ code: "abc", state: "sealed" });
+
+      await expect(
+        GET(req, { params: Promise.resolve({ platform: "instagram" }) })
+      ).rejects.toThrow("NEXT_REDIRECT");
+
+      expect(mockRedirect).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "oauth_error=OAuth%20session%20was%20initiated%20by%20a%20different%20user"
+        )
+      );
     });
   });
 

@@ -6,6 +6,7 @@ import {
   getWorkspaceSocialAccount,
   updateSocialAccountTokens,
 } from "@/lib/actions/social-accounts";
+import { requireWorkspaceAccess } from "@/lib/actions/workspace";
 import type { SocialPlatform } from "@/lib/types";
 
 interface OAuthState {
@@ -52,6 +53,14 @@ export async function GET(
     return redirect("/?oauth_error=state_mismatch");
   }
 
+  // Verify the current user is a member of the workspace and matches the initiator
+  const { user } = await requireWorkspaceAccess(stateData.workspaceId);
+  if (user.id !== stateData.userId) {
+    return redirect(
+      `${stateData.returnUrl}?oauth_error=${encodeURIComponent("OAuth session was initiated by a different user")}`
+    );
+  }
+
   try {
     const adapter = getPlatformAdapter(platform);
 
@@ -79,7 +88,7 @@ export async function GET(
     } else {
       await createSocialAccount({
         workspaceId: stateData.workspaceId,
-        userId: stateData.userId,
+        userId: user.id,
         platform: platform as SocialPlatform,
         platformUserId: profile.platformUserId,
         platformUsername: profile.username,

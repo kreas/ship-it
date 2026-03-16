@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { sealData } from "iron-session";
-import { requireAuth } from "@/lib/actions/workspace";
+import { requireWorkspaceAccess } from "@/lib/actions/workspace";
 import {
   getPlatformAdapter,
   getSupportedPlatforms,
@@ -12,7 +12,6 @@ export async function GET(
   { params }: { params: Promise<{ platform: string }> }
 ) {
   const { platform } = await params;
-  const user = await requireAuth();
 
   if (!getSupportedPlatforms().includes(platform)) {
     return new Response(`Unsupported platform: ${platform}`, { status: 400 });
@@ -25,6 +24,9 @@ export async function GET(
   if (!workspaceId) {
     return new Response("workspaceId is required", { status: 400 });
   }
+
+  // Verify the user is a member of this workspace
+  const { user } = await requireWorkspaceAccess(workspaceId);
 
   const statePayload: {
     userId: string;
