@@ -219,7 +219,7 @@ describe("OAuth callback route", () => {
 
       expect(mockRedirect).toHaveBeenCalledWith(
         expect.stringContaining(
-          "oauth_error=OAuth%20session%20was%20initiated%20by%20a%20different%20user"
+          "oauth_error=OAuth+session+was+initiated+by+a+different+user"
         )
       );
     });
@@ -237,7 +237,7 @@ describe("OAuth callback route", () => {
       ).rejects.toThrow("NEXT_REDIRECT");
 
       expect(mockRedirect).toHaveBeenCalledWith(
-        expect.stringContaining("oauth_error=Invalid%20authorization%20code")
+        expect.stringContaining("oauth_error=Invalid+authorization+code")
       );
     });
   });

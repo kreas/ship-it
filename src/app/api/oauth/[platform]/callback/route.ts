@@ -56,9 +56,12 @@ export async function GET(
   // Verify the current user is a member of the workspace and matches the initiator
   const { user } = await requireWorkspaceAccess(stateData.workspaceId);
   if (user.id !== stateData.userId) {
-    return redirect(
-      `${stateData.returnUrl}?oauth_error=${encodeURIComponent("OAuth session was initiated by a different user")}`
+    const errorUrl = new URL(stateData.returnUrl, url.origin);
+    errorUrl.searchParams.set(
+      "oauth_error",
+      "OAuth session was initiated by a different user"
     );
+    return redirect(errorUrl.toString());
   }
 
   try {
@@ -107,8 +110,8 @@ export async function GET(
     console.error(`[OAuth] ${platform} callback error:`, err);
     const errorMessage =
       err instanceof Error ? err.message : "OAuth callback failed";
-    return redirect(
-      `${stateData.returnUrl}?oauth_error=${encodeURIComponent(errorMessage)}`
-    );
+    const errorUrl = new URL(stateData.returnUrl, url.origin);
+    errorUrl.searchParams.set("oauth_error", errorMessage);
+    return redirect(errorUrl.toString());
   }
 }

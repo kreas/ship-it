@@ -18,8 +18,18 @@ export async function GET(
   }
 
   const url = new URL(request.url);
-  const returnUrl = url.searchParams.get("returnUrl") || "/";
+  const rawReturnUrl = url.searchParams.get("returnUrl") || "/";
   const workspaceId = url.searchParams.get("workspaceId");
+
+  // Validate returnUrl: must be a relative path starting with /w/
+  // to prevent open-redirect attacks via absolute or protocol-relative URLs
+  const ALLOWED_RETURN_PREFIXES = ["/w/"];
+  const returnUrl =
+    rawReturnUrl.startsWith("/") &&
+    !rawReturnUrl.startsWith("//") &&
+    ALLOWED_RETURN_PREFIXES.some((p) => rawReturnUrl.startsWith(p))
+      ? rawReturnUrl
+      : "/";
 
   if (!workspaceId) {
     return new Response("workspaceId is required", { status: 400 });
