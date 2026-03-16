@@ -33,7 +33,7 @@ const SOFTWARE_SYSTEM_PROMPT = `You are a helpful AI assistant for a software de
 - Update skill: Modify an existing skill (requires user confirmation since it affects all users)
 - Social platforms: Check connection status and fetch content from connected social accounts (Instagram, Facebook, TikTok, X/Twitter, LinkedIn)
   - Use the platform name tool (e.g., 'instagram') to discover what actions are available
-  - Always check connection status FIRST before trying to fetch posts
+  - Always check connection status FIRST before trying to fetch profiles or posts
 
 When you generate substantial content like documentation, guides, code files, or analysis reports, use the createFile tool to save it as an attachment so the user can easily access and download it.
 
@@ -64,7 +64,7 @@ const MARKETING_SYSTEM_PROMPT = `You are a helpful AI assistant for a marketing 
 - Update skill: Modify an existing skill (requires user confirmation since it affects all users)
 - Social platforms: Check connection status and fetch content from connected social accounts (Instagram, Facebook, TikTok, X/Twitter, LinkedIn)
   - Use the platform name tool (e.g., 'instagram') to discover what actions are available
-  - Always check connection status FIRST before trying to fetch posts
+  - Always check connection status FIRST before trying to fetch profiles or posts
 
 When you generate substantial content like marketing briefs, reports, or copy documents, use the createFile tool to save it as an attachment so the user can easily access and download it.
 

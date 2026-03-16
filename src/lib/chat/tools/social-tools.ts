@@ -40,6 +40,23 @@ export function createSocialTools(context: SocialToolsContext): ToolSet {
   }
 
   // Execution tools — Instagram
+  tools.instagram_get_profile = tool({
+    description:
+      "Get the connected Instagram account profile info (username, bio, followers, etc.). Call the 'instagram' discovery tool first to verify connection.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return await executeWithValidation(
+        workspaceId,
+        "instagram",
+        async (accessToken) => {
+          const adapter = getPlatformAdapter("instagram");
+          const profile = await adapter.getUserProfile(accessToken);
+          return { success: true, profile };
+        }
+      );
+    },
+  });
+
   tools.instagram_list_posts = tool({
     description:
       "List the workspace's recent Instagram posts with engagement metrics. Call the 'instagram' discovery tool first to verify connection.",
@@ -100,6 +117,23 @@ export function createSocialTools(context: SocialToolsContext): ToolSet {
   });
 
   // Execution tools — Facebook
+  tools.facebook_get_profile = tool({
+    description:
+      "Get the connected Facebook page profile info. Call the 'facebook' discovery tool first to verify connection.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return await executeWithValidation(
+        workspaceId,
+        "facebook",
+        async (accessToken) => {
+          const adapter = getPlatformAdapter("facebook");
+          const profile = await adapter.getUserProfile(accessToken);
+          return { success: true, profile };
+        }
+      );
+    },
+  });
+
   tools.facebook_list_posts = tool({
     description:
       "List the workspace's recent Facebook page posts. Call the 'facebook' discovery tool first to verify connection.",
@@ -160,6 +194,23 @@ export function createSocialTools(context: SocialToolsContext): ToolSet {
   });
 
   // Execution tools — LinkedIn
+  tools.linkedin_get_profile = tool({
+    description:
+      "Get the connected LinkedIn account profile info. Call the 'linkedin' discovery tool first to verify connection.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return await executeWithValidation(
+        workspaceId,
+        "linkedin",
+        async (accessToken) => {
+          const adapter = getPlatformAdapter("linkedin");
+          const profile = await adapter.getUserProfile(accessToken);
+          return { success: true, profile };
+        }
+      );
+    },
+  });
+
   tools.linkedin_list_posts = tool({
     description:
       "List the workspace's recent LinkedIn posts. Call the 'linkedin' discovery tool first to verify connection.",
@@ -220,6 +271,23 @@ export function createSocialTools(context: SocialToolsContext): ToolSet {
   });
 
   // Execution tools — X (Twitter)
+  tools.x_get_profile = tool({
+    description:
+      "Get the connected X (Twitter) account profile info. Call the 'x' discovery tool first to verify connection.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return await executeWithValidation(
+        workspaceId,
+        "x",
+        async (accessToken) => {
+          const adapter = getPlatformAdapter("x");
+          const profile = await adapter.getUserProfile(accessToken);
+          return { success: true, profile };
+        }
+      );
+    },
+  });
+
   tools.x_list_posts = tool({
     description:
       "List the workspace's recent X (Twitter) posts/tweets. Call the 'x' discovery tool first to verify connection.",
@@ -280,6 +348,23 @@ export function createSocialTools(context: SocialToolsContext): ToolSet {
   });
 
   // Execution tools — TikTok
+  tools.tiktok_get_profile = tool({
+    description:
+      "Get the connected TikTok account profile info. Call the 'tiktok' discovery tool first to verify connection.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return await executeWithValidation(
+        workspaceId,
+        "tiktok",
+        async (accessToken) => {
+          const adapter = getPlatformAdapter("tiktok");
+          const profile = await adapter.getUserProfile(accessToken);
+          return { success: true, profile };
+        }
+      );
+    },
+  });
+
   tools.tiktok_list_posts = tool({
     description:
       "List the workspace's recent TikTok videos. Call the 'tiktok' discovery tool first to verify connection.",

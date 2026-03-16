@@ -223,8 +223,8 @@ export default function SocialSettingsPage() {
                   </div>
                 </div>
 
-                {/* Test Actions — only when connected */}
-                {isConnected && workspace?.id && (
+                {/* Test Actions — only when connected and ?test param is set */}
+                {isConnected && workspace?.id && searchParams.has("test") && (
                   <div className="px-5 py-4 space-y-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Test API Methods
