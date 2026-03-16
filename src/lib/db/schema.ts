@@ -3,6 +3,7 @@ import {
   text,
   integer,
   primaryKey,
+  unique,
 } from "drizzle-orm/sqlite-core";
 
 // Users - synced from WorkOS
@@ -532,3 +533,58 @@ export const knowledgeAssets = sqliteTable("knowledge_assets", {
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
+
+// Social Accounts - OAuth connections per workspace per platform
+export const socialAccounts = sqliteTable("social_accounts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  platform: text("platform").notNull(), // "instagram" | "facebook" | "linkedin" | "x" | "tiktok"
+  platformUserId: text("platform_user_id"),
+  platformUsername: text("platform_username"),
+  // Encrypted tokens (sealed via iron-session sealData)
+  accessTokenSealed: text("access_token_sealed").notNull(),
+  refreshTokenSealed: text("refresh_token_sealed"),
+  // Token metadata (not encrypted, needed for logic)
+  tokenExpiresAt: integer("token_expires_at", { mode: "timestamp" }),
+  scopes: text("scopes").notNull(), // JSON array of granted scopes
+  connectionStatus: text("connection_status").notNull().default("connected"), // "connected" | "expired" | "revoked" | "error"
+  lastRefreshedAt: integer("last_refreshed_at", { mode: "timestamp" }),
+  lastError: text("last_error"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Social Posts - normalized posts fetched from connected platforms
+export const socialPosts = sqliteTable(
+  "social_posts",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    socialAccountId: text("social_account_id")
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: "cascade" }),
+    platformPostId: text("platform_post_id").notNull(),
+    platform: text("platform").notNull(), // Denormalized for faster queries
+    postType: text("post_type").notNull(), // "image" | "video" | "carousel" | "reel" | "story" | "text"
+    caption: text("caption"),
+    mediaUrl: text("media_url"),
+    thumbnailUrl: text("thumbnail_url"),
+    permalink: text("permalink"),
+    // Engagement metrics (snapshot at fetch time)
+    likeCount: integer("like_count"),
+    commentCount: integer("comment_count"),
+    shareCount: integer("share_count"),
+    viewCount: integer("view_count"),
+    // Timestamps
+    publishedAt: integer("published_at", { mode: "timestamp" }),
+    fetchedAt: integer("fetched_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    uniquePlatformPost: unique().on(table.socialAccountId, table.platformPostId),
+  })
+);

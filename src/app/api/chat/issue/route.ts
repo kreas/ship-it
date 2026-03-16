@@ -3,6 +3,7 @@ import {
   createChatResponse,
   createIssueTools,
   createMemoryTools,
+  createSocialTools,
   loadSkillsForPurpose,
   loadSkillsForWorkspace,
   getPriorityLabel,
@@ -136,6 +137,9 @@ ${issueContext.description ? `This issue already has a description. **Ask the us
 - **attachContent**: Attach generated content as a file (only when explicitly asked to create something NOW)
 - **create_skill**: Save a repeatable workflow or instruction set as a reusable skill for this workspace
 - **update_skill**: Modify an existing skill (MUST warn user it affects all users and get confirmation first)
+- Social platforms: Check connection status and fetch content from connected social accounts (Instagram, Facebook, TikTok, X/Twitter, LinkedIn)
+  - Use the platform name tool (e.g., 'instagram') to discover what actions are available
+  - Always check connection status FIRST before trying to fetch posts or profiles
 - Web search, code execution, web fetch: Only use when user explicitly asks you to execute immediately
 
 Be conversational and helpful. Ask clarifying questions when needed.`;
@@ -196,11 +200,12 @@ export async function POST(req: Request) {
     console.error("Failed to load knowledge context:", error);
   }
 
-  // Create tools with issue context, memory tools, and skill tools
+  // Create tools with issue context, memory tools, skill tools, and social tools
   const issueTools = createIssueTools({ issueId: issueContext.id });
   const memoryTools = workspaceId ? createMemoryTools({ workspaceId }) : {};
   const skillTools = createSkillTools(workspaceId);
-  const tools = { ...issueTools, ...memoryTools, ...skillTools };
+  const socialTools = workspaceId ? createSocialTools({ workspaceId }) : {};
+  const tools = { ...issueTools, ...memoryTools, ...skillTools, ...socialTools };
 
   return createChatResponse(messages, {
     system: buildSystemPrompt(

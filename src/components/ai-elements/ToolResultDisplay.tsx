@@ -1,10 +1,14 @@
 "use client";
 
-import { Search, Code, Globe, Terminal, FileEdit, FileText, CheckCircle, XCircle } from "lucide-react";
+import { Search, Code, Globe, Terminal, FileEdit, FileText, CheckCircle, XCircle, Share2 } from "lucide-react";
+import { SocialConnectPrompt } from "./SocialConnectPrompt";
+
+const SOCIAL_PLATFORMS = ["instagram", "facebook", "linkedin", "x", "tiktok"];
 
 interface ToolResultDisplayProps {
   toolName: string;
   result?: unknown;
+  workspaceId?: string;
 }
 
 // Extract useful info from tool result objects
@@ -33,7 +37,7 @@ function extractResultInfo(result: unknown): { success: boolean; message?: strin
   return { success: true };
 }
 
-export function ToolResultDisplay({ toolName, result }: ToolResultDisplayProps) {
+export function ToolResultDisplay({ toolName, result, workspaceId }: ToolResultDisplayProps) {
   // Web search
   if (toolName === "web_search") {
     return (
@@ -134,6 +138,66 @@ export function ToolResultDisplay({ toolName, result }: ToolResultDisplayProps) 
           {info.success
             ? `Found ${count ?? 0} file${count === 1 ? "" : "s"}`
             : "Failed to list files"}
+        </span>
+        {info.success ? (
+          <CheckCircle className="w-3 h-3 text-green-500" />
+        ) : (
+          <XCircle className="w-3 h-3 text-red-500" />
+        )}
+      </div>
+    );
+  }
+
+  // Social platform discovery tools (instagram, facebook, etc.)
+  if (SOCIAL_PLATFORMS.includes(toolName)) {
+    const res = result as Record<string, unknown> | undefined;
+    const connectionStatus = res?.connection_status as string | undefined;
+    const uiActions = res?.ui_actions as Array<{ type: string; platform: string }> | undefined;
+
+    // Show connect/reconnect button if needed
+    if (uiActions?.some(a => a.type === "connect_platform" || a.type === "reconnect_platform")) {
+      return (
+        <SocialConnectPrompt
+          platform={toolName}
+          isReconnect={connectionStatus === "expired"}
+          workspaceId={workspaceId}
+        />
+      );
+    }
+
+    const username = res?.username as string | undefined;
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
+        <CheckCircle className="w-3 h-3 text-green-500" />
+        <span>{toolName} connected{username ? ` (@${username})` : ""}</span>
+      </div>
+    );
+  }
+
+  // Social platform execution tools (instagram_list_posts, etc.)
+  if (SOCIAL_PLATFORMS.some(p => toolName.startsWith(`${p}_`))) {
+    const info = extractResultInfo(result);
+    const platformName = toolName.split("_")[0];
+    const action = toolName.slice(platformName.length + 1).replace(/_/g, " ");
+
+    // If execution failed due to not connected, show connect button
+    const res = result as Record<string, unknown> | undefined;
+    const uiActions = res?.ui_actions as Array<{ type: string; platform: string }> | undefined;
+    if (uiActions?.some(a => a.type === "connect_platform" || a.type === "reconnect_platform")) {
+      return (
+        <SocialConnectPrompt
+          platform={platformName}
+          isReconnect={uiActions.some(a => a.type === "reconnect_platform")}
+          workspaceId={workspaceId}
+        />
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
+        <Share2 className="w-3 h-3" />
+        <span className="truncate max-w-[200px]">
+          {platformName}: {action}
         </span>
         {info.success ? (
           <CheckCircle className="w-3 h-3 text-green-500" />

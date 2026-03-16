@@ -85,6 +85,13 @@
       "when": 1771617168394,
       "tag": "0011_majestic_thundra",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1773415396473,
+      "tag": "0012_aromatic_kronos",
+      "breakpoints": true
     }
   ]
 }

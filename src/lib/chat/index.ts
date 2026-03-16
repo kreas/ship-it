@@ -35,8 +35,10 @@ export {
   createChatTools,
   createSkillLoaderTool,
   createMemoryTools,
+  createSocialTools,
   type IssueToolsContext,
   type MemoryToolsContext,
+  type SocialToolsContext,
 } from "./tools";
 
 /**
