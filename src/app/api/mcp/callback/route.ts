@@ -85,7 +85,28 @@ export async function GET(request: NextRequest) {
   // Check if this is a workspace selection submission
   const selectedWorkspace = request.nextUrl.searchParams.get("workspace");
 
+  // Get user's workspaces
+  const memberships = await db
+    .select({
+      workspaceId: workspaceMembers.workspaceId,
+      role: workspaceMembers.role,
+      workspaceName: workspaces.name,
+      workspaceSlug: workspaces.slug,
+      workspacePurpose: workspaces.purpose,
+    })
+    .from(workspaceMembers)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+    .where(eq(workspaceMembers.userId, session.user.id));
+
   if (selectedWorkspace) {
+    const hasWorkspaceAccess = memberships.some(
+      (membership) => membership.workspaceId === selectedWorkspace
+    );
+
+    if (!hasWorkspaceAccess) {
+      return new NextResponse("Access denied", { status: 403 });
+    }
+
     // User has selected a workspace — create auth code and redirect
     const code = await createAuthorizationCode(
       session.user.id,
@@ -104,19 +125,6 @@ export async function GET(request: NextRequest) {
     response.cookies.delete(COOKIE_NAME);
     return response;
   }
-
-  // Get user's workspaces
-  const memberships = await db
-    .select({
-      workspaceId: workspaceMembers.workspaceId,
-      role: workspaceMembers.role,
-      workspaceName: workspaces.name,
-      workspaceSlug: workspaces.slug,
-      workspacePurpose: workspaces.purpose,
-    })
-    .from(workspaceMembers)
-    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
-    .where(eq(workspaceMembers.userId, session.user.id));
 
   if (memberships.length === 0) {
     // No workspaces — grant user-level access only (workspaceId = null)
