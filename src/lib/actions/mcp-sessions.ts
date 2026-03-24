@@ -6,6 +6,8 @@ import { eq, and, gt } from "drizzle-orm";
 import { requireWorkspaceAccess } from "./workspace";
 
 export async function getWorkspaceMcpSessions(workspaceId: string) {
+  await requireWorkspaceAccess(workspaceId, "admin");
+
   const sessions = await db
     .select()
     .from(mcpRefreshTokens)
