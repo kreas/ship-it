@@ -7,7 +7,7 @@ import {
   issueLabels,
   activities,
 } from "@/lib/db/schema";
-import { eq, and, sql, inArray, like } from "drizzle-orm";
+import { eq, and, sql, inArray, like, gte, lte } from "drizzle-orm";
 import type {
   Issue,
   IssueWithLabels,
@@ -111,6 +111,10 @@ export interface ListIssuesFilters {
   cycleId?: string;
   assigneeId?: string;
   query?: string;
+  createdAfter?: Date;
+  createdBefore?: Date;
+  dueAfter?: Date;
+  dueBefore?: Date;
 }
 
 /**
@@ -162,6 +166,18 @@ export async function listIssues(
     conditions.push(
       sql`(${issues.title} LIKE ${q} OR ${issues.description} LIKE ${q})`
     );
+  }
+  if (filters.createdAfter) {
+    conditions.push(gte(issues.createdAt, filters.createdAfter));
+  }
+  if (filters.createdBefore) {
+    conditions.push(lte(issues.createdAt, filters.createdBefore));
+  }
+  if (filters.dueAfter) {
+    conditions.push(gte(issues.dueDate, filters.dueAfter));
+  }
+  if (filters.dueBefore) {
+    conditions.push(lte(issues.dueDate, filters.dueBefore));
   }
 
   const allIssues = await db
@@ -333,6 +349,7 @@ export interface UpdateIssueInput {
   dueDate?: Date | null;
   cycleId?: string | null;
   assigneeId?: string | null;
+  labelIds?: string[];
 }
 
 /**
@@ -470,6 +487,24 @@ export async function updateIssue(
   }
 
   await db.update(issues).set(updates).where(eq(issues.id, issueId));
+
+  // Replace labels if provided
+  if (input.labelIds !== undefined) {
+    await db.delete(issueLabels).where(eq(issueLabels.issueId, issueId));
+    if (input.labelIds.length > 0) {
+      await db.insert(issueLabels).values(
+        input.labelIds.map((labelId) => ({
+          issueId,
+          labelId,
+        }))
+      );
+    }
+    changedFields.push({
+      field: "labels",
+      oldValue: null,
+      newValue: input.labelIds.join(", "),
+    });
+  }
 
   // Log general update if there were field changes
   if (changedFields.length > 0) {

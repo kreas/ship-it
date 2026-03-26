@@ -35,11 +35,22 @@ export function registerIssueTools(server: McpServer, ctx: MCPAuthContext) {
         .string()
         .optional()
         .describe("Search query — matches title and description"),
+      createdAfter: z.string().optional().describe("Issues created after this date (ISO 8601)"),
+      createdBefore: z.string().optional().describe("Issues created before this date (ISO 8601)"),
+      dueAfter: z.string().optional().describe("Issues due after this date (ISO 8601)"),
+      dueBefore: z.string().optional().describe("Issues due before this date (ISO 8601)"),
     },
     async (args) => {
       try {
         await requireMCPWorkspaceAccess(ctx, "viewer");
-        const result = await listIssues(ctx, args);
+        const { createdAfter, createdBefore, dueAfter, dueBefore, ...rest } = args;
+        const result = await listIssues(ctx, {
+          ...rest,
+          createdAfter: createdAfter ? new Date(createdAfter) : undefined,
+          createdBefore: createdBefore ? new Date(createdBefore) : undefined,
+          dueAfter: dueAfter ? new Date(dueAfter) : undefined,
+          dueBefore: dueBefore ? new Date(dueBefore) : undefined,
+        });
         return {
           content: [
             { type: "text" as const, text: JSON.stringify({ issues: result, total: result.length }, null, 2) },
@@ -143,6 +154,10 @@ export function registerIssueTools(server: McpServer, ctx: MCPAuthContext) {
         .nullable()
         .optional()
         .describe("New due date ISO 8601 (null to clear)"),
+      labelIds: z
+        .array(z.string())
+        .optional()
+        .describe("Replace all labels with these IDs (empty array to clear)"),
     },
     async (args) => {
       try {

@@ -10,6 +10,7 @@ import {
 import { eq, asc, inArray } from "drizzle-orm";
 import { McpToolError } from "@/lib/mcp-server/errors";
 import type { MCPAuthContext } from "./auth-context";
+import type { Label } from "@/lib/types";
 
 /**
  * Get a board overview for the connected workspace.
@@ -149,4 +150,28 @@ export async function getBoardOverview(ctx: MCPAuthContext) {
       endDate: c.endDate?.toISOString() ?? null,
     })),
   };
+}
+
+/**
+ * Create a new label in the connected workspace.
+ */
+export async function createLabel(
+  ctx: MCPAuthContext,
+  name: string,
+  color: string
+): Promise<Label> {
+  if (!ctx.workspaceId) {
+    throw new McpToolError("FORBIDDEN", "No workspace connected");
+  }
+
+  const label: Label = {
+    id: crypto.randomUUID(),
+    workspaceId: ctx.workspaceId,
+    name,
+    color,
+    createdAt: new Date(),
+  };
+
+  await db.insert(labels).values(label);
+  return label;
 }
