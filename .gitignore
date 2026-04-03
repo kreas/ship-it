@@ -47,6 +47,6 @@ next-env.d.ts
 .worktrees
 
 # brain docs, reference docs, and inspiration sources (local working files)
-docs/brain-*.md
+docs/brain/
 docs/reference/
 /sources
