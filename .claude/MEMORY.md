@@ -20,6 +20,9 @@ Shared learnings and context that persist across sessions for all contributors.
 ## Gotchas
 
 - Turbopack requires `.tsx` extension for any file containing JSX — `.ts` files with JSX fail with cryptic "Expected '>', got 'src'" errors
+- `proxy.ts` is the WorkOS auth middleware — add unauthenticated API paths there, not in next.config
+- Runway scripts need env vars exported from `.env.local` (drizzle-kit and tsx don't auto-load it)
+- MCP SDK: use `WebStandardStreamableHTTPServerTransport` in Next.js routes, not the Node.js adapter
 
 ## Decisions
 
@@ -29,3 +32,5 @@ Shared learnings and context that persist across sessions for all contributors.
 - Token usage tracked per-workspace for cost monitoring (tokenUsage table)
 - Knowledge base uses wiki-link graph between documents (knowledgeDocumentLinks table)
 - Brand guidelines stored as JSON in brands table, extracted via Inngest background job
+- Runway uses separate Turso DB (`RUNWAY_DATABASE_URL`) on Jason's free tier — will migrate to R1 instance later
+- Runway MCP server at `/api/mcp/runway` — bearer token auth, central access layer for Slack bot + Claude Code + Open Brain
