@@ -27,6 +27,7 @@
 
 # local database
 local.db
+runway-local.db
 
 # debug
 npm-debug.log*
