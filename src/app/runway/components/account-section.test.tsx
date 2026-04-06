@@ -174,9 +174,67 @@ describe("AccountSection", () => {
     const { container } = render(
       <AccountSection account={createAccount({ items: [] })} />
     );
-    // Should still render the account header
     expect(screen.getByText("Convergix")).toBeInTheDocument();
-    // On Hold section should not appear
     expect(container.textContent).not.toContain("On Hold");
+  });
+
+  it("sorts active items by target date", () => {
+    const { container } = render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            { id: "p1", title: "Later", status: "in-production", category: "active", target: "5/1" },
+            { id: "p2", title: "Earlier", status: "in-production", category: "active", target: "4/8" },
+            { id: "p3", title: "No Date", status: "in-production", category: "active" },
+          ],
+        })}
+      />
+    );
+    const text = container.textContent!;
+    const earlierIdx = text.indexOf("Earlier");
+    const laterIdx = text.indexOf("Later");
+    const noDateIdx = text.indexOf("No Date");
+    expect(earlierIdx).toBeLessThan(laterIdx);
+    expect(laterIdx).toBeLessThan(noDateIdx);
+  });
+
+  it("shows short date on cards with target dates", () => {
+    render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            { id: "p1", title: "Dated Item", status: "in-production", category: "active", target: "R1 to Daniel 4/7" },
+          ],
+        })}
+      />
+    );
+    expect(screen.getByText("4/7")).toBeInTheDocument();
+  });
+
+  it("expands MSA abbreviation in contract terms", () => {
+    render(
+      <AccountSection
+        account={createAccount({ contractTerm: "RLF MSA" })}
+      />
+    );
+    expect(screen.getByText("RLF Master Service Agreement")).toBeInTheDocument();
+  });
+
+  it("does not render contract value when absent", () => {
+    render(
+      <AccountSection
+        account={createAccount({ contractValue: undefined })}
+      />
+    );
+    expect(screen.queryByText("$100K")).not.toBeInTheDocument();
+  });
+
+  it("does not render contract term when absent", () => {
+    render(
+      <AccountSection
+        account={createAccount({ contractTerm: undefined })}
+      />
+    );
+    expect(screen.queryByText(/Feb/)).not.toBeInTheDocument();
   });
 });
