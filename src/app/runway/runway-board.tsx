@@ -64,14 +64,9 @@ export function RunwayBoard({
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-4 2xl:px-10">
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
-              Civilization Runway
-            </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Live from database
-            </p>
-          </div>
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
+            Civilization Runway
+          </h1>
           <nav className="flex gap-1 rounded-lg border border-border bg-card/50 p-1">
             {TABS.map((tab) => (
               <button
