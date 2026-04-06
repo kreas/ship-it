@@ -96,9 +96,23 @@ page.tsx (RSC)
   → Maps DB shapes to UI types (src/app/runway/types.ts)
   → RunwayBoard (client component)
     → Pre-computes todayColumn, restOfWeek from thisWeek
+    → mergeWeekendDays() combines Sat+Sun into single Weekend column
+    → groupByWeek() groups upcoming days under "w/o M/D" headers
     → Tab state selects view
     → Leaf components render data
 ```
+
+### Auto-Refresh
+
+`RunwayBoard` uses a `useEffect` with `setInterval` to call `router.refresh()` every 5 minutes. This keeps the TV display current without manual browser refresh. The RSC re-fetches all data on refresh.
+
+### Weekend Merge
+
+`mergeWeekendDays(days)` scans for adjacent Saturday + Sunday `DayItem` entries and combines them into a single "Weekend" column. If only one weekend day has items, it passes through unchanged. Applied to both the This Week and Upcoming sections.
+
+### Week Dividers
+
+`groupByWeek(days)` groups upcoming day columns by their week's Monday, rendering each group under an "Upcoming w/o M/D" header (e.g., "Upcoming w/o 4/13"). This visually separates weeks in the Upcoming section.
 
 ### Shared Display Components
 
