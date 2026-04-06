@@ -56,7 +56,7 @@ describe("TodaySection", () => {
 
   it("renders nothing when no items match today", () => {
     const futureStr = new Date("2030-01-01T12:00:00").toDateString();
-    const { container } = render(
+    render(
       <TodaySection thisWeek={thisWeek} todayStr={futureStr} />
     );
     // Heading should still render

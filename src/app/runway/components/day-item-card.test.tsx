@@ -62,7 +62,7 @@ describe("DayItemCard", () => {
   });
 
   it("applies type indicator color for delivery", () => {
-    const { container } = render(
+    render(
       <DayItemCard item={createEntry({ type: "delivery" })} />
     );
     const typeSpan = screen.getByText("delivery");

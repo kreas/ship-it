@@ -70,7 +70,7 @@ describe("PipelineRow", () => {
   });
 
   it("applies correct color class for sow-sent badge", () => {
-    const { container } = render(
+    render(
       <PipelineRow item={createItem({ status: "sow-sent" })} />
     );
     const badge = screen.getByText("SOW Sent");
