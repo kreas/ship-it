@@ -39,6 +39,7 @@ export const TYPE_INDICATORS: Record<string, string> = {
   deadline: "text-amber-400",
   approval: "text-amber-400",
   launch: "text-rose-400",
+  blocked: "text-red-400",
 };
 
 export function StyledBadge({ label, className, extraClassName }: { label: string; className: string; extraClassName?: string }) {

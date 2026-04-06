@@ -122,7 +122,7 @@ describe("MetadataLabel", () => {
 
 describe("TYPE_INDICATORS", () => {
   it("has entries for all expected categories", () => {
-    const expected = ["delivery", "review", "kickoff", "deadline", "approval", "launch"];
+    const expected = ["delivery", "review", "kickoff", "deadline", "approval", "launch", "blocked"];
     for (const key of expected) {
       expect(TYPE_INDICATORS[key]).toBeDefined();
     }
