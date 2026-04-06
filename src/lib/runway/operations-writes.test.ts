@@ -41,6 +41,7 @@ vi.mock("./operations", () => ({
   getProjectsForClient: (...args: unknown[]) =>
     mockGetProjectsForClient(...args),
   checkIdempotency: (...args: unknown[]) => mockCheckIdempotency(...args),
+  clientNotFoundError: (slug: string) => ({ ok: false, error: `Client '${slug}' not found.` }),
 }));
 
 const client = { id: "c1", name: "Convergix", slug: "convergix" };

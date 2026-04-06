@@ -15,6 +15,7 @@ import { eq, asc } from "drizzle-orm";
 import {
   getAllClients,
   getClientNameMap,
+  groupBy,
 } from "./operations";
 
 export async function getClientsWithCounts() {
@@ -22,13 +23,10 @@ export async function getClientsWithCounts() {
   const allClients = await getAllClients();
   const allProjects = await db.select().from(projects);
 
-  const countByClient = new Map<string, number>();
-  for (const p of allProjects) {
-    countByClient.set(
-      p.clientId,
-      (countByClient.get(p.clientId) ?? 0) + 1
-    );
-  }
+  const projectsByClient = groupBy(allProjects, (p) => p.clientId);
+  const countByClient = new Map(
+    [...projectsByClient.entries()].map(([k, v]) => [k, v.length])
+  );
 
   return allClients.map((c) => ({
     name: c.name,

@@ -12,6 +12,16 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn((a, b) => ({ eq: [a, b] })), asc: vi.f
 vi.mock("./operations", () => ({
   getAllClients: (...args: unknown[]) => mockGetAllClients(...args),
   getClientNameMap: (...args: unknown[]) => mockGetClientNameMap(...args),
+  groupBy: <T, K>(items: T[], keyFn: (item: T) => K) => {
+    const map = new Map<K, T[]>();
+    for (const item of items) {
+      const key = keyFn(item);
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return map;
+  },
 }));
 
 function chainable(data: unknown[]) {
