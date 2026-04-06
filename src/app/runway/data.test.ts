@@ -47,8 +47,8 @@ describe("pipeline seed data", () => {
     }
   });
 
-  it("has 6 pipeline items", () => {
-    expect(pipeline).toHaveLength(6);
+  it("has 7 pipeline items", () => {
+    expect(pipeline).toHaveLength(7);
   });
 });
 

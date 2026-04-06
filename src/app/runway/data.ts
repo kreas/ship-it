@@ -1,7 +1,7 @@
 /**
  * Runway seed data — typed exports consumed by scripts/seed-runway.ts
  *
- * Source: sources/triage/runway-data.md (Kathy session, April 3 2026)
+ * Source: sources/triage/runway-data.md (Kathy session Apr 3, Jill intake Apr 6)
  * Note: Original source had dates off by one for week of 4/6. Corrected here.
  */
 
@@ -63,12 +63,15 @@ export const accounts: AccountData[] = [
       { title: "CDS Landing Page", status: "not-started", category: "active", target: "KO ~4/25, launch ~6/10", notes: "Blocked by messaging approval" },
       { title: "CDS Case Study + Brochure", status: "not-started", category: "active", target: "KO ~5/5, delivery ~6/12", notes: "Blocked by messaging approval" },
       { title: "New Capacity (PPT, brochure, one-pager)", status: "in-production", category: "active", owner: "Roz/Lane", target: "Revisions Mon 4/7, deliver Tues 4/8", notes: "2 slides left. Just got JJ feedback." },
-      { title: "Fanuc Award Article + LI Post", status: "not-started", category: "active", owner: "Lane/Kathy", target: "Enters schedule w/o 4/20, event 4/28", notes: "Keep off plate until 4/20" },
-      { title: "Events Page Updates (5 tradeshows)", status: "not-started", category: "active", owner: "Kathy/Leslie", target: "Kathy starts Mon 4/7, to Leslie by Wed 4/9", notes: "AIST first week of May most time-sensitive" },
+      { title: "Fanuc Award Article + LI Post", status: "not-started", category: "active", owner: "Lane/Kathy", target: "Enters schedule w/o 4/20, event 4/28", notes: "Keep off plate until 4/20. Sales Excellence Award, Fanuc photo op 4/28." },
+      { title: "Events Page Updates (5 tradeshows)", status: "not-started", category: "active", owner: "Kathy/Leslie", target: "Kathy starts Mon 4/7, to Leslie by Wed 4/9", notes: "AIST (May), AUTOMATE (Jun), Med Tech Ireland (Sep), PackExpo (Oct), Automation Fair (Nov)" },
       { title: "Rockwell PartnerNetwork Article", status: "awaiting-client", category: "awaiting-client", waitingOn: "Daniel", notes: "Sent 4/2, asked for feedback by 4/3", staleDays: 4 },
       { title: "Texas Instruments Article", status: "awaiting-client", category: "awaiting-client", waitingOn: "Daniel", notes: "Copy doc sent 4/2", staleDays: 4 },
       { title: "Social Content (12 posts/mo)", status: "in-production", category: "active", owner: "Roz/Ronan", notes: "Full April copy went to creative, designs back Wed for Thu status" },
       { title: "Brand Guide v2 (secondary palette)", status: "blocked", category: "active", owner: "Lane", notes: "Blocked until New Capacity finalizes (4/8)" },
+      { title: "Certifications Page", status: "not-started", category: "active", waitingOn: "Daniel", notes: "Pending kickoff. Daniel to share info." },
+      { title: "Corporate PPT", status: "not-started", category: "active", waitingOn: "Daniel", notes: "Pending kickoff. Daniel to share certification info." },
+      { title: "Industry Vertical Campaigns", status: "not-started", category: "active", notes: "CDS vertical + Industrial/Battery Assembly. Connect with Jamie Nelson. Stakeholders: Bob, Jared." },
       { title: "Corporate Overview Brochure", status: "awaiting-client", category: "awaiting-client", waitingOn: "Daniel", staleDays: 60 },
       { title: "Life Sciences Brochure", status: "awaiting-client", category: "awaiting-client", waitingOn: "Nicole", staleDays: 60 },
       { title: "Social Media Templates", status: "awaiting-client", category: "awaiting-client", waitingOn: "Daniel/Nicole", staleDays: 18 },
@@ -123,7 +126,7 @@ export const accounts: AccountData[] = [
     items: [
       { title: "iFrame Provider Search", status: "in-production", category: "active", owner: "Leslie", target: "Launch evening 4/21, live 4/22", notes: "90% done, waiting on UHG iframe testing" },
       { title: "Payment Gateway Page", status: "in-production", category: "active", owner: "Leslie", notes: "Under signed $30K SOW, through May 2026" },
-      { title: "AARP Member Login + Landing Page", status: "not-started", category: "active", owner: "Josefina/Roz/Ronan/Lane", notes: "NOT STARTING until SOW signed. Launch 7/15." },
+      { title: "AARP Member Login + Landing Page", status: "not-started", category: "active", owner: "Josefina/Roz/Ronan/Lane", notes: "NOT STARTING until SOW signed. Launch 7/15. HIGH PRIORITY: contractor can't be held indefinitely." },
     ],
   },
   {
@@ -145,7 +148,8 @@ export const accounts: AccountData[] = [
     contractStatus: "unsigned",
     items: [
       { title: "Brand Refresh", status: "in-production", category: "active", notes: "In creative, coming out next week maybe" },
-      { title: "Impact Report — Dev", status: "in-production", category: "active", target: "Hard deadline 4/23 (code handoff)", notes: "Client 3 weeks late on content. Compressed timeline." },
+      { title: "Impact Report — Design", status: "in-production", category: "active", owner: "Paige", target: "4/8 Paige presents, 4/10 approval needed", notes: "Paige presenting designs 4/8. Bonterra approval by 4/10." },
+      { title: "Impact Report — Dev", status: "in-production", category: "active", owner: "Leslie", target: "4/10-4/22 dev window, HARD DEADLINE 4/23", notes: "Client 3 weeks late on content. Compressed timeline." },
       { title: "Impact Report — Publish", status: "not-started", category: "active", target: "5/11", notes: "Tight given the compression" },
     ],
   },
@@ -153,11 +157,89 @@ export const accounts: AccountData[] = [
     name: "High Desert Law",
     slug: "hdl",
     contractValue: "$73,000",
-    contractTerm: "Aug 2025 – Jan 2026",
+    contractTerm: "Aug 22, 2025 – Jan 31, 2026",
     contractStatus: "expired",
     items: [
-      { title: "Brand Story + Digital Experience", status: "blocked", category: "active", waitingOn: "Chris (copywriter)", notes: "SOW expired 1/31. Way behind. Eating cost." },
-      { title: "Brand Video / Photo Shoot", status: "not-started", category: "active", waitingOn: "Client availability", notes: "Client can't do shoot until May" },
+      { title: "Home Page Design", status: "completed", category: "completed", notes: "Done 2/25" },
+      { title: "Site Copy", status: "in-production", category: "active", waitingOn: "Chris (copywriter)", notes: "Due 3/26, late. Chris blocker." },
+      { title: "Site Copy Review", status: "not-started", category: "active", waitingOn: "HDL", target: "4/8", notes: "HDL to review" },
+      { title: "Full Site Design", status: "not-started", category: "active", target: "4/15", notes: "Civilization delivers" },
+      { title: "Full Site Design Approval", status: "not-started", category: "awaiting-client", waitingOn: "HDL", target: "4/22", notes: "Copy revisions to move to dev" },
+      { title: "Photo Shoot Prep", status: "not-started", category: "active", target: "4/15", notes: "Production book + shot list" },
+      { title: "Start Development", status: "not-started", category: "active", target: "5/1", notes: "After design approval" },
+      { title: "Schema/SEO/AIO", status: "not-started", category: "active" },
+      { title: "Ad Words", status: "not-started", category: "active", notes: "Jamie Lincoln (HDL side)" },
+      { title: "Smokeball Integration", status: "not-started", category: "active", notes: "Lead capture, form fields" },
+      { title: "Domain/URL + Webflow", status: "not-started", category: "active" },
+      { title: "Site Staging", status: "not-started", category: "active", notes: "Publish pages as complete" },
+      { title: "Production Shoot", status: "not-started", category: "active", target: "May", notes: "Client can't do shoot until May" },
+      { title: "Site Live", status: "not-started", category: "active", target: "6/30" },
+    ],
+  },
+  {
+    name: "TAP",
+    slug: "tap",
+    contractTerm: "Mar 1 – Nov 30, 2026",
+    contractStatus: "signed",
+    team: "Jason (lead), Tim (requirements)",
+    items: [
+      { title: "Discovery Session (3 days onsite)", status: "completed", category: "completed", owner: "Jason/Tim", notes: "Mount Pleasant, TN. Mid-March." },
+      { title: "Requirements Doc (SRD)", status: "in-production", category: "active", owner: "Tim/Jason", target: "Tue 4/7", notes: "Tim merging two versions into final for client" },
+      { title: "Travel Invoice ($2,723 actuals)", status: "not-started", category: "active", owner: "Allie", target: "Mon 4/6", notes: "Jason approved, Allie to send" },
+      { title: "TAP Reviews SRD + Greenlights", status: "not-started", category: "awaiting-client", waitingOn: "Kim Sproul", target: "After 4/7", notes: "Expect approval, scope unchanged" },
+      { title: "Database Design & Architecture", status: "not-started", category: "active", target: "Late March–Mid-April", notes: "2-3 weeks post-discovery" },
+      { title: "Development (8 modules)", status: "not-started", category: "active", target: "Mid-April–Mid-August", notes: "Iterative, module by module" },
+      { title: "Data Migration", status: "not-started", category: "active", target: "Mid-Aug–Late Aug", notes: "Access 97 to PostgreSQL" },
+      { title: "Testing & QA", status: "not-started", category: "active", target: "September", notes: "Civ QA + TAP UAT" },
+      { title: "Deployment & Go-Live", status: "not-started", category: "active", target: "Mid-October", notes: "Cloud or on-prem TBD" },
+      { title: "Training & Handoff", status: "not-started", category: "active", target: "Late October", notes: "All three orgs" },
+    ],
+  },
+  {
+    name: "Dave Asprey",
+    slug: "dave-asprey",
+    contractTerm: "Through Apr 30, 2026",
+    contractStatus: "signed",
+    team: "Allison (lead)",
+    items: [
+      { title: "Social Content — Wind Down", status: "in-production", category: "active", owner: "Allison", notes: "Daily posts + ManyChat flows weekdays, pre-scheduled weekends. Account ends EOM April." },
+      { title: "Disconnect Google Sheet from ManyChat", status: "not-started", category: "active", owner: "Jason", target: "Wed 4/29", notes: "Clean cutoff task" },
+    ],
+  },
+  {
+    name: "AG1",
+    slug: "ag1",
+    contractStatus: "unsigned",
+    team: "Jill (lead), Allison (strategy), Lane (CD), Kathy (copy), Sami (community mgmt)",
+    items: [
+      { title: "Social Content Trial", status: "not-started", category: "active", notes: "30-day trial. 5-7 posts/week, possibly clipping work. Verbal, SOW being drafted." },
+    ],
+  },
+  {
+    name: "EDF",
+    slug: "edf",
+    contractStatus: "unsigned",
+    team: "Jill (lead)",
+    items: [
+      { title: "TBD — Work may pick up w/o 4/13", status: "not-started", category: "active", notes: "Recent meeting to learn more. Need updates from Jill and Kathy." },
+    ],
+  },
+  {
+    name: "Wilsonart",
+    slug: "wilsonart",
+    contractStatus: "signed",
+    team: "Allison (lead), Lane (CD)",
+    items: [
+      { title: "Chester Videos", status: "in-production", category: "active", owner: "Lane", notes: "Wrapping up this week. TBD on campaign extension." },
+    ],
+  },
+  {
+    name: "ABM",
+    slug: "abm",
+    contractStatus: "unsigned",
+    team: "Jill (lead)",
+    items: [
+      { title: "RFP Response", status: "in-production", category: "active", owner: "Jill", notes: "Competing against 8 agencies. 30-min meeting held last week. Need scope + timeline from Jill." },
     ],
   },
 ];
@@ -178,6 +260,7 @@ export const thisWeek: WeekDayData[] = [
       { title: "Chase Daniel: Rockwell + TI articles", account: "Convergix", owner: "Kathy", type: "review" },
       { title: "AARP API meeting", account: "Soundly", type: "kickoff", notes: "Holds until SOW signed" },
       { title: "AARP Creative KO", account: "Soundly", type: "kickoff", notes: "Holds until SOW signed" },
+      { title: "TAP Travel Invoice — Allie to send", account: "TAP", owner: "Jason", type: "deadline", notes: "$2,723 actuals. Jason approved." },
     ],
   },
   {
@@ -186,6 +269,7 @@ export const thisWeek: WeekDayData[] = [
       { title: "CDS Messaging R1 to Daniel", account: "Convergix", owner: "Kathy", type: "deadline", notes: "Daniel reviews, feedback by 4/11" },
       { title: "New Capacity — deliver to JJ", account: "Convergix", owner: "Roz/Lane", type: "delivery" },
       { title: "LPPC copy expected (Permitting + FEMA)", account: "LPPC", type: "deadline", notes: "Design + dev starts after copy arrives" },
+      { title: "TAP Requirements Doc (SRD) to client", account: "TAP", owner: "Tim/Jason", type: "delivery", notes: "Tim merging two versions into final" },
     ],
   },
   {
@@ -194,6 +278,8 @@ export const thisWeek: WeekDayData[] = [
       { title: "Social designs back from Roz", account: "Convergix", owner: "Roz", type: "delivery", notes: "For Thursday status review" },
       { title: "New Capacity finalizes → Brand Guide v2 unblocked", account: "Convergix", owner: "Lane", type: "review" },
       { title: "Events Page copy to Leslie", account: "Convergix", owner: "Kathy", type: "deadline", notes: "Kathy writing Mon-Wed, handoff to dev" },
+      { title: "Bonterra — Paige presenting designs", account: "Bonterra", owner: "Paige", type: "delivery", notes: "Impact Report design presentation" },
+      { title: "HDL Site Copy Review", account: "High Desert Law", type: "review", notes: "HDL to review site copy" },
     ],
   },
   {
@@ -207,6 +293,7 @@ export const thisWeek: WeekDayData[] = [
     date: "2026-04-10", // Friday
     items: [
       { title: "Daniel feedback deadline on CDS Messaging", account: "Convergix", type: "deadline", notes: "Daniel may miss Friday — follow up Monday if needed" },
+      { title: "Bonterra approval needed", account: "Bonterra", type: "deadline", notes: "Impact Report designs. Dev window starts after approval." },
     ],
   },
 ];
@@ -219,6 +306,13 @@ export const upcoming: WeekDayData[] = [
     items: [
       { title: "LPPC Map R2", account: "LPPC", owner: "Roz/Leslie", type: "delivery", notes: "Based on minor R1 feedback" },
       { title: "CDS Messaging R2 (if feedback received)", account: "Convergix", type: "delivery" },
+    ],
+  },
+  {
+    date: "2026-04-15", // Tuesday
+    items: [
+      { title: "HDL Full Site Design — Civ delivers", account: "High Desert Law", type: "delivery", notes: "Civilization delivers full site design" },
+      { title: "HDL Photo Shoot Prep", account: "High Desert Law", type: "delivery", notes: "Production book + shot list" },
     ],
   },
   {
@@ -235,6 +329,12 @@ export const upcoming: WeekDayData[] = [
     ],
   },
   {
+    date: "2026-04-22", // Wednesday
+    items: [
+      { title: "HDL Full Site Design Approval", account: "High Desert Law", type: "deadline", notes: "HDL approves. Copy revisions to move to dev." },
+    ],
+  },
+  {
     date: "2026-04-23", // Thursday
     items: [
       { title: "Bonterra Impact Report — code handoff", account: "Bonterra", type: "deadline", notes: "Hard deadline. Client was 3 weeks late on content." },
@@ -247,9 +347,21 @@ export const upcoming: WeekDayData[] = [
     ],
   },
   {
+    date: "2026-04-29", // Tuesday
+    items: [
+      { title: "Disconnect Google Sheet from Dave ManyChat", account: "Dave Asprey", owner: "Jason", type: "deadline", notes: "Clean cutoff task" },
+    ],
+  },
+  {
     date: "2026-04-30", // Wed — end of April
     items: [
       { title: "Hopdoddy Brand Refresh Website launch", account: "Hopdoddy", owner: "Leslie", type: "launch", notes: "National Burger Day timing" },
+    ],
+  },
+  {
+    date: "2026-05-01", // Thursday
+    items: [
+      { title: "HDL Start Development", account: "High Desert Law", type: "kickoff", notes: "After design approval" },
     ],
   },
   {
@@ -289,7 +401,7 @@ export const pipeline: PipelineData[] = [
     value: "$31,400",
     status: "no-sow",
     waitingOn: "Soundly to sign",
-    notes: "Not starting until signed. Launch 7/15.",
+    notes: "Not starting until signed. Launch 7/15. HIGH PRIORITY.",
   },
   {
     account: "Beyond Petrochemicals",
@@ -322,5 +434,13 @@ export const pipeline: PipelineData[] = [
     status: "drafting",
     waitingOn: "Jill drafting scope",
     notes: "Client wants ASAP. Scope TBD.",
+  },
+  {
+    account: "AG1",
+    title: "Social Content Trial",
+    value: "$30,000",
+    status: "drafting",
+    waitingOn: "SOW to be drafted",
+    notes: "30-day trial. Potential $30K/mo annual retainer if successful.",
   },
 ];
