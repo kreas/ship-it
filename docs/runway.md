@@ -114,6 +114,33 @@ page.tsx (RSC)
 
 `groupByWeek(days)` groups upcoming day columns by their week's Monday, rendering each group under an "Upcoming w/o M/D" header (e.g., "Upcoming w/o 4/13"). This visually separates weeks in the Upcoming section.
 
+### Card Hierarchy
+
+`DayItemCard` renders fields in this order: account name (uppercase, prominent), project/task title, owner (if present), notes. The type tag (delivery, review, kickoff, etc.) appears on the right. Both `sm` (day columns) and `lg` (today section) sizes share the same `ACCOUNT_CLASS` constant for the account label.
+
+### Scroll Constraints
+
+Day columns use `max-h-[60vh] overflow-y-auto` so they scroll internally instead of growing infinitely. The Today section uses `max-h-[70vh]`. This keeps the TV display readable when a day has many items.
+
+### Account View
+
+`AccountSection` shows projects as divider-separated sections (border-t between items) sorted by target date. Key behaviors:
+
+- **Date sorting**: `targetSortKey()` parses `M/D` patterns from free-text target strings. Items with no parseable date sort to the end.
+- **Short date display**: `extractDate()` pulls the first `M/D` from the target and shows it on the right side of each project card.
+- **Contract label expansion**: `formatContractTerm()` expands abbreviations (MSA, SOW, NDA) in contract term strings for readability.
+- **Graceful nulls**: Missing `contractValue` or `contractTerm` fields are simply not rendered (no empty elements).
+
+Both `targetSortKey` and `extractDate` share a single `DATE_PATTERN` regex.
+
+### Pipeline View
+
+`PipelineRow` displays unsigned SOWs with these behaviors:
+
+- **Status labels**: `no-sow` displays as "Drafting" (same label as `drafting`, different color). `sow-sent` displays as "SOW Sent", `verbal` as "Verbal".
+- **Waiting on fallback**: `getWaitingOnDisplay()` returns the explicit `waitingOn` name if set. For `sow-sent` and `verbal` statuses without a name, falls back to "Client". Other statuses show nothing.
+- **Next Steps prefix**: Notes are shown with a "Next Steps:" label prefix.
+
 ### Shared Display Components
 
 `status-badge.tsx` exports reusable badge and label components:
@@ -227,6 +254,7 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/app/runway/runway-board.tsx` | Board client component (3 views) |
 | `src/app/runway/queries.ts` | Board-specific DB queries |
 | `src/app/runway/date-utils.ts` | `parseISODate`, `getMondayISODate` |
+| `src/app/runway/components/day-item-card.tsx` | Card component (account-first hierarchy, blocked override) |
 | `src/app/runway/components/status-badge.tsx` | Shared badge and label components |
 | `src/app/runway/data.ts` | Seed data (13 clients, typed exports) |
 | `scripts/seed-runway.ts` | Seed script (imports from date-utils) |
