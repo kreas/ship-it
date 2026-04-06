@@ -1,7 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { RunwayBoard } from "./runway-board";
 import { thisWeek, upcoming, accounts, pipeline } from "./runway-board-test-fixtures";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 const defaultProps = { thisWeek, upcoming, accounts, pipeline };
 

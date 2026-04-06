@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { DayItem, Account, PipelineItem } from "./types";
 import { parseISODate } from "./date-utils";
+
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 import { DayColumn } from "./components/day-column";
 import { TodaySection } from "./components/today-section";
 import { AccountSection } from "./components/account-section";
@@ -29,7 +32,13 @@ export function RunwayBoard({
   accounts,
   pipeline,
 }: RunwayBoardProps) {
+  const router = useRouter();
   const [view, setView] = useState<View>("triage");
+
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [router]);
 
   const pipelineTotal = useMemo(
     () =>
