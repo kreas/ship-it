@@ -4,12 +4,12 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { DayItem, Account, PipelineItem } from "./types";
 import { parseISODate, getMondayISODate } from "./date-utils";
-
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 import { DayColumn } from "./components/day-column";
 import { TodaySection } from "./components/today-section";
 import { AccountSection } from "./components/account-section";
 import { PipelineRow } from "./components/pipeline-row";
+
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 type View = "triage" | "accounts" | "pipeline";
 

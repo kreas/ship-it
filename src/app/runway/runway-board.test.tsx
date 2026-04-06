@@ -1,11 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { RunwayBoard, mergeWeekendDays, groupByWeek } from "./runway-board";
 import { thisWeek, upcoming, accounts, pipeline } from "./runway-board-test-fixtures";
 import type { DayItem } from "./types";
 
+const mockRefresh = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
 
 const defaultProps = { thisWeek, upcoming, accounts, pipeline };
@@ -131,6 +132,19 @@ describe("RunwayBoard", () => {
     fireEvent.click(screen.getByText("By Account"));
     // Should not crash, just render empty
     expect(screen.queryByText("Convergix")).not.toBeInTheDocument();
+  });
+
+  it("calls router.refresh on 5-minute interval", () => {
+    vi.useFakeTimers();
+    mockRefresh.mockClear();
+    render(<RunwayBoard {...defaultProps} />);
+
+    expect(mockRefresh).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    expect(mockRefresh).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 });
 
