@@ -4,14 +4,15 @@ import { useMemo } from "react";
 import type { Account, TriageItem } from "../types";
 import { StatusBadge, StaleBadge, ContractBadge, MetadataLabel } from "./status-badge";
 
+const DATE_PATTERN = /(\d{1,2})\/(\d{1,2})/;
+
 /**
  * Parse a target string like "4/11", "w/o 4/20", "Late March", "May" into a sortable value.
  * Returns a large number for unparseable values so they sort to the end.
  */
 function targetSortKey(target?: string): number {
   if (!target) return 99999;
-  // Match patterns like "4/7", "4/11", "5/1", etc.
-  const match = target.match(/(\d{1,2})\/(\d{1,2})/);
+  const match = target.match(DATE_PATTERN);
   if (match) return parseInt(match[1]) * 100 + parseInt(match[2]);
   return 99998;
 }
@@ -19,8 +20,8 @@ function targetSortKey(target?: string): number {
 /** Extract a short date like "4/11" from a target string, if one exists. */
 function extractDate(target?: string): string | null {
   if (!target) return null;
-  const match = target.match(/\d{1,2}\/\d{1,2}/);
-  return match ? match[0] : null;
+  const match = target.match(DATE_PATTERN);
+  return match ? `${match[1]}/${match[2]}` : null;
 }
 
 /**

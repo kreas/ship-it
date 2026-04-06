@@ -127,4 +127,19 @@ describe("PipelineRow", () => {
     render(<PipelineRow item={createItem({ account: "" })} />);
     expect(screen.getByText("New SOW")).toBeInTheDocument();
   });
+
+  it("shows explicit waitingOn for no-sow status instead of fallback", () => {
+    render(
+      <PipelineRow item={createItem({ status: "no-sow", waitingOn: "Soundly to sign" })} />
+    );
+    expect(screen.getByText("Waiting on: Soundly to sign")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting on: Client")).not.toBeInTheDocument();
+  });
+
+  it("does not show waiting on fallback for no-sow without waitingOn", () => {
+    render(
+      <PipelineRow item={createItem({ status: "no-sow", waitingOn: undefined })} />
+    );
+    expect(screen.queryByText(/Waiting on/)).not.toBeInTheDocument();
+  });
 });

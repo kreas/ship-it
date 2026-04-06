@@ -19,10 +19,11 @@ interface DayItemCardProps {
   size?: "sm" | "lg";
 }
 
+const ACCOUNT_CLASS = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+
 const SIZE_CLASSES = {
   sm: {
     card: "rounded-lg border border-border/50 bg-background/50 p-3",
-    account: "text-xs font-semibold uppercase tracking-wide text-muted-foreground",
     title: "mt-0.5 text-sm font-medium leading-snug text-foreground",
     meta: "mt-1 flex flex-wrap items-center gap-2",
     metaText: "text-xs text-muted-foreground",
@@ -31,7 +32,6 @@ const SIZE_CLASSES = {
   },
   lg: {
     card: "rounded-xl border border-sky-500/30 bg-sky-500/5 p-4",
-    account: "text-xs font-semibold uppercase tracking-wide text-muted-foreground",
     title: "mt-0.5 text-base font-medium leading-snug text-foreground",
     meta: "mt-2 flex flex-wrap items-center gap-2",
     metaText: "text-sm text-muted-foreground",
@@ -48,7 +48,7 @@ export function DayItemCard({ item, size = "sm" }: DayItemCardProps) {
     <div className={s.card}>
       <div className={`flex items-start justify-between ${s.gap}`}>
         <div className="min-w-0 flex-1">
-          <p className={s.account}>{item.account}</p>
+          <p className={ACCOUNT_CLASS}>{item.account}</p>
           <p className={s.title}>{item.title}</p>
           {item.owner ? (
             <div className={s.meta}>

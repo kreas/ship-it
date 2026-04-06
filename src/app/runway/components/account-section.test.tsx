@@ -237,4 +237,55 @@ describe("AccountSection", () => {
     );
     expect(screen.queryByText(/Feb/)).not.toBeInTheDocument();
   });
+
+  it("sorts items with unparseable targets before no-target items", () => {
+    const { container } = render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            { id: "p1", title: "No Date", status: "in-production", category: "active" },
+            { id: "p2", title: "Vague", status: "in-production", category: "active", target: "Late March" },
+            { id: "p3", title: "Exact", status: "in-production", category: "active", target: "4/15" },
+          ],
+        })}
+      />
+    );
+    const text = container.textContent!;
+    expect(text.indexOf("Exact")).toBeLessThan(text.indexOf("Vague"));
+    expect(text.indexOf("Vague")).toBeLessThan(text.indexOf("No Date"));
+  });
+
+  it("sorts by first date when target has a date range", () => {
+    const { container } = render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            { id: "p1", title: "Later", status: "in-production", category: "active", target: "4/10-4/22 dev window" },
+            { id: "p2", title: "Earlier", status: "in-production", category: "active", target: "4/8" },
+          ],
+        })}
+      />
+    );
+    const text = container.textContent!;
+    expect(text.indexOf("Earlier")).toBeLessThan(text.indexOf("Later"));
+  });
+
+  it("does not show short date for text-only targets", () => {
+    render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            { id: "p1", title: "Vague Item", status: "in-production", category: "active", target: "Late March" },
+          ],
+        })}
+      />
+    );
+    // Should show the full target in metadata but no short date on the right
+    expect(screen.getByText("Target: Late March")).toBeInTheDocument();
+    // No standalone short date element
+    const allText = screen.getByText("Vague Item").closest("div")!.parentElement!;
+    const spans = Array.from(allText.querySelectorAll("span"));
+    const dateSpans = spans.filter((s) => /^\d{1,2}\/\d{1,2}$/.test(s.textContent ?? ""));
+    expect(dateSpans).toHaveLength(0);
+  });
 });

@@ -10,7 +10,6 @@ export function DayColumn({
   day: DayItem;
   isToday?: boolean;
 }) {
-
   return (
     <div
       className={`rounded-xl border p-4 ${
