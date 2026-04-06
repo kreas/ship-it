@@ -56,7 +56,7 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 
 | File | Purpose |
 |------|---------|
-| `operations.ts` | Shared queries (client cache, name map, fuzzy match), re-exports from split modules |
+| `operations.ts` | Shared queries (client cache, name map, fuzzy match), utilities (`groupBy`, `clientNotFoundError`), re-exports from split modules |
 | `operations-reads.ts` | Read operations: clients with counts, filtered projects, week items, pipeline |
 | `operations-writes.ts` | Status updates with idempotency and audit logging |
 | `operations-add.ts` | New projects and free-form updates |
@@ -65,6 +65,13 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 ### Client Cache
 
 `operations.ts` uses a 5-second in-memory cache for client rows to avoid repeated DB round-trips within a single request. The cache expires so concurrent requests don't serve stale data.
+
+### Shared Utilities
+
+`operations.ts` exports two helpers used across write modules:
+
+- `clientNotFoundError(slug)` — standard error result for missing clients (used by writes + add operations)
+- `groupBy(items, keyFn)` — generic array grouping (used by reads and board queries)
 
 ### Idempotency
 
@@ -85,11 +92,22 @@ Server-rendered page at `/runway` with three client-side views:
 ```
 page.tsx (RSC)
   → Promise.all([getClientsWithProjects(), getWeekItems(), getPipeline()])
+  → Splits week items into thisWeek/upcoming by current Monday
   → Maps DB shapes to UI types (src/app/runway/types.ts)
   → RunwayBoard (client component)
+    → Pre-computes todayColumn, restOfWeek from thisWeek
     → Tab state selects view
     → Leaf components render data
 ```
+
+### Shared Display Components
+
+`status-badge.tsx` exports reusable badge and label components:
+
+- `StatusBadge` — project status (in-production, blocked, etc.)
+- `ContractBadge` — contract state (expired, unsigned)
+- `StaleBadge` — stale-days indicator
+- `MetadataLabel` — "Label: Value" pattern with configurable color (used by AccountSection and PipelineRow)
 
 ### Types
 
@@ -187,11 +205,13 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/lib/slack/bot-tools.ts` | Bot tool definitions |
 | `src/lib/slack/verify.ts` | Slack signature verification |
 | `src/lib/slack/updates-channel.ts` | Updates channel posting |
-| `src/app/runway/page.tsx` | Board page (RSC) |
-| `src/app/runway/runway-board.tsx` | Board client component |
+| `src/app/runway/page.tsx` | Board page (RSC, data transformation) |
+| `src/app/runway/runway-board.tsx` | Board client component (3 views) |
 | `src/app/runway/queries.ts` | Board-specific DB queries |
-| `src/app/runway/data.ts` | Seed data for database |
-| `scripts/seed-runway.ts` | Seed script |
+| `src/app/runway/date-utils.ts` | `parseISODate`, `getMondayISODate` |
+| `src/app/runway/components/status-badge.tsx` | Shared badge and label components |
+| `src/app/runway/data.ts` | Seed data (13 clients, typed exports) |
+| `scripts/seed-runway.ts` | Seed script (imports from date-utils) |
 
 ## Related Documentation
 
