@@ -94,10 +94,12 @@ describe("RunwayBoard", () => {
   });
 
   it("hides This Week section when restOfWeek is empty", () => {
-    // Only today's items, no other days
+    // Use local date to match how the component detects "today"
+    const now = new Date();
+    const localISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const todayOnly: typeof thisWeek = [
       {
-        date: new Date().toISOString().split("T")[0],
+        date: localISO,
         label: "Mon 4/6",
         items: [{ title: "Today Thing", account: "Test", type: "delivery" }],
       },
