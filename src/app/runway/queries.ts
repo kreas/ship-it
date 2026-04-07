@@ -31,6 +31,7 @@ function mapWeekItemToEntry(
     title: item.title,
     account: item.clientId ? (clientNameById.get(item.clientId) ?? "") : "",
     ...(item.owner ? { owner: item.owner } : {}),
+    ...(item.resources ? { resources: item.resources } : {}),
     type: (item.category ?? "delivery") as DayItemType,
     ...(item.notes ? { notes: item.notes } : {}),
   };

@@ -29,6 +29,9 @@ function formatContractTerm(term?: string): string | undefined {
 }
 
 function ProjectCard({ item }: { item: TriageItem }) {
+  const showOwnerSeparately = item.owner && item.resources && item.resources !== item.owner;
+  const displayResources = item.resources ?? item.owner;
+
   return (
     <div className="border-t border-border/30 py-3 first:border-t-0 first:pt-0">
       <div className="min-w-0">
@@ -38,8 +41,11 @@ function ProjectCard({ item }: { item: TriageItem }) {
           {item.staleDays ? <StaleBadge days={item.staleDays} /> : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {item.owner ? (
-            <MetadataLabel label="Owner" value={item.owner} />
+          {displayResources ? (
+            <MetadataLabel label="Resources" value={displayResources} />
+          ) : null}
+          {showOwnerSeparately ? (
+            <MetadataLabel label="Owner" value={item.owner!} className="text-xs text-muted-foreground/50" />
           ) : null}
           {item.waitingOn ? (
             <MetadataLabel label="Waiting on" value={item.waitingOn} className="text-xs text-amber-400/80" />

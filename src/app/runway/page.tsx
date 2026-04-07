@@ -50,6 +50,7 @@ export default async function RunwayPage() {
       status: (p.status ?? "not-started") as ItemStatus,
       category: (p.category ?? "active") as ItemCategory,
       owner: p.owner ?? undefined,
+      resources: p.resources ?? undefined,
       waitingOn: p.waitingOn ?? undefined,
       target: p.target ?? undefined,
       notes: p.notes ?? undefined,
@@ -66,6 +67,7 @@ export default async function RunwayPage() {
       | "drafting"
       | "no-sow"
       | "verbal",
+    owner: p.owner ?? undefined,
     waitingOn: p.waitingOn ?? undefined,
     notes: p.notes ?? undefined,
   }));

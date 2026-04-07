@@ -129,9 +129,51 @@ describe("AccountSection", () => {
         })}
       />
     );
-    expect(screen.getByText("Owner: Kathy")).toBeInTheDocument();
+    expect(screen.getByText("Resources: Kathy")).toBeInTheDocument();
     expect(screen.getByText("Target: 4/11")).toBeInTheDocument();
     expect(screen.getByText("Gate for content")).toBeInTheDocument();
+  });
+
+  it("shows resources prominently and owner muted when they differ", () => {
+    render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            {
+              id: "p1",
+              title: "Team Item",
+              status: "in-production",
+              category: "active",
+              owner: "Kathy",
+              resources: "Kathy + Lane",
+            },
+          ],
+        })}
+      />
+    );
+    expect(screen.getByText("Resources: Kathy + Lane")).toBeInTheDocument();
+    expect(screen.getByText("Owner: Kathy")).toBeInTheDocument();
+  });
+
+  it("shows only resources when resources equals owner", () => {
+    render(
+      <AccountSection
+        account={createAccount({
+          items: [
+            {
+              id: "p1",
+              title: "Solo Item",
+              status: "in-production",
+              category: "active",
+              owner: "Kathy",
+              resources: "Kathy",
+            },
+          ],
+        })}
+      />
+    );
+    expect(screen.getByText("Resources: Kathy")).toBeInTheDocument();
+    expect(screen.queryByText("Owner: Kathy")).not.toBeInTheDocument();
   });
 
   it("does not render database IDs in active items", () => {

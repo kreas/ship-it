@@ -48,6 +48,26 @@ describe("DayColumn", () => {
         })}
       />
     );
+    expect(screen.getByText("Resources: Kathy")).toBeInTheDocument();
+  });
+
+  it("shows resources and muted owner when they differ", () => {
+    render(
+      <DayColumn
+        day={createDay({
+          items: [
+            {
+              title: "Team Kickoff",
+              account: "LPPC",
+              owner: "Kathy",
+              resources: "Kathy + Lane",
+              type: "kickoff",
+            },
+          ],
+        })}
+      />
+    );
+    expect(screen.getByText("Resources: Kathy + Lane")).toBeInTheDocument();
     expect(screen.getByText("Owner: Kathy")).toBeInTheDocument();
   });
 

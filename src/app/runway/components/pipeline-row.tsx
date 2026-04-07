@@ -46,6 +46,9 @@ export function PipelineRow({ item }: { item: PipelineItem }) {
           <span className="text-sm text-foreground/80">{item.title}</span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {item.owner ? (
+            <MetadataLabel label="Owner" value={item.owner} className="text-xs text-muted-foreground/50" />
+          ) : null}
           {waitingOn ? (
             <MetadataLabel label="Waiting on" value={waitingOn} />
           ) : null}

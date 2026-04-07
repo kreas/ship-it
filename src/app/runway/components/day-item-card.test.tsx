@@ -20,14 +20,35 @@ describe("DayItemCard", () => {
     expect(screen.getByText("review")).toBeInTheDocument();
   });
 
-  it("renders owner with MetadataLabel when present", () => {
+  it("renders owner as resources when no resources field", () => {
     render(<DayItemCard item={createEntry({ owner: "Kathy" })} />);
+    expect(screen.getByText("Resources: Kathy")).toBeInTheDocument();
+  });
+
+  it("does not render resources or owner when both absent", () => {
+    render(<DayItemCard item={createEntry()} />);
+    expect(screen.queryByText(/Resources:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Owner:/)).not.toBeInTheDocument();
+  });
+
+  it("shows resources prominently and owner muted when they differ", () => {
+    render(
+      <DayItemCard
+        item={createEntry({ owner: "Kathy", resources: "Kathy + Lane" })}
+      />
+    );
+    expect(screen.getByText("Resources: Kathy + Lane")).toBeInTheDocument();
     expect(screen.getByText("Owner: Kathy")).toBeInTheDocument();
   });
 
-  it("does not render owner when absent", () => {
-    render(<DayItemCard item={createEntry()} />);
-    expect(screen.queryByText(/Owner:/)).not.toBeInTheDocument();
+  it("shows only resources when resources equals owner", () => {
+    render(
+      <DayItemCard
+        item={createEntry({ owner: "Kathy", resources: "Kathy" })}
+      />
+    );
+    expect(screen.getByText("Resources: Kathy")).toBeInTheDocument();
+    expect(screen.queryByText("Owner: Kathy")).not.toBeInTheDocument();
   });
 
   it("renders notes when present", () => {
