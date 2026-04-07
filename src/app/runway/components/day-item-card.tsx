@@ -1,7 +1,7 @@
 "use client";
 
 import type { DayItemEntry, DayItemType } from "../types";
-import { TYPE_INDICATORS } from "./status-badge";
+import { TYPE_INDICATORS, MetadataLabel } from "./status-badge";
 
 const HOLD_PATTERN = /\b(hold[s]?\s+until|on\s+hold|blocked|not\s+starting\s+until)\b/i;
 
@@ -52,7 +52,7 @@ export function DayItemCard({ item, size = "sm" }: DayItemCardProps) {
           <p className={s.title}>{item.title}</p>
           {item.owner ? (
             <div className={s.meta}>
-              <span className={s.metaText}>{item.owner}</span>
+              <MetadataLabel label="Owner" value={item.owner} className={s.metaText} />
             </div>
           ) : null}
           {item.notes ? <p className={s.notes}>{item.notes}</p> : null}

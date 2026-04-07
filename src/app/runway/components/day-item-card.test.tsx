@@ -20,14 +20,14 @@ describe("DayItemCard", () => {
     expect(screen.getByText("review")).toBeInTheDocument();
   });
 
-  it("renders owner when present", () => {
+  it("renders owner with MetadataLabel when present", () => {
     render(<DayItemCard item={createEntry({ owner: "Kathy" })} />);
-    expect(screen.getByText("Kathy")).toBeInTheDocument();
+    expect(screen.getByText("Owner: Kathy")).toBeInTheDocument();
   });
 
   it("does not render owner when absent", () => {
     render(<DayItemCard item={createEntry()} />);
-    expect(screen.queryByText("Kathy")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Owner:/)).not.toBeInTheDocument();
   });
 
   it("renders notes when present", () => {

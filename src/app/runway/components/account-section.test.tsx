@@ -198,7 +198,7 @@ describe("AccountSection", () => {
     expect(laterIdx).toBeLessThan(noDateIdx);
   });
 
-  it("shows short date on cards with target dates", () => {
+  it("shows target date via MetadataLabel", () => {
     render(
       <AccountSection
         account={createAccount({
@@ -208,7 +208,7 @@ describe("AccountSection", () => {
         })}
       />
     );
-    expect(screen.getByText("4/7")).toBeInTheDocument();
+    expect(screen.getByText("Target: R1 to Daniel 4/7")).toBeInTheDocument();
   });
 
   it("expands MSA abbreviation in contract terms", () => {
@@ -270,7 +270,7 @@ describe("AccountSection", () => {
     expect(text.indexOf("Earlier")).toBeLessThan(text.indexOf("Later"));
   });
 
-  it("does not show short date for text-only targets", () => {
+  it("shows full target text via MetadataLabel for text-only targets", () => {
     render(
       <AccountSection
         account={createAccount({
@@ -280,12 +280,6 @@ describe("AccountSection", () => {
         })}
       />
     );
-    // Should show the full target in metadata but no short date on the right
     expect(screen.getByText("Target: Late March")).toBeInTheDocument();
-    // No standalone short date element
-    const allText = screen.getByText("Vague Item").closest("div")!.parentElement!;
-    const spans = Array.from(allText.querySelectorAll("span"));
-    const dateSpans = spans.filter((s) => /^\d{1,2}\/\d{1,2}$/.test(s.textContent ?? ""));
-    expect(dateSpans).toHaveLength(0);
   });
 });
