@@ -92,9 +92,25 @@ export async function handleDirectMessage(
     // Proactive follow-up: if user leads accounts, nudge about stale items
     if (teamMemberRecord?.accountsLed?.length) {
       try {
+        // Collect project names the bot just updated so we don't nag about them
+        const updatedProjects: string[] = [];
+        for (const step of result.steps) {
+          for (const call of step.toolCalls) {
+            if (
+              (call.toolName === "update_project_status" || call.toolName === "add_update") &&
+              call.input &&
+              typeof call.input === "object" &&
+              "projectName" in call.input &&
+              typeof call.input.projectName === "string"
+            ) {
+              updatedProjects.push(call.input.projectName);
+            }
+          }
+        }
+
         const staleItems = await getStaleItemsForAccounts(teamMemberRecord.accountsLed);
         if (staleItems.length > 0) {
-          const followUp = formatProactiveFollowUp(staleItems);
+          const followUp = formatProactiveFollowUp(staleItems, updatedProjects);
           if (followUp) {
             await slack.chat.postMessage({
               channel: channelId,

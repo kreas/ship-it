@@ -56,6 +56,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "Got it, marked as complete.",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -73,6 +74,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "Hi Kathy",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");
@@ -103,6 +105,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");
@@ -126,6 +129,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -139,6 +143,7 @@ describe("handleDirectMessage", () => {
     const { generateText, stepCountIs } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -151,6 +156,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -166,6 +172,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "I see the image",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -184,6 +191,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "That's a screenshot",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -201,6 +209,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -214,6 +223,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -229,6 +239,7 @@ describe("handleDirectMessage", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -244,6 +255,7 @@ describe("buildBotSystemPrompt integration", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");
@@ -277,6 +289,7 @@ describe("buildBotSystemPrompt integration", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const { handleDirectMessage } = await import("./bot");
@@ -296,6 +309,7 @@ describe("proactive follow-up", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "Got it, updated.",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");
@@ -313,10 +327,38 @@ describe("proactive follow-up", () => {
     expect(mockPostMessage.mock.calls[1][0].thread_ts).toBe("ts123");
   });
 
+  it("excludes just-updated projects from proactive follow-up", async () => {
+    const { generateText } = await import("ai");
+    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      text: "Updated CDS.",
+      steps: [{
+        toolCalls: [{
+          toolName: "update_project_status",
+          input: { clientSlug: "convergix", projectName: "CDS Messaging", newStatus: "completed" },
+        }],
+      }],
+    });
+
+    const ops = await import("@/lib/runway/operations");
+    (ops.getStaleItemsForAccounts as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { clientName: "Convergix", projectName: "CDS Messaging", staleDays: 10 },
+      { clientName: "Convergix", projectName: "Old Brochure", staleDays: 20 },
+    ]);
+
+    const { handleDirectMessage } = await import("./bot");
+    await handleDirectMessage("U12345", "D67890", "CDS is done", "ts123");
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(2);
+    const followUpText = mockPostMessage.mock.calls[1][0].text;
+    expect(followUpText).not.toContain("CDS Messaging");
+    expect(followUpText).toContain("Old Brochure");
+  });
+
   it("does NOT send follow-up when no stale items exist", async () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "Done.",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");
@@ -333,6 +375,7 @@ describe("proactive follow-up", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "response",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");
@@ -355,6 +398,7 @@ describe("proactive follow-up", () => {
     const { generateText } = await import("ai");
     (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: "Done.",
+      steps: [{ toolCalls: [] }],
     });
 
     const ops = await import("@/lib/runway/operations");

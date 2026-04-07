@@ -10,7 +10,7 @@
 
 import { createHash } from "crypto";
 import type { Account, DayItem, PipelineItem } from "@/app/runway/types";
-import { parseISODate } from "@/app/runway/date-utils";
+import { parseISODate, toISODateString } from "@/app/runway/date-utils";
 
 export type FlagSeverity = "critical" | "warning" | "info";
 export type FlagType = "resource-conflict" | "stale" | "deadline" | "bottleneck";
@@ -113,10 +113,10 @@ function detectStaleItems(accounts: Account[]): RunwayFlag[] {
  */
 function detectDeadlines(thisWeek: DayItem[]): RunwayFlag[] {
   const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayStr = toISODateString(now);
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const tomorrowStr = toISODateString(tomorrow);
 
   const flags: RunwayFlag[] = [];
   for (const day of thisWeek) {

@@ -24,3 +24,11 @@ export function getMonday(date: Date): Date {
 export function getMondayISODate(date: Date): string {
   return getMonday(date).toISOString().split("T")[0];
 }
+
+/**
+ * Format a Date as a local ISO date string (YYYY-MM-DD).
+ * Uses local time, not UTC, to avoid timezone shifts.
+ */
+export function toISODateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}

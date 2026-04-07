@@ -2,24 +2,21 @@
 
 import type { RunwayFlag, FlagSeverity } from "@/lib/runway/flags";
 
-const SEVERITY_STYLES: Record<FlagSeverity, { icon: string; border: string; text: string; badge: string }> = {
+const SEVERITY_STYLES: Record<FlagSeverity, { icon: string; border: string; text: string }> = {
   critical: {
     icon: "text-red-400",
     border: "border-red-500/30",
     text: "text-red-300",
-    badge: "bg-red-500/20 text-red-300",
   },
   warning: {
     icon: "text-amber-400",
     border: "border-amber-500/30",
     text: "text-amber-300",
-    badge: "bg-amber-500/20 text-amber-300",
   },
   info: {
     icon: "text-sky-400",
     border: "border-sky-500/30",
     text: "text-sky-300",
-    badge: "bg-sky-500/20 text-sky-300",
   },
 };
 

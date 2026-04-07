@@ -14,8 +14,9 @@ vi.mock("./queries", () => ({
   getStaleWeekItems: () => mockGetStaleWeekItems(),
 }));
 
+const mockAnalyzeFlags = vi.fn().mockReturnValue([]);
 vi.mock("@/lib/runway/flags", () => ({
-  analyzeFlags: vi.fn().mockReturnValue([]),
+  analyzeFlags: (...args: unknown[]) => mockAnalyzeFlags(...args),
 }));
 
 vi.mock("./runway-board", () => ({
@@ -172,5 +173,42 @@ describe("RunwayPage", () => {
     const props = JSON.parse(screen.getByTestId("runway-board").getAttribute("data-props")!);
     expect(props.thisWeek).toHaveLength(1);
     expect(props.upcoming).toHaveLength(0);
+  });
+
+  it("passes flags from analyzeFlags to RunwayBoard", async () => {
+    const mockFlags = [{ id: "f1", type: "stale", severity: "warning", title: "Old", detail: "stale 14d" }];
+    mockAnalyzeFlags.mockReturnValue(mockFlags);
+    mockGetClientsWithProjects.mockResolvedValue([client]);
+    mockGetWeekItems.mockResolvedValue([weekDay]);
+    mockGetPipeline.mockResolvedValue([]);
+
+    const el = await RunwayPage();
+    render(el);
+
+    const props = JSON.parse(screen.getByTestId("runway-board").getAttribute("data-props")!);
+    expect(props.flags).toEqual(mockFlags);
+    expect(mockAnalyzeFlags).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ name: "Convergix" })]),
+      expect.any(Array),
+      expect.any(Array),
+      expect.any(Array)
+    );
+  });
+
+  it("passes staleItems from getStaleWeekItems to RunwayBoard", async () => {
+    const staleDay = {
+      date: "2026-04-05", label: "Sun 4/5",
+      items: [{ title: "Stale Item", account: "Test", type: "review" }],
+    };
+    mockGetStaleWeekItems.mockResolvedValue([staleDay]);
+    mockGetClientsWithProjects.mockResolvedValue([]);
+    mockGetWeekItems.mockResolvedValue([]);
+    mockGetPipeline.mockResolvedValue([]);
+
+    const el = await RunwayPage();
+    render(el);
+
+    const props = JSON.parse(screen.getByTestId("runway-board").getAttribute("data-props")!);
+    expect(props.staleItems).toEqual([staleDay]);
   });
 });

@@ -145,7 +145,7 @@ export function RunwayBoard({
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-4 2xl:px-10">
+        <div className="mx-auto flex max-w-[1800px] items-center justify-between px-6 py-4 2xl:px-10">
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
             Civilization Runway
           </h1>

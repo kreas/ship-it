@@ -214,4 +214,21 @@ describe("getStaleWeekItems", () => {
 
     vi.useRealTimers();
   });
+
+  it("treats items without projectId as always stale", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-07T12:00:00"));
+
+    // Item with no projectId — should always be stale regardless of updates
+    mockResults.push([createWeekItem({ date: "2026-04-06", projectId: null })]);
+    mockResults.push([]);
+
+    const { getStaleWeekItems } = await import("./queries");
+    const result = await getStaleWeekItems();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].items[0].title).toBe("CDS Review");
+
+    vi.useRealTimers();
+  });
 });
