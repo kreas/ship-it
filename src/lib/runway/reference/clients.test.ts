@@ -21,6 +21,36 @@ describe("CLIENT_REFERENCES", () => {
       expect(client.nicknames.length).toBeGreaterThanOrEqual(1);
     }
   });
+
+  it("every client has a non-empty fullName", () => {
+    for (const client of CLIENT_REFERENCES) {
+      expect(client.fullName.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("slugs are lowercase kebab-case", () => {
+    for (const client of CLIENT_REFERENCES) {
+      expect(client.slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+    }
+  });
+
+  it("contacts have non-empty names when present", () => {
+    for (const client of CLIENT_REFERENCES) {
+      for (const contact of client.contacts) {
+        expect(contact.name.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("nicknames include the fullName or a short form", () => {
+    for (const client of CLIENT_REFERENCES) {
+      // Each client should be findable by at least one of its nicknames
+      expect(client.nicknames.length).toBeGreaterThanOrEqual(1);
+      for (const nick of client.nicknames) {
+        expect(nick.length).toBeGreaterThan(0);
+      }
+    }
+  });
 });
 
 describe("getClientReference", () => {
@@ -62,6 +92,22 @@ describe("findClientByNickname", () => {
 
   it("returns undefined for unknown nickname", () => {
     expect(findClientByNickname("FakeClient")).toBeUndefined();
+  });
+
+  it("returns undefined for empty string", () => {
+    expect(findClientByNickname("")).toBeUndefined();
+  });
+
+  it("finds Hopdoddy by short nickname Hop", () => {
+    const ref = findClientByNickname("Hop");
+    expect(ref).toBeDefined();
+    expect(ref!.slug).toBe("hopdoddy");
+  });
+
+  it("finds HDL by all three nicknames", () => {
+    expect(findClientByNickname("HDL")?.slug).toBe("hdl");
+    expect(findClientByNickname("High Desert")?.slug).toBe("hdl");
+    expect(findClientByNickname("High Desert Law")?.slug).toBe("hdl");
   });
 });
 

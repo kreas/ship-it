@@ -17,11 +17,42 @@ describe("TEAM_REFERENCES", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
+  it("has unique first names", () => {
+    const firstNames = TEAM_REFERENCES.map((m) => m.firstName);
+    expect(new Set(firstNames).size).toBe(firstNames.length);
+  });
+
   it("every member has firstName, fullName, and title", () => {
     for (const member of TEAM_REFERENCES) {
       expect(member.firstName).toBeTruthy();
       expect(member.fullName).toBeTruthy();
       expect(member.title).toBeTruthy();
+    }
+  });
+
+  it("every member has a valid roleCategory", () => {
+    const validRoles = new Set(["creative", "dev", "am", "pm", "leadership", "community"]);
+    for (const member of TEAM_REFERENCES) {
+      expect(validRoles.has(member.roleCategory)).toBe(true);
+    }
+  });
+
+  it("accountsLed contains only valid client slugs", () => {
+    // Known slugs from CLIENT_REFERENCES
+    const validSlugs = new Set([
+      "convergix", "beyond-petro", "lppc", "soundly", "hopdoddy",
+      "bonterra", "hdl", "tap", "dave-asprey", "ag1", "edf", "wilsonart", "abm",
+    ]);
+    for (const member of TEAM_REFERENCES) {
+      for (const slug of member.accountsLed) {
+        expect(validSlugs.has(slug)).toBe(true);
+      }
+    }
+  });
+
+  it("fullName starts with firstName", () => {
+    for (const member of TEAM_REFERENCES) {
+      expect(member.fullName.startsWith(member.firstName)).toBe(true);
     }
   });
 });
@@ -84,6 +115,26 @@ describe("findTeamMember", () => {
   it("Ronan resolves to Ronan Lane via first name", () => {
     const member = findTeamMember("Ronan");
     expect(member!.fullName).toBe("Ronan Lane");
+  });
+
+  it("returns undefined for unknown name", () => {
+    expect(findTeamMember("Bob")).toBeUndefined();
+  });
+
+  it("returns undefined for empty string", () => {
+    expect(findTeamMember("")).toBeUndefined();
+  });
+
+  it("is case-insensitive for nicknames", () => {
+    const member = findTeamMember("allie");
+    expect(member).toBeDefined();
+    expect(member!.fullName).toBe("Allison Shannon");
+  });
+
+  it("finds Sami by first name", () => {
+    const member = findTeamMember("Sami");
+    expect(member).toBeDefined();
+    expect(member!.roleCategory).toBe("community");
   });
 });
 
