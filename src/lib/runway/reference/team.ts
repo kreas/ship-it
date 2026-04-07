@@ -12,7 +12,8 @@ export type RoleCategory =
   | "am"
   | "pm"
   | "leadership"
-  | "community";
+  | "community"
+  | "contractor";
 
 export interface TeamMemberReference {
   fullName: string;
@@ -105,6 +106,24 @@ export const TEAM_REFERENCES: TeamMemberReference[] = [
     roleCategory: "dev",
     accountsLed: [],
     title: "Director of AI",
+  },
+  {
+    fullName: "Chris",
+    firstName: "Chris",
+    nicknames: [],
+    slackUserId: "",
+    roleCategory: "contractor",
+    accountsLed: [],
+    title: "Copywriter (HDL)",
+  },
+  {
+    fullName: "Josefina",
+    firstName: "Josefina",
+    nicknames: [],
+    slackUserId: "",
+    roleCategory: "contractor",
+    accountsLed: [],
+    title: "Contractor (Soundly)",
   },
 ];
 
