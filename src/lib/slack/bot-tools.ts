@@ -23,7 +23,8 @@ async function safePostUpdate(update: Parameters<typeof postUpdate>[0]) {
   }
 }
 
-export function createBotTools(userName: string) {
+export function createBotTools(userName: string, now: Date = new Date()) {
+  const currentMonday = getMonday(now).toISOString().slice(0, 10);
   return {
     get_clients: tool({
       description: "List all clients with project counts",
@@ -50,21 +51,19 @@ export function createBotTools(userName: string) {
     }),
 
     get_week_items: tool({
-      description: "Get this week's calendar items, optionally filtered by owner. If weekOf is omitted, defaults to the current week. Never ask the user for a date — use the date context from your system prompt.",
+      description: `Get calendar items for a given week, optionally filtered by owner. The weekOf parameter defaults to the current week (${currentMonday}) — do not ask the user for a date.`,
       inputSchema: z.object({
         weekOf: z
           .string()
-          .optional()
-          .describe("ISO date of the Monday. Omit to use current week — do NOT ask the user for this."),
+          .default(currentMonday)
+          .describe(`ISO date of the Monday for the week to query. Defaults to ${currentMonday} (this week). Use this for "next week" or "last week" queries — never ask the user for a raw date.`),
         owner: z
           .string()
           .optional()
           .describe("Filter by owner name (case-insensitive substring, e.g. 'Kathy')"),
       }),
       execute: async ({ weekOf, owner }) => {
-        // Default to current week if not provided — never require user to supply a date
-        const effectiveWeekOf = weekOf ?? getMonday(new Date()).toISOString().slice(0, 10);
-        return getWeekItemsData(effectiveWeekOf, owner);
+        return getWeekItemsData(weekOf, owner);
       },
     }),
 
