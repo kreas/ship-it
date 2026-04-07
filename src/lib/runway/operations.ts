@@ -173,6 +173,11 @@ export {
   getWeekItemsData,
   getPersonWorkload,
   getPipelineData,
+  getStaleItemsForAccounts,
+} from "./operations-reads";
+
+export type {
+  StaleAccountItem,
 } from "./operations-reads";
 
 export {

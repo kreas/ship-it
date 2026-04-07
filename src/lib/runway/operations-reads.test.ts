@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockSelectFrom = vi.fn();
 const mockGetAllClients = vi.fn();
@@ -6,12 +6,22 @@ const mockGetClientNameMap = vi.fn();
 
 vi.mock("@/lib/db/runway", () => ({ getRunwayDb: () => ({ select: () => ({ from: mockSelectFrom }) }) }));
 vi.mock("@/lib/db/runway-schema", () => ({
-  projects: { sortOrder: "sortOrder" }, weekItems: { weekOf: "weekOf", date: "date", sortOrder: "sortOrder" }, pipelineItems: { sortOrder: "sortOrder" },
+  projects: { sortOrder: "sortOrder", clientId: "clientId" },
+  weekItems: { weekOf: "weekOf", date: "date", sortOrder: "sortOrder" },
+  pipelineItems: { sortOrder: "sortOrder" },
+  updates: { clientId: "clientId", createdAt: "createdAt" },
 }));
-vi.mock("drizzle-orm", () => ({ eq: vi.fn((a, b) => ({ eq: [a, b] })), asc: vi.fn((col) => ({ asc: col })) }));
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn((a, b) => ({ eq: [a, b] })),
+  asc: vi.fn((col) => ({ asc: col })),
+  desc: vi.fn((col) => ({ desc: col })),
+}));
+const mockGetClientBySlug = vi.fn();
+
 vi.mock("./operations", () => ({
   getAllClients: (...args: unknown[]) => mockGetAllClients(...args),
   getClientNameMap: (...args: unknown[]) => mockGetClientNameMap(...args),
+  getClientBySlug: (...args: unknown[]) => mockGetClientBySlug(...args),
   matchesSubstring: (value: string | null | undefined, search: string) => {
     if (!value) return false;
     return value.toLowerCase().includes(search.toLowerCase());
@@ -46,6 +56,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetAllClients.mockResolvedValue(clients);
   mockGetClientNameMap.mockResolvedValue(new Map([["c1", "Convergix"], ["c2", "LPPC"]]));
+  mockGetClientBySlug.mockImplementation(async (slug: string) => {
+    const map: Record<string, typeof clients[0]> = {
+      convergix: clients[0],
+      lppc: clients[1],
+    };
+    return map[slug] ?? null;
+  });
 });
 
 describe("getClientsWithCounts", () => {
@@ -346,5 +363,105 @@ describe("getPipelineData", () => {
     const { getPipelineData } = await import("./operations-reads");
     const result = await getPipelineData();
     expect(result[0].account).toBeNull();
+  });
+});
+
+describe("getStaleItemsForAccounts", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-07T12:00:00"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns stale projects (staleDays >= 7)", async () => {
+    let callCount = 0;
+    mockSelectFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        // projects for convergix
+        return chainable([
+          { id: "p1", clientId: "c1", name: "CDS Messaging", status: "in-production", staleDays: 10, sortOrder: 0 },
+        ]);
+      }
+      // updates for convergix
+      return chainable([]);
+    });
+
+    const { getStaleItemsForAccounts } = await import("./operations-reads");
+    const result = await getStaleItemsForAccounts(["convergix"]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].clientName).toBe("Convergix");
+    expect(result[0].projectName).toBe("CDS Messaging");
+    expect(result[0].staleDays).toBe(10);
+  });
+
+  it("excludes completed projects", async () => {
+    mockSelectFrom.mockImplementation(() =>
+      chainable([
+        { id: "p1", clientId: "c1", name: "Done", status: "completed", staleDays: 30, sortOrder: 0 },
+      ])
+    );
+
+    const { getStaleItemsForAccounts } = await import("./operations-reads");
+    const result = await getStaleItemsForAccounts(["convergix"]);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it("excludes recently updated projects", async () => {
+    let callCount = 0;
+    mockSelectFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return chainable([
+          { id: "p1", clientId: "c1", name: "Fresh", status: "in-production", staleDays: 0, sortOrder: 0 },
+        ]);
+      }
+      // recent update (within 7 days)
+      return chainable([
+        { id: "u1", projectId: "p1", clientId: "c1", createdAt: new Date("2026-04-06T10:00:00") },
+      ]);
+    });
+
+    const { getStaleItemsForAccounts } = await import("./operations-reads");
+    const result = await getStaleItemsForAccounts(["convergix"]);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns empty for empty slugs", async () => {
+    const { getStaleItemsForAccounts } = await import("./operations-reads");
+    const result = await getStaleItemsForAccounts([]);
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty for unknown client", async () => {
+    const { getStaleItemsForAccounts } = await import("./operations-reads");
+    const result = await getStaleItemsForAccounts(["nonexistent"]);
+    expect(result).toEqual([]);
+  });
+
+  it("sorts by staleDays descending", async () => {
+    let callCount = 0;
+    mockSelectFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return chainable([
+          { id: "p1", clientId: "c1", name: "Less Stale", status: "in-production", staleDays: 7, sortOrder: 0 },
+          { id: "p2", clientId: "c1", name: "Very Stale", status: "blocked", staleDays: 30, sortOrder: 1 },
+        ]);
+      }
+      return chainable([]);
+    });
+
+    const { getStaleItemsForAccounts } = await import("./operations-reads");
+    const result = await getStaleItemsForAccounts(["convergix"]);
+
+    expect(result[0].projectName).toBe("Very Stale");
+    expect(result[1].projectName).toBe("Less Stale");
   });
 });

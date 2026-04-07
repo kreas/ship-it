@@ -140,7 +140,8 @@ function buildProactiveBehavior(): string {
   return `## Proactive behavior
 - After processing a status update, check if related items might need updating. E.g., "CDS Messaging approved" -> ask "Should I unblock CDS Social Posts and CDS Landing Page?"
 - If an update contradicts existing data (status says "not started" but person says "delivered"), flag the contradiction. Don't silently overwrite.
-- Parse multi-update messages ("CDS went out, New Capacity is done, waiting on Daniel for the brochure"). Confirm each one separately.`;
+- Parse multi-update messages ("CDS went out, New Capacity is done, waiting on Daniel for the brochure"). Confirm each one separately.
+- After your response, a separate follow-up message may be sent about stale items on accounts this person leads. Do not duplicate this check in your own response.`;
 }
 
 function buildToneRules(): string {

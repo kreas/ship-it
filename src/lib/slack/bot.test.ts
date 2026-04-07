@@ -40,6 +40,7 @@ vi.mock("@/lib/runway/operations", () => ({
     roleCategory: "leadership",
     accountsLed: ["convergix"],
   }),
+  getStaleItemsForAccounts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/runway/bot-context", () => ({
@@ -283,5 +284,90 @@ describe("buildBotSystemPrompt integration", () => {
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.system).toBe("mocked system prompt");
+  });
+});
+
+describe("proactive follow-up", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends proactive follow-up when user leads accounts with stale items", async () => {
+    const { generateText } = await import("ai");
+    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      text: "Got it, updated.",
+    });
+
+    const ops = await import("@/lib/runway/operations");
+    (ops.getStaleItemsForAccounts as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { clientName: "Convergix", projectName: "Old Project", staleDays: 14 },
+    ]);
+
+    const { handleDirectMessage } = await import("./bot");
+    await handleDirectMessage("U12345", "D67890", "CDS is done", "ts123");
+
+    // First call: AI response, second call: proactive follow-up
+    expect(mockPostMessage).toHaveBeenCalledTimes(2);
+    expect(mockPostMessage.mock.calls[1][0].text).toContain("Got a minute");
+    expect(mockPostMessage.mock.calls[1][0].text).toContain("Old Project");
+    expect(mockPostMessage.mock.calls[1][0].thread_ts).toBe("ts123");
+  });
+
+  it("does NOT send follow-up when no stale items exist", async () => {
+    const { generateText } = await import("ai");
+    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      text: "Done.",
+    });
+
+    const ops = await import("@/lib/runway/operations");
+    (ops.getStaleItemsForAccounts as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const { handleDirectMessage } = await import("./bot");
+    await handleDirectMessage("U12345", "D67890", "hello", "ts123");
+
+    // Only the AI response, no follow-up
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT send follow-up when user has no accountsLed", async () => {
+    const { generateText } = await import("ai");
+    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      text: "response",
+    });
+
+    const ops = await import("@/lib/runway/operations");
+    (ops.getTeamMemberRecordBySlackId as ReturnType<typeof vi.fn>).mockResolvedValue({
+      name: "Jason Burks",
+      firstName: "Jason",
+      title: "Dev",
+      roleCategory: "dev",
+      accountsLed: [],
+    });
+
+    const { handleDirectMessage } = await import("./bot");
+    await handleDirectMessage("U99999", "D67890", "hello", "ts123");
+
+    expect(ops.getStaleItemsForAccounts).not.toHaveBeenCalled();
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles proactive follow-up error gracefully", async () => {
+    const { generateText } = await import("ai");
+    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      text: "Done.",
+    });
+
+    const ops = await import("@/lib/runway/operations");
+    (ops.getStaleItemsForAccounts as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("DB error")
+    );
+
+    const { handleDirectMessage } = await import("./bot");
+    // Should not throw
+    await handleDirectMessage("U12345", "D67890", "CDS is done", "ts123");
+
+    // AI response still posted
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage.mock.calls[0][0].text).toBe("Done.");
   });
 });

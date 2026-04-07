@@ -10,10 +10,12 @@ import {
   projects,
   weekItems,
   pipelineItems,
+  updates,
 } from "@/lib/db/runway-schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import {
   getAllClients,
+  getClientBySlug,
   getClientNameMap,
   groupBy,
   matchesSubstring,
@@ -191,4 +193,74 @@ export async function getPipelineData() {
     waitingOn: item.waitingOn,
     notes: item.notes,
   }));
+}
+
+export interface StaleAccountItem {
+  clientName: string;
+  projectName: string;
+  staleDays: number;
+  lastUpdate?: string;
+}
+
+/**
+ * Find stale projects for a set of client slugs.
+ * A project is stale if staleDays >= 7 or it has no updates in the last 7 days.
+ * Results are sorted by staleness (most stale first).
+ */
+export async function getStaleItemsForAccounts(
+  clientSlugs: string[]
+): Promise<StaleAccountItem[]> {
+  if (clientSlugs.length === 0) return [];
+
+  const db = getRunwayDb();
+  const results: StaleAccountItem[] = [];
+
+  for (const slug of clientSlugs) {
+    const client = await getClientBySlug(slug);
+    if (!client) continue;
+
+    const clientProjects = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.clientId, client.id))
+      .orderBy(asc(projects.sortOrder));
+
+    // Get most recent update per project for this client
+    const clientUpdates = await db
+      .select()
+      .from(updates)
+      .where(eq(updates.clientId, client.id))
+      .orderBy(desc(updates.createdAt));
+
+    const latestUpdateByProject = new Map<string, Date>();
+    for (const u of clientUpdates) {
+      if (u.projectId && u.createdAt && !latestUpdateByProject.has(u.projectId)) {
+        latestUpdateByProject.set(u.projectId, u.createdAt);
+      }
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    for (const project of clientProjects) {
+      // Skip completed projects
+      if (project.status === "completed") continue;
+
+      const isStaleByStaleDays = project.staleDays != null && project.staleDays >= 7;
+      const lastUpdate = latestUpdateByProject.get(project.id);
+      const isStaleByUpdates = !lastUpdate || lastUpdate < sevenDaysAgo;
+
+      if (isStaleByStaleDays || isStaleByUpdates) {
+        results.push({
+          clientName: client.name,
+          projectName: project.name,
+          staleDays: project.staleDays ?? 0,
+          lastUpdate: lastUpdate?.toISOString(),
+        });
+      }
+    }
+  }
+
+  results.sort((a, b) => b.staleDays - a.staleDays);
+  return results;
 }

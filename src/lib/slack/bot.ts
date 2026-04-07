@@ -20,9 +20,11 @@ import { getSlackClient } from "./client";
 import {
   getTeamMemberBySlackId,
   getTeamMemberRecordBySlackId,
+  getStaleItemsForAccounts,
 } from "@/lib/runway/operations";
 import { createBotTools } from "./bot-tools";
 import { buildBotSystemPrompt } from "@/lib/runway/bot-context";
+import { formatProactiveFollowUp } from "./bot-proactive";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_STEPS = 5;
@@ -86,6 +88,25 @@ export async function handleDirectMessage(
       text: result.text,
       thread_ts: messageTs,
     });
+
+    // Proactive follow-up: if user leads accounts, nudge about stale items
+    if (teamMemberRecord?.accountsLed?.length) {
+      try {
+        const staleItems = await getStaleItemsForAccounts(teamMemberRecord.accountsLed);
+        if (staleItems.length > 0) {
+          const followUp = formatProactiveFollowUp(staleItems);
+          if (followUp) {
+            await slack.chat.postMessage({
+              channel: channelId,
+              text: followUp,
+              thread_ts: messageTs,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("[Runway Bot] Proactive follow-up failed:", err);
+      }
+    }
   } catch (err) {
     console.error("[Runway Bot] AI generation failed:", err);
     await slack.chat.postMessage({
