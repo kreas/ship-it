@@ -1,4 +1,3 @@
-// TODO: Re-enable auth when deployed to Vercel (WorkOS callback is port-bound)
 import { getClientsWithProjects, getWeekItems, getPipeline } from "./queries";
 import type { ItemStatus, ItemCategory } from "./types";
 import { RunwayBoard } from "./runway-board";
