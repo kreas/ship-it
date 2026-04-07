@@ -24,16 +24,24 @@ export const processRunwaySlackMessage = inngest.createFunction(
       if (!imageFiles?.length) return [];
       const token = process.env.SLACK_BOT_TOKEN;
       if (!token) return [];
-      return Promise.all(
+      const results = await Promise.allSettled(
         imageFiles.map(async (file: { url: string; mimetype: string }) => {
           const response = await fetch(file.url, {
             headers: { Authorization: `Bearer ${token}` },
           });
+          if (!response.ok) {
+            throw new Error(`Slack returned ${response.status} for image download`);
+          }
           const buffer = await response.arrayBuffer();
           const base64 = Buffer.from(buffer).toString("base64");
           return { mimetype: file.mimetype, base64 };
         })
       );
+      return results
+        .filter((r): r is PromiseFulfilledResult<{ mimetype: string; base64: string }> =>
+          r.status === "fulfilled"
+        )
+        .map((r) => r.value);
     });
 
     await step.run("process-message", async () => {

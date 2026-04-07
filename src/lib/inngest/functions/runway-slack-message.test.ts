@@ -77,6 +77,7 @@ describe("processRunwaySlackMessage", () => {
     // Mock fetch to return image data
     const fakeImageBuffer = new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer;
     mockFetch.mockResolvedValue({
+      ok: true,
       arrayBuffer: () => Promise.resolve(fakeImageBuffer),
     });
 
@@ -108,6 +109,66 @@ describe("processRunwaySlackMessage", () => {
       "check this",
       "1234567890.123456",
       [{ mimetype: "image/png", base64: expectedBase64 }]
+    );
+  });
+
+  it("skips failed image downloads gracefully", async () => {
+    // First image succeeds, second fails with HTTP error
+    const fakeImageBuffer = new Uint8Array([0x89, 0x50]).buffer;
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(fakeImageBuffer),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+      });
+
+    const eventData = {
+      data: {
+        slackUserId: "U12345",
+        channelId: "D67890",
+        messageText: "two images",
+        messageTs: "1234567890.123456",
+        imageFiles: [
+          { url: "https://files.slack.com/good.png", mimetype: "image/png" },
+          { url: "https://files.slack.com/bad.png", mimetype: "image/png" },
+        ],
+      },
+    };
+
+    await handler({ event: eventData, step: { run: mockStepRun } });
+
+    // Only the successful image should be passed through
+    const expectedBase64 = Buffer.from(fakeImageBuffer).toString("base64");
+    expect(mockHandleDirectMessage).toHaveBeenCalledWith(
+      "U12345", "D67890", "two images", "1234567890.123456",
+      [{ mimetype: "image/png", base64: expectedBase64 }]
+    );
+  });
+
+  it("handles network errors during image download", async () => {
+    mockFetch.mockRejectedValue(new Error("Network error"));
+
+    const eventData = {
+      data: {
+        slackUserId: "U12345",
+        channelId: "D67890",
+        messageText: "broken image",
+        messageTs: "1234567890.123456",
+        imageFiles: [
+          { url: "https://files.slack.com/err.png", mimetype: "image/png" },
+        ],
+      },
+    };
+
+    await handler({ event: eventData, step: { run: mockStepRun } });
+
+    // Should still call handleDirectMessage with empty images array
+    expect(mockHandleDirectMessage).toHaveBeenCalledWith(
+      "U12345", "D67890", "broken image", "1234567890.123456", []
     );
   });
 
