@@ -102,8 +102,11 @@ export const updates = sqliteTable("updates", {
 export const teamMembers = sqliteTable("team_members", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  firstName: text("first_name"),
   title: text("title"),
   slackUserId: text("slack_user_id").unique(),
+  roleCategory: text("role_category"), // creative, dev, am, pm, leadership, community
+  accountsLed: text("accounts_led"), // JSON array of client slugs
   channelPurpose: text("channel_purpose"),
   isActive: integer("is_active").notNull().default(1),
 });

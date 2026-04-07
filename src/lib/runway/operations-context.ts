@@ -51,9 +51,20 @@ export async function getTeamMembersData() {
 
   return members.map((m) => ({
     name: m.name,
+    firstName: m.firstName,
     title: m.title,
+    roleCategory: m.roleCategory,
+    accountsLed: m.accountsLed ? JSON.parse(m.accountsLed) as string[] : [],
     channelPurpose: m.channelPurpose,
   }));
+}
+
+export interface TeamMemberRecord {
+  name: string;
+  firstName: string | null;
+  title: string | null;
+  roleCategory: string | null;
+  accountsLed: string[];
 }
 
 export async function getClientContacts(clientSlug: string) {
@@ -82,4 +93,23 @@ export async function getTeamMemberBySlackId(
     .where(eq(teamMembers.slackUserId, slackUserId))
     .get();
   return member?.name ?? null;
+}
+
+export async function getTeamMemberRecordBySlackId(
+  slackUserId: string
+): Promise<TeamMemberRecord | null> {
+  const db = getRunwayDb();
+  const member = await db
+    .select()
+    .from(teamMembers)
+    .where(eq(teamMembers.slackUserId, slackUserId))
+    .get();
+  if (!member) return null;
+  return {
+    name: member.name,
+    firstName: member.firstName,
+    title: member.title,
+    roleCategory: member.roleCategory,
+    accountsLed: member.accountsLed ? JSON.parse(member.accountsLed) as string[] : [],
+  };
 }

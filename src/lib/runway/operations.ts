@@ -144,6 +144,7 @@ export {
   getClientsWithCounts,
   getProjectsFiltered,
   getWeekItemsData,
+  getPersonWorkload,
   getPipelineData,
 } from "./operations-reads";
 
@@ -152,6 +153,11 @@ export {
   getTeamMembersData,
   getClientContacts,
   getTeamMemberBySlackId,
+  getTeamMemberRecordBySlackId,
+} from "./operations-context";
+
+export type {
+  TeamMemberRecord,
 } from "./operations-context";
 
 export {

@@ -182,21 +182,25 @@ async function seed() {
 
   // ── 5. Team Members ─────────────────────────────────────────
   const team = [
-    { name: "Kathy Horn", title: "Creative Director / Copywriter", channelPurpose: "Creative, copy, client relationships" },
-    { name: "Jason Burks", title: "TAP / Strategy", channelPurpose: "Strategy, operations, account management" },
-    { name: "Jill Runyon", title: "Director of Client Experience", channelPurpose: "Beyond Petro, AM accounts" },
-    { name: "Allison", title: "Account Manager", channelPurpose: "Wilsonart, AM accounts" },
-    { name: "Lane", title: "Creative Director", channelPurpose: "Brand, design direction" },
-    { name: "Roz", title: "Designer", channelPurpose: "Design execution" },
-    { name: "Leslie", title: "Developer / PM", channelPurpose: "Dev, web builds" },
-    { name: "Ronan Lane", title: "Senior PM", channelPurpose: "Project management, status tracking" },
+    { name: "Kathy Horn", firstName: "Kathy", title: "Creative Director / Copywriter", roleCategory: "leadership", accountsLed: ["convergix"], channelPurpose: "Creative, copy, client relationships" },
+    { name: "Jason Burks", firstName: "Jason", title: "TAP / Strategy", roleCategory: "leadership", accountsLed: ["tap"], channelPurpose: "Strategy, operations, account management" },
+    { name: "Jill Runyon", firstName: "Jill", title: "Director of Client Experience", roleCategory: "am", accountsLed: ["beyond-petro", "bonterra", "ag1", "edf", "abm"], channelPurpose: "Beyond Petro, AM accounts" },
+    { name: "Allison Shannon", firstName: "Allison", title: "Account Manager", roleCategory: "am", accountsLed: ["wilsonart", "dave-asprey"], channelPurpose: "Wilsonart, AM accounts" },
+    { name: "Lane Jordan", firstName: "Lane", title: "Creative Director", roleCategory: "creative", accountsLed: [], channelPurpose: "Brand, design direction" },
+    { name: "Roz", firstName: "Roz", title: "Designer", roleCategory: "creative", accountsLed: [], channelPurpose: "Design execution" },
+    { name: "Leslie Crosby", firstName: "Leslie", title: "Developer", roleCategory: "dev", accountsLed: [], channelPurpose: "Dev, web builds" },
+    { name: "Ronan Lane", firstName: "Ronan", title: "Senior PM", roleCategory: "pm", accountsLed: ["hopdoddy", "lppc", "soundly"], channelPurpose: "Project management, status tracking" },
+    { name: "Sami Blumenthal", firstName: "Sami", title: "Community Manager", roleCategory: "community", accountsLed: [], channelPurpose: "Community management" },
   ];
 
   for (const member of team) {
     await db.insert(teamMembers).values({
       id: generateId(),
       name: member.name,
+      firstName: member.firstName,
       title: member.title,
+      roleCategory: member.roleCategory,
+      accountsLed: JSON.stringify(member.accountsLed),
       channelPurpose: member.channelPurpose,
     });
   }
