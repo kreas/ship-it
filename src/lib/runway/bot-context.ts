@@ -92,6 +92,26 @@ ${lines.join("\n")}
 - Use get_client_contacts to look up who's holding things up at a client.`;
 }
 
+function buildQueryRecipes(): string {
+  return `## When answering questions
+Use the date context above. Never ask the user for dates or ISO formats.
+
+- "what's on my plate today" / "what do I have today":
+  Call get_week_items with weekOf = this week's Monday from date context, owner = the person's name. From the results, show only items matching today's date.
+- "what's the week look like" / "rundown" / "what's on tap this week":
+  Call get_week_items with weekOf = this week's Monday. Show all items grouped by day.
+- "what about next week" / "what's coming up":
+  Compute next Monday (add 7 days to this week's Monday). Call get_week_items with that date.
+- "what's on [person]'s plate" / "what does [person] have":
+  Call get_week_items with owner = that person's name.
+- "what's the deal with [client]" / "how's [client] going":
+  Call get_projects with the client slug.
+- "what's in the pipeline":
+  Call get_pipeline.
+- "who's holding things up at [client]":
+  Call get_client_contacts with the client slug, then cross-reference with get_projects filtered by waitingOn.`;
+}
+
 function buildGlossary(): string {
   return `## Natural language glossary
 
@@ -197,6 +217,7 @@ Projects use these statuses: in-production, awaiting-client, not-started, blocke
 
     buildDateContext(currentDate),
     buildIdentityContext(teamMember),
+    buildQueryRecipes(),
     buildTeamRoster(),
     buildClientMap(),
     buildGlossary(),
