@@ -411,7 +411,7 @@ describe("getPipelineData", () => {
 
   it("returns null account when clientId is null", async () => {
     mockSelectFrom.mockReturnValue(chainable([
-      { clientId: null, name: "Orphan", status: "no-sow", estimatedValue: "TBD", waitingOn: null, notes: null },
+      { clientId: null, name: "Orphan", status: "at-risk", estimatedValue: "TBD", waitingOn: null, notes: null },
     ]));
     const { getPipelineData } = await import("./operations-reads");
     const result = await getPipelineData();

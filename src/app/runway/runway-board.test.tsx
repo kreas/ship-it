@@ -75,7 +75,7 @@ describe("RunwayBoard", () => {
 
   it("shows $0+ when all pipeline values are TBD", () => {
     const tbdPipeline = [
-      { account: "A", title: "SOW 1", value: "TBD", status: "no-sow" as const },
+      { account: "A", title: "SOW 1", value: "TBD", status: "at-risk" as const },
     ];
     render(<RunwayBoard {...defaultProps} pipeline={tbdPipeline} />);
     fireEvent.click(screen.getByText("Pipeline"));

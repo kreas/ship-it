@@ -31,9 +31,19 @@ describe("PipelineRow", () => {
     expect(screen.getByText("Drafting")).toBeInTheDocument();
   });
 
-  it("renders no-sow status as Drafting", () => {
-    render(<PipelineRow item={createItem({ status: "no-sow" })} />);
-    expect(screen.getByText("Drafting")).toBeInTheDocument();
+  it("renders at-risk status", () => {
+    render(<PipelineRow item={createItem({ status: "at-risk" })} />);
+    expect(screen.getByText("At Risk")).toBeInTheDocument();
+  });
+
+  it("renders signed status", () => {
+    render(<PipelineRow item={createItem({ status: "signed" })} />);
+    expect(screen.getByText("Signed")).toBeInTheDocument();
+  });
+
+  it("renders scoping status", () => {
+    render(<PipelineRow item={createItem({ status: "scoping" })} />);
+    expect(screen.getByText("Scoping")).toBeInTheDocument();
   });
 
   it("renders verbal status", () => {
@@ -128,18 +138,32 @@ describe("PipelineRow", () => {
     expect(screen.getByText("New SOW")).toBeInTheDocument();
   });
 
-  it("shows explicit waitingOn for no-sow status instead of fallback", () => {
+  it("shows explicit waitingOn for at-risk status instead of fallback", () => {
     render(
-      <PipelineRow item={createItem({ status: "no-sow", waitingOn: "Soundly to sign" })} />
+      <PipelineRow item={createItem({ status: "at-risk", waitingOn: "Soundly to sign" })} />
     );
     expect(screen.getByText("Waiting on: Soundly to sign")).toBeInTheDocument();
     expect(screen.queryByText("Waiting on: Client")).not.toBeInTheDocument();
   });
 
-  it("does not show waiting on fallback for no-sow without waitingOn", () => {
+  it("does not show waiting on fallback for at-risk without waitingOn", () => {
     render(
-      <PipelineRow item={createItem({ status: "no-sow", waitingOn: undefined })} />
+      <PipelineRow item={createItem({ status: "at-risk", waitingOn: undefined })} />
     );
     expect(screen.queryByText(/Waiting on/)).not.toBeInTheDocument();
+  });
+
+  it("applies correct color for at-risk badge", () => {
+    render(<PipelineRow item={createItem({ status: "at-risk" })} />);
+    const badge = screen.getByText("At Risk");
+    expect(badge.className).toContain("bg-red-500/20");
+    expect(badge.className).toContain("text-red-400");
+  });
+
+  it("applies correct color for signed badge", () => {
+    render(<PipelineRow item={createItem({ status: "signed" })} />);
+    const badge = screen.getByText("Signed");
+    expect(badge.className).toContain("bg-sky-500/20");
+    expect(badge.className).toContain("text-sky-400");
   });
 });
