@@ -26,7 +26,7 @@ import { createBotTools } from "./bot-tools";
 import { buildBotSystemPrompt } from "@/lib/runway/bot-context";
 import { formatProactiveFollowUp } from "./bot-proactive";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-sonnet-4-6";
 const MAX_STEPS = 5;
 
 export interface SlackImage {
@@ -54,7 +54,8 @@ export async function handleDirectMessage(
   ]);
 
   const displayName = userName ?? "Unknown team member";
-  const tools = createBotTools(displayName);
+  const now = new Date();
+  const tools = createBotTools(displayName, now);
 
   // Build message content — use content blocks when images are present
   let userContent: UserContent = messageText;
@@ -74,9 +75,11 @@ export async function handleDirectMessage(
   }
 
   try {
+    const systemPrompt = buildBotSystemPrompt(teamMemberRecord, now);
+
     const result = await generateText({
       model: anthropic(MODEL),
-      system: buildBotSystemPrompt(teamMemberRecord, new Date()),
+      system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
