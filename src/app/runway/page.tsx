@@ -2,6 +2,7 @@ import { getClientsWithProjects, getWeekItems, getPipeline } from "./queries";
 import type { ItemStatus, ItemCategory } from "./types";
 import { RunwayBoard } from "./runway-board";
 import { getMondayISODate, parseISODate } from "./date-utils";
+import { analyzeFlags } from "@/lib/runway/flags";
 
 export const metadata = {
   title: "Runway — Civilization Agency",
@@ -68,12 +69,15 @@ export default async function RunwayPage() {
     notes: p.notes ?? undefined,
   }));
 
+  const flags = analyzeFlags(accounts, thisWeek, upcoming, pipelineProps);
+
   return (
     <RunwayBoard
       thisWeek={thisWeek}
       upcoming={upcoming}
       accounts={accounts}
       pipeline={pipelineProps}
+      flags={flags}
     />
   );
 }

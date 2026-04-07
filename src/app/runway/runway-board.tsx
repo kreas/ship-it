@@ -3,11 +3,13 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { DayItem, Account, PipelineItem } from "./types";
+import type { RunwayFlag } from "@/lib/runway/flags";
 import { parseISODate, getMondayISODate } from "./date-utils";
 import { DayColumn } from "./components/day-column";
 import { TodaySection } from "./components/today-section";
 import { AccountSection } from "./components/account-section";
 import { PipelineRow } from "./components/pipeline-row";
+import { FlagsPanel } from "./components/flags-panel";
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -77,6 +79,7 @@ interface RunwayBoardProps {
   upcoming: DayItem[];
   accounts: Account[];
   pipeline: PipelineItem[];
+  flags?: RunwayFlag[];
 }
 
 const TABS = [
@@ -90,6 +93,7 @@ export function RunwayBoard({
   upcoming,
   accounts,
   pipeline,
+  flags = [],
 }: RunwayBoardProps) {
   const router = useRouter();
   const [view, setView] = useState<View>("triage");
@@ -160,73 +164,79 @@ export function RunwayBoard({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-6 py-6 2xl:px-10">
-        {view === "triage" ? (
-          <div className="space-y-10">
-            <TodaySection todayColumn={todayColumn} />
+      <main className="mx-auto max-w-[1800px] px-6 py-6 2xl:px-10">
+        <div className="flex gap-6">
+          <div className="min-w-0 flex-1">
+            {view === "triage" ? (
+              <div className="space-y-10">
+                <TodaySection todayColumn={todayColumn} />
 
-            {restOfWeek.length > 0 ? (
-              <section>
-                <h2 className="mb-4 font-display text-2xl font-bold text-foreground">
-                  This Week
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {restOfWeek.map((day) => (
-                    <DayColumn key={day.date} day={day} isToday={false} />
-                  ))}
-                </div>
-              </section>
+                {restOfWeek.length > 0 ? (
+                  <section>
+                    <h2 className="mb-4 font-display text-2xl font-bold text-foreground">
+                      This Week
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      {restOfWeek.map((day) => (
+                        <DayColumn key={day.date} day={day} isToday={false} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {upcomingWeeks.map((week) => (
+                  <section key={week.mondayDate}>
+                    <h2 className="mb-4 font-display text-2xl font-bold text-foreground">
+                      Upcoming{" "}
+                      <span className="text-lg font-normal text-muted-foreground">
+                        {week.label}
+                      </span>
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {week.days.map((day) => (
+                        <DayColumn key={day.date} day={day} isToday={false} />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
             ) : null}
 
-            {upcomingWeeks.map((week) => (
-              <section key={week.mondayDate}>
-                <h2 className="mb-4 font-display text-2xl font-bold text-foreground">
-                  Upcoming{" "}
-                  <span className="text-lg font-normal text-muted-foreground">
-                    {week.label}
-                  </span>
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {week.days.map((day) => (
-                    <DayColumn key={day.date} day={day} isToday={false} />
+            {view === "accounts" ? (
+              <div className="space-y-6">
+                {accounts.map((account) => (
+                  <AccountSection key={account.slug} account={account} />
+                ))}
+              </div>
+            ) : null}
+
+            {view === "pipeline" ? (
+              <div className="space-y-6">
+                <div className="flex items-end justify-between">
+                  <h2 className="font-display text-2xl font-bold text-foreground">
+                    Unsigned SOWs &amp; New Business
+                  </h2>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total Pipeline</p>
+                    <p className="font-mono text-3xl font-bold text-foreground">
+                      ${pipelineTotal.toLocaleString()}+
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {pipeline.map((item) => (
+                    <PipelineRow
+                      key={`${item.account}-${item.title}`}
+                      item={item}
+                    />
                   ))}
                 </div>
-              </section>
-            ))}
-          </div>
-        ) : null}
-
-        {view === "accounts" ? (
-          <div className="space-y-6">
-            {accounts.map((account) => (
-              <AccountSection key={account.slug} account={account} />
-            ))}
-          </div>
-        ) : null}
-
-        {view === "pipeline" ? (
-          <div className="space-y-6">
-            <div className="flex items-end justify-between">
-              <h2 className="font-display text-2xl font-bold text-foreground">
-                Unsigned SOWs &amp; New Business
-              </h2>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Pipeline</p>
-                <p className="font-mono text-3xl font-bold text-foreground">
-                  ${pipelineTotal.toLocaleString()}+
-                </p>
               </div>
-            </div>
-            <div className="space-y-3">
-              {pipeline.map((item) => (
-                <PipelineRow
-                  key={`${item.account}-${item.title}`}
-                  item={item}
-                />
-              ))}
-            </div>
+            ) : null}
           </div>
-        ) : null}
+
+          <FlagsPanel flags={flags} />
+        </div>
       </main>
     </div>
   );

@@ -11,6 +11,10 @@ vi.mock("./queries", () => ({
   getPipeline: () => mockGetPipeline(),
 }));
 
+vi.mock("@/lib/runway/flags", () => ({
+  analyzeFlags: vi.fn().mockReturnValue([]),
+}));
+
 vi.mock("./runway-board", () => ({
   RunwayBoard: (props: Record<string, unknown>) => {
     // Expose props as data attributes for testing
