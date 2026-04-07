@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { RunwayBoard, mergeWeekendDays, groupByWeek } from "./runway-board";
+import { RunwayBoard } from "./runway-board";
+import { mergeWeekendDays, groupByWeek } from "./runway-board-utils";
 import { thisWeek, upcoming, accounts, pipeline } from "./runway-board-test-fixtures";
 import type { DayItem } from "./types";
 
