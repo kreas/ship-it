@@ -18,7 +18,7 @@ const mockGetClientNameMap = vi.fn();
 vi.mock("@/lib/db/runway", () => ({ getRunwayDb: () => ({ select: () => ({ from: mockSelectFrom }) }) }));
 vi.mock("@/lib/db/runway-schema", () => ({
   projects: { sortOrder: "sortOrder", clientId: "clientId" },
-  weekItems: { weekOf: "weekOf", date: "date", sortOrder: "sortOrder" },
+  weekItems: { weekOf: "weekOf", date: "date", sortOrder: "sortOrder", projectId: "projectId" },
   pipelineItems: { sortOrder: "sortOrder" },
   updates: { clientId: "clientId", createdAt: "createdAt" },
 }));
@@ -527,5 +527,26 @@ describe("getStaleItemsForAccounts", () => {
 
     expect(result[0].projectName).toBe("Very Stale");
     expect(result[1].projectName).toBe("Less Stale");
+  });
+});
+
+describe("getLinkedWeekItems", () => {
+  it("returns week items linked to a project", async () => {
+    mockSelectFrom.mockReturnValue(chainable([
+      { id: "wi1", projectId: "p1", title: "CDS Review", status: null },
+      { id: "wi2", projectId: "p1", title: "CDS Delivery", status: "completed" },
+    ]));
+    const { getLinkedWeekItems } = await import("./operations-reads");
+    const result = await getLinkedWeekItems("p1");
+    expect(result).toHaveLength(2);
+    expect(result[0].title).toBe("CDS Review");
+    expect(result[1].title).toBe("CDS Delivery");
+  });
+
+  it("returns empty array for project with no linked items", async () => {
+    mockSelectFrom.mockReturnValue(chainable([]));
+    const { getLinkedWeekItems } = await import("./operations-reads");
+    const result = await getLinkedWeekItems("nonexistent");
+    expect(result).toEqual([]);
   });
 });

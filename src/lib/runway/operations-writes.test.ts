@@ -20,6 +20,7 @@ vi.mock("@/lib/db/runway", () => ({
 vi.mock("@/lib/db/runway-schema", () => ({
   projects: { id: "id" },
   updates: {},
+  weekItems: { id: "id" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -31,8 +32,11 @@ const mockGetClientBySlug = vi.fn();
 const mockFindProjectByFuzzyName = vi.fn();
 const mockGetProjectsForClient = vi.fn();
 const mockCheckIdempotency = vi.fn();
+const mockGetLinkedWeekItems = vi.fn();
 
 vi.mock("./operations", () => ({
+  CASCADE_STATUSES: ["completed", "blocked", "on-hold"],
+  TERMINAL_ITEM_STATUSES: ["completed", "canceled"],
   generateIdempotencyKey: (...parts: string[]) => parts.join("|"),
   generateId: () => "mock-id-12345678901234",
   getClientOrFail: async (slug: string) => {
@@ -45,6 +49,7 @@ vi.mock("./operations", () => ({
   getProjectsForClient: (...args: unknown[]) =>
     mockGetProjectsForClient(...args),
   checkIdempotency: (...args: unknown[]) => mockCheckIdempotency(...args),
+  getLinkedWeekItems: (...args: unknown[]) => mockGetLinkedWeekItems(...args),
 }));
 
 const client = { id: "c1", name: "Convergix", slug: "convergix" };
@@ -53,6 +58,7 @@ const project = { id: "p1", name: "CDS Messaging", status: "in-production" };
 beforeEach(() => {
   vi.clearAllMocks();
   mockCheckIdempotency.mockResolvedValue(false);
+  mockGetLinkedWeekItems.mockResolvedValue([]);
 });
 
 describe("updateProjectStatus", () => {
@@ -189,6 +195,7 @@ describe("updateProjectStatus", () => {
         projectName: "CDS Messaging",
         previousStatus: "in-production",
         newStatus: "completed",
+        cascadedItems: [],
       });
     }
   });
@@ -227,5 +234,156 @@ describe("updateProjectStatus", () => {
     expect(insertCall.newValue).toBe("blocked");
     expect(insertCall.clientId).toBe("c1");
     expect(insertCall.projectId).toBe("p1");
+  });
+
+  it("cascades completed status to linked non-terminal week items", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockGetLinkedWeekItems.mockResolvedValue([
+      { id: "wi1", title: "CDS Review", status: null },
+      { id: "wi2", title: "CDS Delivery", status: "in-progress" },
+    ]);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "completed",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual(["CDS Review", "CDS Delivery"]);
+    }
+    // Two week item updates (one per linked item)
+    expect(mockUpdateSet).toHaveBeenCalledTimes(3); // 1 project + 2 week items
+  });
+
+  it("does not cascade completed to already-completed week items", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockGetLinkedWeekItems.mockResolvedValue([
+      { id: "wi1", title: "Already Done", status: "completed" },
+      { id: "wi2", title: "Active Item", status: null },
+    ]);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "completed",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual(["Active Item"]);
+    }
+  });
+
+  it("does not cascade completed to canceled week items", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockGetLinkedWeekItems.mockResolvedValue([
+      { id: "wi1", title: "Canceled Item", status: "canceled" },
+    ]);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "completed",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual([]);
+    }
+  });
+
+  it("does not cascade non-terminal status (in-production)", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockGetLinkedWeekItems.mockResolvedValue([
+      { id: "wi1", title: "Active Item", status: null },
+    ]);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "in-production",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual([]);
+    }
+    // getLinkedWeekItems should NOT be called for non-terminal statuses
+    expect(mockGetLinkedWeekItems).not.toHaveBeenCalled();
+  });
+
+  it("cascades blocked status to linked active week items", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockGetLinkedWeekItems.mockResolvedValue([
+      { id: "wi1", title: "Blocked Item", status: null },
+    ]);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "blocked",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual(["Blocked Item"]);
+    }
+  });
+
+  it("cascades on-hold status to linked active week items", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockGetLinkedWeekItems.mockResolvedValue([
+      { id: "wi1", title: "Paused Item", status: "in-progress" },
+    ]);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "on-hold",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual(["Paused Item"]);
+    }
+  });
+
+  it("does not cascade awaiting-client status", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue(project);
+
+    const { updateProjectStatus } = await import("./operations-writes");
+    const result = await updateProjectStatus({
+      clientSlug: "convergix",
+      projectName: "CDS Messaging",
+      newStatus: "awaiting-client",
+      updatedBy: "kathy",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.cascadedItems).toEqual([]);
+    }
+    expect(mockGetLinkedWeekItems).not.toHaveBeenCalled();
   });
 });

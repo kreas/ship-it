@@ -8,15 +8,18 @@
  */
 
 import { getRunwayDb } from "@/lib/db/runway";
-import { projects, updates } from "@/lib/db/runway-schema";
+import { projects, updates, weekItems } from "@/lib/db/runway-schema";
 import { eq } from "drizzle-orm";
 import {
+  CASCADE_STATUSES,
+  TERMINAL_ITEM_STATUSES,
   generateIdempotencyKey,
   generateId,
   getClientOrFail,
   findProjectByFuzzyName,
   getProjectsForClient,
   checkIdempotency,
+  getLinkedWeekItems,
 } from "./operations";
 
 // ── Types ────────────────────────────────────────────────
@@ -64,7 +67,16 @@ export async function updateProjectStatus(
   );
 
   if (await checkIdempotency(idemKey)) {
-    return { ok: true, message: "Update already applied (duplicate request)." };
+    return {
+      ok: true,
+      message: "Update already applied (duplicate request).",
+      data: {
+        clientName: client.name,
+        projectName: project.name,
+        previousStatus,
+        newStatus,
+      },
+    };
   }
 
   await db
@@ -85,6 +97,25 @@ export async function updateProjectStatus(
     summary,
   });
 
+  // Cascade to linked week items for terminal/blocking statuses
+  const cascadedItems: string[] = [];
+  const shouldCascade = (CASCADE_STATUSES as readonly string[]).includes(newStatus);
+
+  if (shouldCascade) {
+    const linkedItems = await getLinkedWeekItems(project.id);
+    for (const item of linkedItems) {
+      const itemAlreadyTerminal = (TERMINAL_ITEM_STATUSES as readonly string[]).includes(item.status ?? "");
+
+      if (!itemAlreadyTerminal) {
+        await db
+          .update(weekItems)
+          .set({ status: newStatus, updatedAt: new Date() })
+          .where(eq(weekItems.id, item.id));
+        cascadedItems.push(item.title);
+      }
+    }
+  }
+
   return {
     ok: true,
     message: `Updated ${client.name} / ${project.name}: ${previousStatus} -> ${newStatus}`,
@@ -93,6 +124,7 @@ export async function updateProjectStatus(
       projectName: project.name,
       previousStatus,
       newStatus,
+      cascadedItems,
     },
   };
 }

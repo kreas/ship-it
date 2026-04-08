@@ -10,6 +10,7 @@
  */
 
 export { getClientsWithCounts, getProjectsFiltered } from "./operations-reads-clients";
-export { getWeekItemsData, getPersonWorkload } from "./operations-reads-week";
+export { getLinkedWeekItems, getWeekItemsData, getPersonWorkload } from "./operations-reads-week";
+export type { WeekItemRow } from "./operations-reads-week";
 export { getPipelineData, getStaleItemsForAccounts } from "./operations-reads-pipeline";
 export type { StaleAccountItem } from "./operations-reads-pipeline";
