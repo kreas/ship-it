@@ -60,12 +60,12 @@ Full product intent lives in `brain-PRODUCT-VISION.md`.
 | **Phase 0: Updates channel** | **Done** — Formatted posts to private Slack channel on every write. Fixed idempotency bug that was swallowing `data` on retries. Bot added to channel. |
 | **Phase 0: Bot testing** | **Done** — Full QA pass: identity, date context, "my plate" morning briefing, CGX queries, pipeline, writes with updates channel post, image attachments, client contacts. All passing on Sonnet 4.6. |
 | **Phase 0: Pipeline status overhaul** | **Done** — CC ran prompt. Lifecycle: scoping, drafting, sow-sent, verbal, signed + at-risk flag. |
-| **Phase 0: Status cascade** | **In progress** — CC running prompt. Project status changes cascade to linked week items (completed/blocked/on-hold). Seed script links weekItems to projects via fuzzy matching. |
+| **Phase 0: Status cascade** | **Done** — Project status changes cascade to linked week items (completed/blocked/on-hold). Seed script links 15/39 items via fuzzy matching. 4 cascade scenarios tested. |
 | Phase 0: Data intake (Allison, Ronan, Jason) | Not started — QA questions stockpiled. |
 | User stories (4-pass) | Not started — next after Phase 0 ships |
 | Full product `/plan` | Not started |
 
-**Immediate next action:** Verify status cascade CC output. Test cascade locally. Swap Slack Event URL back to production (`https://runway.startround1.com/api/slack/events`). Create PR for `feature/runway-bot-context` targeting `upstream/runway`. Remaining QA sessions: Allison, Ronan, Jason. Thursday 4/9: review client reference data.
+**Immediate next action:** Merge PR #80. Deploy to production (Tim deploys from `runway` branch). Verify bot responds in production post-deploy. Remaining QA sessions: Allison, Ronan, Jason. Thursday 4/9: review client reference data.
 
 ---
 
@@ -237,4 +237,4 @@ Full table in `brain-RULES.md`. The ones that must never be re-litigated:
 
 ---
 
-*Session-start status: Updated April 7, 2026 (evening). Phase 0 Runway live at runway.startround1.com. PRs #77-#79 merged. `feature/runway-bot-context` has 40+ commits with bot intelligence, owner/resource separation, updates channel, pipeline overhaul, image support, AI flags, and status cascade (in progress). 1017+ tests passing. Slack bot fully tested on Sonnet 4.6. Next: verify cascade, swap Event URL to prod, create PR targeting `upstream/runway`, remaining QA sessions (Allison, Ronan, Jason). Update §2 at end of every session.*
+*Session-start status: Updated April 7, 2026 (end of day). Phase 0 Runway live at runway.startround1.com. PRs #77-#79 merged, PR #80 up (bot intelligence, owner/resource, status cascade, pipeline overhaul, updates channel, image support -- 50 commits, 1047 tests). Slack Event URL back on production. Next: merge #80, deploy, verify bot in prod, remaining QA sessions (Allison, Ronan, Jason). Update §2 at end of every session.*
