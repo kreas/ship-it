@@ -5,27 +5,11 @@
  * Requires: RUNWAY_DATABASE_URL in .env.local (or falls back to file:runway-local.db)
  */
 
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
+import { loadEnvLocal } from "./lib/load-env";
 
-// Load .env.local since tsx doesn't auto-load it
-try {
-  const envPath = resolve(process.cwd(), ".env.local");
-  const envContent = readFileSync(envPath, "utf-8");
-  for (const line of envContent.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const value = trimmed.slice(eqIdx + 1).trim();
-    if (!process.env[key]) process.env[key] = value;
-  }
-} catch {
-  // .env.local not found, rely on existing env vars
-}
+loadEnvLocal();
 import {
   clients,
   projects,
@@ -59,6 +43,73 @@ const DAY_NAMES: Record<string, string> = {
   "5": "friday",
   "6": "saturday",
 };
+
+/**
+ * Extract the "base name" of a title — the part before any parenthetical,
+ * em dash, or special delimiter. E.g.:
+ * "New Capacity (PPT, brochure, one-pager)" → "new capacity"
+ * "CDS Messaging & Pillars R1" → "cds messaging & pillars r1"
+ */
+function baseName(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/\s*[(\u2014—].*$/, "") // strip from first ( or em dash onwards
+    .trim();
+}
+
+/**
+ * Find a matching projectId for a week item by fuzzy-matching its title
+ * against the client's projects.
+ *
+ * Match strategies (tried in order, first match wins):
+ * 1. Full project name is contained in the week item title
+ * 2. Week item title is contained in the full project name (min 8 chars to avoid false positives)
+ * 3. Base name of the project (before parenthetical) matches the start of the week item base name
+ *
+ * Returns null for standalone tasks with no project match.
+ */
+export function findProjectIdForWeekItem(
+  clientId: string,
+  title: string,
+  projectsByClient: Map<string, { id: string; name: string }[]>
+): string | null {
+  const clientProjects = projectsByClient.get(clientId);
+  if (!clientProjects) return null;
+
+  const normalizedTitle = title.toLowerCase().trim();
+  const titleBase = baseName(title);
+
+  // Try each project — longest name first to prefer more specific matches
+  const sorted = [...clientProjects].sort(
+    (a, b) => b.name.length - a.name.length
+  );
+
+  for (const project of sorted) {
+    const normalizedName = project.name.toLowerCase().trim();
+
+    // Strategy 1: Full project name contained in week item title
+    if (normalizedTitle.includes(normalizedName)) {
+      return project.id;
+    }
+
+    // Strategy 2: Week item title contained in project name (min 8 chars)
+    if (normalizedTitle.length >= 8 && normalizedName.includes(normalizedTitle)) {
+      return project.id;
+    }
+
+    // Strategy 3: Base name prefix match (min 8 chars to avoid "CDS" matching everything)
+    const projectBase = baseName(project.name);
+    if (
+      projectBase.length >= 8 &&
+      (titleBase.startsWith(projectBase) || projectBase.startsWith(titleBase))
+    ) {
+      return project.id;
+    }
+  }
+
+  return null;
+}
 
 async function seed() {
   console.log("Seeding Runway database...");
@@ -97,6 +148,7 @@ async function seed() {
   // ── 2. Projects ─────────────────────────────────────────────
   let projectCount = 0;
   const projectMap = new Map<string, string>(); // "slug:projectTitle" -> id
+  const projectsByClient = new Map<string, { id: string; name: string }[]>(); // clientId -> [{id, name}]
 
   for (const account of accounts) {
     const clientId = clientMap.get(account.slug)!;
@@ -105,6 +157,11 @@ async function seed() {
       const item = account.items[i];
       const id = generateId();
       projectMap.set(`${account.slug}:${item.title}`, id);
+
+      // Build lookup for week item linking
+      const list = projectsByClient.get(clientId) ?? [];
+      list.push({ id, name: item.title });
+      projectsByClient.set(clientId, list);
 
       await db.insert(projects).values({
         id,
@@ -126,6 +183,8 @@ async function seed() {
 
   // ── 3. Week Items ───────────────────────────────────────────
   let weekItemCount = 0;
+  let linkedCount = 0;
+  let unlinkedCount = 0;
 
   // Helper to find client ID by account name
   function findClientId(accountName: string): string | null {
@@ -142,22 +201,35 @@ async function seed() {
       const id = generateId();
       const clientId = findClientId(item.account);
 
+      // Try to link to a parent project
+      const projectId = clientId
+        ? findProjectIdForWeekItem(clientId, item.title, projectsByClient)
+        : null;
+
+      if (projectId) {
+        linkedCount++;
+      } else {
+        unlinkedCount++;
+      }
+
       await db.insert(weekItems).values({
         id,
         clientId,
+        projectId,
         dayOfWeek,
         weekOf,
         date: dayItems.date,
         title: item.title,
         category: item.type,
         owner: item.owner ?? null,
+        resources: item.resources ?? null,
         notes: item.notes ?? null,
         sortOrder: i,
       });
       weekItemCount++;
     }
   }
-  console.log(`  Week Items: ${weekItemCount} inserted`);
+  console.log(`  Week Items: ${weekItemCount} inserted (${linkedCount} linked to projects, ${unlinkedCount} unlinked)`);
 
   // ── 4. Pipeline ─────────────────────────────────────────────
   for (let i = 0; i < pipeline.length; i++) {
@@ -182,21 +254,29 @@ async function seed() {
 
   // ── 5. Team Members ─────────────────────────────────────────
   const team = [
-    { name: "Kathy Horn", title: "Creative Director / Copywriter", channelPurpose: "Creative, copy, client relationships" },
-    { name: "Jason Burks", title: "TAP / Strategy", channelPurpose: "Strategy, operations, account management" },
-    { name: "Jill Runyon", title: "Director of Client Experience", channelPurpose: "Beyond Petro, AM accounts" },
-    { name: "Allison", title: "Account Manager", channelPurpose: "Wilsonart, AM accounts" },
-    { name: "Lane", title: "Creative Director", channelPurpose: "Brand, design direction" },
-    { name: "Roz", title: "Designer", channelPurpose: "Design execution" },
-    { name: "Leslie", title: "Developer / PM", channelPurpose: "Dev, web builds" },
-    { name: "Ronan Lane", title: "Senior PM", channelPurpose: "Project management, status tracking" },
+    { name: "Kathy Horn", firstName: "Kathy", slackUserId: "U11NL4SBS", title: "Co-Founder / Executive Creative Director", roleCategory: "leadership", accountsLed: ["convergix"], channelPurpose: "Creative, copy, client relationships" },
+    { name: "Jason Burks", firstName: "Jason", slackUserId: "U1HH41TFX", title: "Co-Founder / Development Director", roleCategory: "leadership", accountsLed: ["tap"], channelPurpose: "Strategy, operations, account management" },
+    { name: "Jill Runyon", firstName: "Jill", slackUserId: "U08TZ6ZDEUF", title: "Director of Client Experience", roleCategory: "am", accountsLed: ["beyond-petro", "bonterra", "ag1", "edf", "abm"], channelPurpose: "Beyond Petro, AM accounts" },
+    { name: "Allison Shannon", firstName: "Allison", slackUserId: "U06BA311N92", title: "Strategy Director / Sr. Account Manager", roleCategory: "am", accountsLed: ["wilsonart", "dave-asprey"], channelPurpose: "Wilsonart, AM accounts" },
+    { name: "Lane Jordan", firstName: "Lane", slackUserId: "U03F7MED8F8", title: "Creative Director", roleCategory: "creative", accountsLed: [], channelPurpose: "Brand, design direction" },
+    { name: "Roz", firstName: "Roz", slackUserId: "", title: "Designer", roleCategory: "creative", accountsLed: [], channelPurpose: "Design execution" },
+    { name: "Leslie Crosby", firstName: "Leslie", slackUserId: "U01LJGMC1GV", title: "Sr. Frontend Dev / Technical PM", roleCategory: "dev", accountsLed: [], channelPurpose: "Dev, web builds" },
+    { name: "Ronan Lane", firstName: "Ronan", slackUserId: "", title: "Senior PM", roleCategory: "pm", accountsLed: ["hopdoddy", "lppc", "soundly"], channelPurpose: "Project management, status tracking" },
+    { name: "Sami Blumenthal", firstName: "Sami", slackUserId: "U0AFM4FG87P", title: "Community Manager", roleCategory: "community", accountsLed: [], channelPurpose: "Community management" },
+    { name: "Tim Warren", firstName: "Tim", slackUserId: "U016N17D9KR", title: "Director of AI", roleCategory: "dev", accountsLed: [], channelPurpose: "AI, development" },
+    { name: "Chris", firstName: "Chris", slackUserId: "", title: "Copywriter (HDL)", roleCategory: "contractor", accountsLed: [], channelPurpose: "HDL copy" },
+    { name: "Josefina", firstName: "Josefina", slackUserId: "", title: "Contractor (Soundly)", roleCategory: "contractor", accountsLed: [], channelPurpose: "Soundly contractor" },
   ];
 
   for (const member of team) {
     await db.insert(teamMembers).values({
       id: generateId(),
       name: member.name,
+      firstName: member.firstName,
+      slackUserId: member.slackUserId || undefined,
       title: member.title,
+      roleCategory: member.roleCategory,
+      accountsLed: JSON.stringify(member.accountsLed),
       channelPurpose: member.channelPurpose,
     });
   }
@@ -205,7 +285,15 @@ async function seed() {
   console.log("\nSeed complete.");
 }
 
-seed().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
+// Only run when executed directly (not when imported by tests)
+const isDirectExecution =
+  typeof process !== "undefined" &&
+  process.argv[1] &&
+  (process.argv[1].endsWith("seed-runway.ts") || process.argv[1].endsWith("seed-runway"));
+
+if (isDirectExecution) {
+  seed().catch((err) => {
+    console.error("Seed failed:", err);
+    process.exit(1);
+  });
+}

@@ -381,13 +381,15 @@ Bearer token via `RUNWAY_MCP_API_KEY` environment variable. No workspace-scoped 
 Tools are registered in `/src/lib/mcp/runway-tools.ts` using the MCP SDK's `server.tool()` API with Zod schemas. Each tool is a thin formatting layer over the shared operations layer in `src/lib/runway/` (split across `operations.ts`, `operations-reads.ts`, `operations-writes.ts`, `operations-add.ts`, `operations-context.ts`):
 
 ```typescript
-server.tool("get_projects", "List projects filtered by client or status", {
+server.tool("get_projects", "List projects filtered by client, status, owner, or waitingOn", {
   clientSlug: z.string().optional(),
   status: z.string().optional(),
-}, async ({ clientSlug, status }) => textResult(await getProjectsFiltered({ clientSlug, status })));
+  owner: z.string().optional(),
+  waitingOn: z.string().optional(),
+}, async ({ clientSlug, status, owner, waitingOn }) => textResult(await getProjectsFiltered({ clientSlug, status, owner, waitingOn })));
 ```
 
-Available tools: `get_clients`, `get_projects`, `get_week_items`, `get_pipeline`, `get_updates`, `update_project_status`, `add_project`, `add_update`, `get_team_members`, `get_client_contacts`.
+Available tools: `get_clients`, `get_projects`, `get_week_items`, `get_pipeline`, `get_updates`, `update_project_status`, `add_project`, `add_update`, `get_team_members`, `get_client_contacts`, `get_person_workload`.
 
 ### Adding a Standalone MCP Server
 

@@ -10,6 +10,11 @@ import { updates, teamMembers } from "@/lib/db/runway-schema";
 import { eq, desc } from "drizzle-orm";
 import { getClientBySlug, getClientNameMap } from "./operations";
 
+function parseAccountsLed(json: string | null): string[] {
+  if (!json) return [];
+  return JSON.parse(json) as string[];
+}
+
 export async function getUpdatesData(opts?: {
   clientSlug?: string;
   limit?: number;
@@ -51,9 +56,20 @@ export async function getTeamMembersData() {
 
   return members.map((m) => ({
     name: m.name,
+    firstName: m.firstName,
     title: m.title,
+    roleCategory: m.roleCategory,
+    accountsLed: parseAccountsLed(m.accountsLed),
     channelPurpose: m.channelPurpose,
   }));
+}
+
+export interface TeamMemberRecord {
+  name: string;
+  firstName: string | null;
+  title: string | null;
+  roleCategory: string | null;
+  accountsLed: string[];
 }
 
 export async function getClientContacts(clientSlug: string) {
@@ -82,4 +98,23 @@ export async function getTeamMemberBySlackId(
     .where(eq(teamMembers.slackUserId, slackUserId))
     .get();
   return member?.name ?? null;
+}
+
+export async function getTeamMemberRecordBySlackId(
+  slackUserId: string
+): Promise<TeamMemberRecord | null> {
+  const db = getRunwayDb();
+  const member = await db
+    .select()
+    .from(teamMembers)
+    .where(eq(teamMembers.slackUserId, slackUserId))
+    .get();
+  if (!member) return null;
+  return {
+    name: member.name,
+    firstName: member.firstName,
+    title: member.title,
+    roleCategory: member.roleCategory,
+    accountsLed: parseAccountsLed(member.accountsLed),
+  };
 }

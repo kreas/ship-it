@@ -5,13 +5,15 @@ import { z } from "zod";
 import { postUpdate } from "./updates-channel";
 import {
   getClientsWithCounts,
-  getProjectsForClient,
+  getProjectsFiltered,
   getPipelineData,
   getWeekItemsData,
-  getClientBySlug,
+  getPersonWorkload,
   updateProjectStatus,
   addUpdate,
 } from "@/lib/runway/operations";
+import { getClientContactsRef } from "@/lib/runway/reference/clients";
+import { getMonday, toISODateString } from "@/app/runway/date-utils";
 
 async function safePostUpdate(update: Parameters<typeof postUpdate>[0]) {
   try {
@@ -21,7 +23,8 @@ async function safePostUpdate(update: Parameters<typeof postUpdate>[0]) {
   }
 }
 
-export function createBotTools(userName: string) {
+export function createBotTools(userName: string, now: Date = new Date()) {
+  const currentMonday = toISODateString(getMonday(now));
   return {
     get_clients: tool({
       description: "List all clients with project counts",
@@ -30,22 +33,14 @@ export function createBotTools(userName: string) {
     }),
 
     get_projects: tool({
-      description: "List projects for a client",
+      description: "List projects, optionally filtered by client, owner, or waitingOn",
       inputSchema: z.object({
-        clientSlug: z.string().describe("Client slug (e.g. 'convergix')"),
+        clientSlug: z.string().optional().describe("Client slug (e.g. 'convergix')"),
+        owner: z.string().optional().describe("Filter by owner name (case-insensitive substring, e.g. 'Kathy')"),
+        waitingOn: z.string().optional().describe("Filter by waitingOn name (case-insensitive substring, e.g. 'Daniel')"),
       }),
-      execute: async ({ clientSlug }) => {
-        const client = await getClientBySlug(clientSlug);
-        if (!client) return { error: `Client '${clientSlug}' not found` };
-
-        const projectList = await getProjectsForClient(client.id);
-        return projectList.map((p) => ({
-          name: p.name,
-          status: p.status,
-          owner: p.owner,
-          waitingOn: p.waitingOn,
-          notes: p.notes,
-        }));
+      execute: async ({ clientSlug, owner, waitingOn }) => {
+        return getProjectsFiltered({ clientSlug, owner, waitingOn });
       },
     }),
 
@@ -56,14 +51,24 @@ export function createBotTools(userName: string) {
     }),
 
     get_week_items: tool({
-      description: "Get this week's calendar items",
+      description: `Get calendar items for a given week, optionally filtered by owner or resource. Owner = who is accountable. Resource = who is doing the work. The weekOf parameter defaults to the current week (${currentMonday}) — do not ask the user for a date.`,
       inputSchema: z.object({
         weekOf: z
           .string()
+          .default(currentMonday)
+          .describe(`ISO date of the Monday for the week to query. Defaults to ${currentMonday} (this week). Use this for "next week" or "last week" queries — never ask the user for a raw date.`),
+        owner: z
+          .string()
           .optional()
-          .describe("ISO date of the Monday (e.g. '2026-04-06')"),
+          .describe("Filter by owner name (person accountable, case-insensitive substring, e.g. 'Kathy')"),
+        resource: z
+          .string()
+          .optional()
+          .describe("Filter by resource name (person doing the work, case-insensitive substring, e.g. 'Roz')"),
       }),
-      execute: async ({ weekOf }) => getWeekItemsData(weekOf),
+      execute: async ({ weekOf, owner, resource }) => {
+        return getWeekItemsData(weekOf, owner, resource);
+      },
     }),
 
     update_project_status: tool({
@@ -87,9 +92,11 @@ export function createBotTools(userName: string) {
           return { error: result.error, available: result.available };
         }
 
+        const cascaded = result.data?.cascadedItems as string[] | undefined;
+
         // Post to updates channel (bot-specific behavior)
         if (result.data) {
-          const updateText = `${result.data.previousStatus} -> ${result.data.newStatus}${notes ? ` (${notes})` : ""}`;
+          const updateText = `${result.data.previousStatus} -> ${result.data.newStatus}${notes ? ` (${notes})` : ""}${cascaded?.length ? ` [+${cascaded.length} week items]` : ""}`;
           await safePostUpdate({
             clientName: result.data.clientName as string,
             projectName: result.data.projectName as string,
@@ -98,7 +105,11 @@ export function createBotTools(userName: string) {
           });
         }
 
-        return { result: result.message };
+        const cascadeNote = cascaded?.length
+          ? ` Also updated ${cascaded.length} linked week item(s): ${cascaded.join(", ")}.`
+          : "";
+
+        return { result: result.message + cascadeNote };
       },
     }),
 
@@ -135,6 +146,30 @@ export function createBotTools(userName: string) {
         }
 
         return { result: result.message };
+      },
+    }),
+
+    get_person_workload: tool({
+      description:
+        "Get all week items and projects where a person is owner OR resource, grouped by client. Powers 'what's on X's plate?' questions.",
+      inputSchema: z.object({
+        personName: z.string().describe("Person's name (e.g. 'Kathy', 'Roz')"),
+      }),
+      execute: async ({ personName }) => getPersonWorkload(personName),
+    }),
+
+    get_client_contacts: tool({
+      description:
+        "Get client-side contacts for a given client. Powers 'who's holding things up at X?' questions.",
+      inputSchema: z.object({
+        clientSlug: z.string().describe("Client slug (e.g. 'convergix')"),
+      }),
+      execute: async ({ clientSlug }) => {
+        const contacts = getClientContactsRef(clientSlug);
+        if (contacts.length === 0) {
+          return { client: clientSlug, contacts: [], note: "No contacts on file for this client" };
+        }
+        return { client: clientSlug, contacts };
       },
     }),
   };

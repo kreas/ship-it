@@ -118,7 +118,7 @@ Uses @dnd-kit with custom collision detection in `src/lib/collision-detection.ts
 | Background tasks | Haiku | `claude-haiku-4-5-20251001` |
 | AI task execution | Haiku | `claude-haiku-4-5-20251001` |
 | Chat (default) | Haiku | `claude-haiku-4-5-20251001` |
-| Complex reasoning (user requested) | Sonnet | `claude-sonnet-4-5-20251001` |
+| Complex reasoning (user requested) | Sonnet | `claude-sonnet-4-6` |
 
 **Cost comparison (per 1M tokens):**
 - Haiku: $0.25 input / $1.25 output

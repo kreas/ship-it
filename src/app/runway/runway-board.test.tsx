@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { RunwayBoard, mergeWeekendDays, groupByWeek } from "./runway-board";
+import { RunwayBoard } from "./runway-board";
+import { mergeWeekendDays, groupByWeek } from "./runway-board-utils";
 import { thisWeek, upcoming, accounts, pipeline } from "./runway-board-test-fixtures";
 import type { DayItem } from "./types";
 
@@ -75,7 +76,7 @@ describe("RunwayBoard", () => {
 
   it("shows $0+ when all pipeline values are TBD", () => {
     const tbdPipeline = [
-      { account: "A", title: "SOW 1", value: "TBD", status: "no-sow" as const },
+      { account: "A", title: "SOW 1", value: "TBD", status: "at-risk" as const },
     ];
     render(<RunwayBoard {...defaultProps} pipeline={tbdPipeline} />);
     fireEvent.click(screen.getByText("Pipeline"));
@@ -94,10 +95,12 @@ describe("RunwayBoard", () => {
   });
 
   it("hides This Week section when restOfWeek is empty", () => {
-    // Only today's items, no other days
+    // Use local date to match how the component detects "today"
+    const now = new Date();
+    const localISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const todayOnly: typeof thisWeek = [
       {
-        date: new Date().toISOString().split("T")[0],
+        date: localISO,
         label: "Mon 4/6",
         items: [{ title: "Today Thing", account: "Test", type: "delivery" }],
       },

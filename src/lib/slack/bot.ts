@@ -15,49 +15,23 @@
  */
 
 import { anthropic } from "@ai-sdk/anthropic";
-import { generateText, stepCountIs } from "ai";
+import { generateText, stepCountIs, type UserContent } from "ai";
 import { getSlackClient } from "./client";
-import { getTeamMemberBySlackId } from "@/lib/runway/operations";
+import {
+  getTeamMemberBySlackId,
+  getTeamMemberRecordBySlackId,
+  getStaleItemsForAccounts,
+} from "@/lib/runway/operations";
 import { createBotTools } from "./bot-tools";
+import { buildBotSystemPrompt } from "@/lib/runway/bot-context";
+import { formatProactiveFollowUp } from "./bot-proactive";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-sonnet-4-6";
 const MAX_STEPS = 5;
 
-/**
- * Build the system prompt for the Runway bot.
- * Clean, factual, no AI voice.
- */
-export function buildBotSystemPrompt(userName: string): string {
-  return `You are the Civilization Runway bot. You help team members update project statuses and log information about client work.
-
-## Your role
-- Understand what the person is telling you about a project or client
-- Use the tools to look up the right project and make updates
-- Confirm changes clearly and factually
-- After confirming an update, you can offer: "I've got a couple things that could use your input. Want me to run through them?"
-
-## Rules
-- Be concise. No filler, no fluff.
-- Never use em dashes.
-- Never say "I've updated" or "I've processed" or anything AI-sounding.
-- Speak plainly like a teammate, not an assistant.
-- If you're not sure which project they mean, ask. Don't guess.
-- If the update doesn't match any known client or project, say so and list what's available.
-
-## Context
-- The person messaging you is: ${userName}
-- They are a Civilization team member updating project status via DM.
-- You have tools to look up clients, projects, and make updates.
-- Every status change gets logged and posted to the updates channel automatically.
-
-## Status values
-Projects use these statuses: in-production, awaiting-client, not-started, blocked, on-hold, completed
-
-## When making updates
-1. First use get_clients and/or get_projects to find the right project
-2. Call update_project_status or add_update to make the change
-3. Confirm what you did in plain language
-4. The updates channel post happens automatically`;
+export interface SlackImage {
+  mimetype: string;
+  base64: string;
 }
 
 /**
@@ -68,21 +42,45 @@ export async function handleDirectMessage(
   slackUserId: string,
   channelId: string,
   messageText: string,
-  messageTs: string
+  messageTs: string,
+  images?: SlackImage[]
 ): Promise<void> {
   const slack = getSlackClient();
 
-  // Look up team member
-  const userName =
-    (await getTeamMemberBySlackId(slackUserId)) ?? "Unknown team member";
+  // Look up team member (both name for tools and full record for prompt)
+  const [userName, teamMemberRecord] = await Promise.all([
+    getTeamMemberBySlackId(slackUserId),
+    getTeamMemberRecordBySlackId(slackUserId),
+  ]);
 
-  const tools = createBotTools(userName);
+  const displayName = userName ?? "Unknown team member";
+  const now = new Date();
+  const tools = createBotTools(displayName, now);
+
+  // Build message content — use content blocks when images are present
+  let userContent: UserContent = messageText;
+  if (images?.length) {
+    const parts: Array<{ type: "text"; text: string } | { type: "image"; image: string; mediaType: string }> = [];
+    if (messageText) {
+      parts.push({ type: "text", text: messageText });
+    }
+    for (const img of images) {
+      parts.push({
+        type: "image",
+        image: img.base64,
+        mediaType: img.mimetype,
+      });
+    }
+    userContent = parts;
+  }
 
   try {
+    const systemPrompt = buildBotSystemPrompt(teamMemberRecord, now);
+
     const result = await generateText({
       model: anthropic(MODEL),
-      system: buildBotSystemPrompt(userName),
-      messages: [{ role: "user", content: messageText }],
+      system: systemPrompt,
+      messages: [{ role: "user", content: userContent }],
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
       maxRetries: 1,
@@ -93,6 +91,41 @@ export async function handleDirectMessage(
       text: result.text,
       thread_ts: messageTs,
     });
+
+    // Proactive follow-up: if user leads accounts, nudge about stale items
+    if (teamMemberRecord?.accountsLed?.length) {
+      try {
+        // Collect project names the bot just updated so we don't nag about them
+        const updatedProjects: string[] = [];
+        for (const step of result.steps) {
+          for (const call of step.toolCalls) {
+            if (
+              (call.toolName === "update_project_status" || call.toolName === "add_update") &&
+              call.input &&
+              typeof call.input === "object" &&
+              "projectName" in call.input &&
+              typeof call.input.projectName === "string"
+            ) {
+              updatedProjects.push(call.input.projectName);
+            }
+          }
+        }
+
+        const staleItems = await getStaleItemsForAccounts(teamMemberRecord.accountsLed);
+        if (staleItems.length > 0) {
+          const followUp = formatProactiveFollowUp(staleItems, updatedProjects);
+          if (followUp) {
+            await slack.chat.postMessage({
+              channel: channelId,
+              text: followUp,
+              thread_ts: messageTs,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("[Runway Bot] Proactive follow-up failed:", err);
+      }
+    }
   } catch (err) {
     console.error("[Runway Bot] AI generation failed:", err);
     await slack.chat.postMessage({

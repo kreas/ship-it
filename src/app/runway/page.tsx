@@ -1,8 +1,8 @@
-// TODO: Re-enable auth when deployed to Vercel (WorkOS callback is port-bound)
-import { getClientsWithProjects, getWeekItems, getPipeline } from "./queries";
+import { getClientsWithProjects, getWeekItems, getPipeline, getStaleWeekItems } from "./queries";
 import type { ItemStatus, ItemCategory } from "./types";
 import { RunwayBoard } from "./runway-board";
 import { getMondayISODate, parseISODate } from "./date-utils";
+import { analyzeFlags } from "@/lib/runway/flags";
 
 export const metadata = {
   title: "Runway — Civilization Agency",
@@ -11,10 +11,11 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RunwayPage() {
-  const [clientsWithProjects, allWeekItems, pipelineData] = await Promise.all([
+  const [clientsWithProjects, allWeekItems, pipelineData, staleItems] = await Promise.all([
     getClientsWithProjects(),
     getWeekItems(),
     getPipeline(),
+    getStaleWeekItems(),
   ]);
 
   // Split week items into thisWeek and upcoming in a single pass
@@ -49,6 +50,7 @@ export default async function RunwayPage() {
       status: (p.status ?? "not-started") as ItemStatus,
       category: (p.category ?? "active") as ItemCategory,
       owner: p.owner ?? undefined,
+      resources: p.resources ?? undefined,
       waitingOn: p.waitingOn ?? undefined,
       target: p.target ?? undefined,
       notes: p.notes ?? undefined,
@@ -60,14 +62,19 @@ export default async function RunwayPage() {
     account: p.accountName ?? "",
     title: p.name,
     value: p.estimatedValue ?? "TBD",
-    status: (p.status ?? "no-sow") as
-      | "sow-sent"
+    status: (p.status ?? "drafting") as
+      | "scoping"
       | "drafting"
-      | "no-sow"
-      | "verbal",
+      | "sow-sent"
+      | "verbal"
+      | "signed"
+      | "at-risk",
+    owner: p.owner ?? undefined,
     waitingOn: p.waitingOn ?? undefined,
     notes: p.notes ?? undefined,
   }));
+
+  const flags = analyzeFlags(accounts, thisWeek, upcoming, pipelineProps);
 
   return (
     <RunwayBoard
@@ -75,6 +82,8 @@ export default async function RunwayPage() {
       upcoming={upcoming}
       accounts={accounts}
       pipeline={pipelineProps}
+      flags={flags}
+      staleItems={staleItems}
     />
   );
 }

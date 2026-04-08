@@ -33,7 +33,7 @@ describe("TodaySection", () => {
   it("renders item details (account, owner, notes)", () => {
     render(<TodaySection todayColumn={todayColumn} />);
     expect(screen.getByText("Convergix")).toBeInTheDocument();
-    expect(screen.getByText("Kathy")).toBeInTheDocument();
+    expect(screen.getByText("Resources: Kathy")).toBeInTheDocument();
     expect(screen.getByText("Copy ready")).toBeInTheDocument();
   });
 

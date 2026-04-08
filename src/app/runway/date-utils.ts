@@ -7,11 +7,28 @@ export function parseISODate(dateStr: string): Date {
 }
 
 /**
+ * Get the Monday Date object for a given date's week.
+ * Sunday is treated as part of the previous week.
+ */
+export function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+/**
  * Get the ISO date string (YYYY-MM-DD) of the Monday for a given date's week.
  */
 export function getMondayISODate(date: Date): string {
-  const day = date.getDay();
-  const monday = new Date(date);
-  monday.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
-  return monday.toISOString().split("T")[0];
+  return toISODateString(getMonday(date));
+}
+
+/**
+ * Format a Date as a local ISO date string (YYYY-MM-DD).
+ * Uses local time, not UTC, to avoid timezone shifts.
+ */
+export function toISODateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

@@ -33,9 +33,9 @@ Runway uses a **separate Turso database** (`RUNWAY_DATABASE_URL`), not the main 
 | Table | Purpose |
 |-------|---------|
 | `clients` | Agency clients (Convergix, LPPC, etc.) with contract info |
-| `projects` | Work items under each client, with status and category |
-| `week_items` | Calendar entries by date, linked to clients |
-| `pipeline_items` | Unsigned SOWs and new business, linked to clients |
+| `projects` | Work items under each client, with status, owner, and resources |
+| `week_items` | Calendar entries by date, with owner/resources separation |
+| `pipeline_items` | Unsigned SOWs and new business, with owner and pipeline status lifecycle |
 | `updates` | Audit log of all changes (idempotency-keyed) |
 | `team_members` | Civilization team with Slack user IDs |
 
@@ -56,11 +56,14 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 
 | File | Purpose |
 |------|---------|
-| `operations.ts` | Shared queries (client cache, name map, fuzzy match), utilities (`groupBy`, `clientNotFoundError`), re-exports from split modules |
-| `operations-reads.ts` | Read operations: clients with counts, filtered projects, week items, pipeline |
-| `operations-writes.ts` | Status updates with idempotency and audit logging |
+| `operations.ts` | Shared queries (client cache, name map, fuzzy match), utilities (`groupBy`, `matchesSubstring`, `getClientOrFail`), re-exports from split modules |
+| `operations-reads.ts` | Barrel re-export for read operations (split into clients, week, pipeline modules) |
+| `operations-reads-clients.ts` | Client/project queries: clients with counts, filtered projects |
+| `operations-reads-week.ts` | Week items (filterable by owner/resource), person workload, and `getLinkedWeekItems(projectId)` |
+| `operations-reads-pipeline.ts` | Pipeline data and stale items detection |
+| `operations-writes.ts` | Status updates with idempotency, audit logging, and cascade to linked week items |
 | `operations-add.ts` | New projects and free-form updates |
-| `operations-context.ts` | Team members, client contacts, update history |
+| `operations-context.ts` | Team members (with roleCategory/accountsLed), client contacts, update history |
 
 ### Client Cache
 
@@ -68,14 +71,44 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 
 ### Shared Utilities
 
-`operations.ts` exports two helpers used across write modules:
+`operations.ts` exports helpers used across modules:
 
-- `clientNotFoundError(slug)` — standard error result for missing clients (used by writes + add operations)
+- `getClientOrFail(slug)` — looks up client, returns `{ ok, client }` or standard error result (used by writes + add operations)
+- `matchesSubstring(value, search)` — case-insensitive substring match (used by read operations for owner/waitingOn filters)
 - `groupBy(items, keyFn)` — generic array grouping (used by reads and board queries)
+- `clientNotFoundError(slug)` — standard error result for missing clients
+- `CASCADE_STATUSES` — statuses that cascade from projects to linked week items: `completed`, `blocked`, `on-hold`
+- `TERMINAL_ITEM_STATUSES` — week item statuses that block cascade: `completed`, `canceled`
+
+### Status Cascade
+
+When a project status changes to a cascade status (`completed`, `blocked`, `on-hold`), linked week items automatically update to match. Week items already in a terminal state (`completed`, `canceled`) are left alone. Non-terminal project statuses (`in-production`, `awaiting-client`) do NOT cascade because individual week items may be at different stages.
+
+The cascade is implemented in `operations-writes.ts` using `getLinkedWeekItems(projectId)` from `operations-reads-week.ts`. The result includes a `cascadedItems: string[]` field listing which week item titles were updated. The bot surfaces this in its response and in the updates channel post.
 
 ### Idempotency
 
 All write operations generate a deterministic idempotency key (SHA-256 hash of operation parts). Duplicate requests return success without writing.
+
+## Reference Data
+
+Static lookup tables for clients and team members, used by the bot system prompt and contact tools. Easier to edit than DB rows.
+
+| File | Purpose |
+|------|---------|
+| `src/lib/runway/reference/clients.ts` | 13 clients with slugs, nicknames, and contacts |
+| `src/lib/runway/reference/team.ts` | 11 team members with roles, accountsLed, titles (includes contractors) |
+| `src/lib/runway/date-constants.ts` | Shared `DAY_NAMES`, `MONTH_NAMES`, `MONTH_NAMES_SHORT` |
+
+### Client References
+
+Each entry has `slug`, `fullName`, `nicknames[]`, and `contacts[]`. Used by `buildBotSystemPrompt` for the client map section and by the `get_client_contacts` bot tool.
+
+### Team References
+
+Each entry has `fullName`, `firstName`, `nicknames[]`, `roleCategory` (creative/dev/am/pm/leadership/community/contractor), `accountsLed[]`, and `title`. Used by the system prompt for the team roster and name disambiguation. Contractors (Chris, Josefina) have empty `slackUserId` and `accountsLed`.
+
+Key disambiguation: "Lane" defaults to Lane Jordan (Creative Director), not Ronan Lane (PM).
 
 ## Board UI
 
@@ -91,13 +124,16 @@ Server-rendered page at `/runway` with three client-side views:
 
 ```
 page.tsx (RSC)
-  → Promise.all([getClientsWithProjects(), getWeekItems(), getPipeline()])
+  → Promise.all([getClientsWithProjects(), getWeekItems(), getPipeline(), getStaleWeekItems()])
   → Splits week items into thisWeek/upcoming by current Monday
+  → analyzeFlags() generates AI flags from board data
   → Maps DB shapes to UI types (src/app/runway/types.ts)
   → RunwayBoard (client component)
+    → NeedsUpdateSection: stale items from previous days (above Today)
     → Pre-computes todayColumn, restOfWeek from thisWeek
     → mergeWeekendDays() combines Sat+Sun into single Weekend column
     → groupByWeek() groups upcoming days under "w/o M/D" headers
+    → FlagsPanel: AI flags sidebar (resource conflicts, stale items, deadlines, bottlenecks)
     → Tab state selects view
     → Leaf components render data
 ```
@@ -116,7 +152,7 @@ page.tsx (RSC)
 
 ### Card Hierarchy
 
-`DayItemCard` renders fields in this order: account name (uppercase, prominent), project/task title, owner (if present), notes. The type tag (delivery, review, kickoff, etc.) appears on the right. Both `sm` (day columns) and `lg` (today section) sizes share the same `ACCOUNT_CLASS` constant for the account label.
+`DayItemCard` renders fields in this order: account name (uppercase, prominent), project/task title, resources via `MetadataLabel` (who does the work), notes with parsed "Next Step:" labels and "(Risk: ...)" in amber, then owner (muted, only when different from resources). The type tag (delivery, review, kickoff, etc.) appears on the right. Owner/resources display logic is in `display-utils.ts` (`getOwnerResourcesDisplay`). Both `sm` (day columns) and `lg` (today section) sizes share the same `ACCOUNT_CLASS` constant.
 
 ### Scroll Constraints
 
@@ -127,17 +163,16 @@ Day columns use `max-h-[60vh] overflow-y-auto` so they scroll internally instead
 `AccountSection` shows projects as divider-separated sections (border-t between items) sorted by target date. Key behaviors:
 
 - **Date sorting**: `targetSortKey()` parses `M/D` patterns from free-text target strings. Items with no parseable date sort to the end.
-- **Short date display**: `extractDate()` pulls the first `M/D` from the target and shows it on the right side of each project card.
+- **Target display**: Target dates are shown via `MetadataLabel` inline with owner and waiting-on fields — no separate short date on the right side.
 - **Contract label expansion**: `formatContractTerm()` expands abbreviations (MSA, SOW, NDA) in contract term strings for readability.
 - **Graceful nulls**: Missing `contractValue` or `contractTerm` fields are simply not rendered (no empty elements).
 
-Both `targetSortKey` and `extractDate` share a single `DATE_PATTERN` regex.
-
 ### Pipeline View
 
-`PipelineRow` displays unsigned SOWs with these behaviors:
+`PipelineRow` displays SOWs and new business with these behaviors:
 
-- **Status labels**: `no-sow` displays as "Drafting" (same label as `drafting`, different color). `sow-sent` displays as "SOW Sent", `verbal` as "Verbal".
+- **Pipeline status lifecycle**: `scoping` -> `drafting` -> `sow-sent` -> `verbal` -> `signed`, with `at-risk` as a branch (work happening without formal agreement). Statuses: `scoping` (gray), `drafting` (violet), `sow-sent` (amber), `verbal` (green), `signed` (sky), `at-risk` (red).
+- **Owner display**: Owner shown as muted metadata alongside waitingOn.
 - **Waiting on fallback**: `getWaitingOnDisplay()` returns the explicit `waitingOn` name if set. For `sow-sent` and `verbal` statuses without a name, falls back to "Client". Other statuses show nothing.
 - **Next Steps prefix**: Notes are shown with a "Next Steps:" label prefix.
 
@@ -148,7 +183,7 @@ Both `targetSortKey` and `extractDate` share a single `DATE_PATTERN` regex.
 - `StatusBadge` — project status (in-production, blocked, etc.)
 - `ContractBadge` — contract state (expired, unsigned)
 - `StaleBadge` — stale-days indicator
-- `MetadataLabel` — "Label: Value" pattern with configurable color (used by AccountSection and PipelineRow)
+- `MetadataLabel` — "Label: Value" pattern with configurable color (used by AccountSection, PipelineRow, and DayItemCard)
 
 ### Blocked Override
 
@@ -160,17 +195,45 @@ UI types are in `src/app/runway/types.ts`. DB types are inferred from Drizzle sc
 
 ## MCP Server
 
-Documented in [MCP Integration](./mcp-integration.md#standalone-mcp-servers-runway). Bearer token auth at `POST /api/mcp/runway`. 10 tools wrapping the operations layer.
+Documented in [MCP Integration](./mcp-integration.md#standalone-mcp-servers-runway). Bearer token auth at `POST /api/mcp/runway`. 11 tools wrapping the operations layer (includes `get_person_workload` for cross-client workload queries).
 
 ## Slack Bot
 
 ### Flow
 
-1. Team member DMs the bot
-2. `POST /api/slack/events` verifies HMAC signature, dispatches to Inngest
-3. Inngest function (`runway/slack.message`) calls `handleDirectMessage`
-4. `handleDirectMessage` uses Haiku with 6 tools to interpret the message
+1. Team member DMs the bot (text and/or images)
+2. `POST /api/slack/events` verifies HMAC signature, extracts image file metadata, dispatches to Inngest
+3. Inngest function (`runway/slack.message`) downloads images via Slack API (with `Promise.allSettled` for graceful failure), then calls `handleDirectMessage`
+4. `handleDirectMessage` builds a dynamic system prompt via `buildBotSystemPrompt`, sends text + images as AI SDK content blocks to Haiku with 8 tools
 5. Bot responds in thread, posts formatted update to updates channel
+
+### Dynamic System Prompt
+
+`src/lib/runway/bot-context.ts` composes sections from `bot-context-sections.ts` (data builders) and `bot-context-behaviors.ts` (behavior rules) into a context-rich prompt with 10 sections:
+
+1. Core rules (project statuses, pipeline statuses, update workflow)
+2. Date context (today, this week's Monday, yesterday, tomorrow)
+3. Identity context (who's talking -- name, role, accounts led)
+4. Query recipes (owner vs resource distinction: "what am I working on" uses resource, "what do I own" uses owner)
+5. Team roster (all members with roles and accounts)
+6. Client map (nicknames, slugs, contacts)
+7. Natural language glossary ("out the door" = delivered, "sitting on it" = awaiting client, etc.)
+8. Role-based behavior (AM vs creative vs PM query interpretation)
+9. Proactive behavior (suggest related updates, flag contradictions)
+10. Tone rules (no AI voice, acknowledge frustration)
+11. Unsupported features (graceful handling of availability, reminders)
+
+The prompt is built per-message using the team member's record from the DB and the current date. Unknown Slack users get a null record and the bot asks who they are.
+
+### Image Attachments
+
+When a user sends images in a DM:
+
+1. `route.ts` extracts `event.files`, filters to `image/*` mimetypes
+2. Messages with only images (no text) are dispatched normally
+3. Inngest downloads each image using `SLACK_BOT_TOKEN` auth, converts to base64
+4. Failed downloads are skipped gracefully (`Promise.allSettled`)
+5. `bot.ts` sends images as AI SDK `ImagePart` content blocks alongside text
 
 ### Bot Tools
 
@@ -179,10 +242,12 @@ Defined in `src/lib/slack/bot-tools.ts`. Same operations as MCP but wrapped as A
 | Tool | Purpose |
 |------|---------|
 | `get_clients` | List clients with project counts |
-| `get_projects` | List projects for a client |
+| `get_projects` | List projects filtered by client, owner, or waitingOn |
 | `get_pipeline` | List unsigned SOWs |
-| `get_week_items` | Calendar items for a week |
-| `update_project_status` | Change status + post to updates channel |
+| `get_week_items` | Calendar items for a week, filterable by owner (accountable) or resource (doing the work) |
+| `get_person_workload` | Cross-client view of a person's projects and week items (searches both owner and resource fields) |
+| `get_client_contacts` | Contact names and roles for a client (from reference data) |
+| `update_project_status` | Change status + cascade to linked week items + post to updates channel |
 | `add_update` | Log free-form update + post to updates channel |
 
 ### Updates Channel
@@ -208,16 +273,19 @@ The Slack bot uses Inngest for durable processing so the webhook can respond wit
 
 ```typescript
 // src/lib/inngest/functions/runway-slack-message.ts
-export const runwaySlackMessage = inngest.createFunction(
-  { id: "runway-slack-message" },
+export const processRunwaySlackMessage = inngest.createFunction(
+  { id: "runway-slack-message", retries: 2, concurrency: { limit: 3 } },
   { event: "runway/slack.message" },
-  async ({ event }) => {
-    await handleDirectMessage(
-      event.data.slackUserId,
-      event.data.channelId,
-      event.data.messageText,
-      event.data.messageTs,
-    );
+  async ({ event, step }) => {
+    const { slackUserId, channelId, messageText, messageTs, imageFiles } = event.data;
+
+    // Download images (graceful failure via Promise.allSettled)
+    const images = await step.run("download-images", async () => { /* ... */ });
+
+    // Process message with text + images
+    await step.run("process-message", async () => {
+      await handleDirectMessage(slackUserId, channelId, messageText, messageTs, images);
+    });
   },
 );
 ```
@@ -241,23 +309,35 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 |------|---------|
 | `src/lib/db/runway-schema.ts` | Database schema (6 tables) |
 | `src/lib/db/runway.ts` | Database client factory |
-| `src/lib/runway/operations.ts` | Shared operations entry point |
+| `src/lib/runway/operations.ts` | Barrel re-export + shared utilities (groupBy, matchesSubstring, etc.) |
+| `src/lib/runway/operations-utils.ts` | Shared utility implementations (client cache, fuzzy match, idempotency) |
+| `src/lib/runway/flags.ts` | AI flag analysis (resource conflicts, stale items, deadlines, bottlenecks) |
+| `src/lib/runway/bot-context.ts` | Dynamic system prompt coordinator |
+| `src/lib/runway/bot-context-sections.ts` | Prompt data builders (date, identity, roster, client map, recipes) |
+| `src/lib/runway/bot-context-behaviors.ts` | Prompt behavior rules (glossary, roles, tone, proactive) |
+| `src/lib/runway/date-constants.ts` | Shared date formatting constants |
+| `src/lib/runway/reference/clients.ts` | Client reference data (nicknames, contacts) |
+| `src/lib/runway/reference/team.ts` | Team reference data (roles, accounts led) |
 | `src/lib/mcp/runway-server.ts` | MCP server factory |
-| `src/lib/mcp/runway-tools.ts` | MCP tool registrations |
+| `src/lib/mcp/runway-tools.ts` | MCP tool registrations (11 tools) |
 | `src/app/api/mcp/runway/route.ts` | MCP HTTP endpoint |
-| `src/app/api/slack/events/route.ts` | Slack webhook handler |
-| `src/lib/slack/bot.ts` | AI bot orchestration |
-| `src/lib/slack/bot-tools.ts` | Bot tool definitions |
+| `src/app/api/slack/events/route.ts` | Slack webhook handler (text + images) |
+| `src/lib/slack/bot.ts` | AI bot orchestration (text + image content blocks) |
+| `src/lib/slack/bot-tools.ts` | Bot tool definitions (8 tools) |
 | `src/lib/slack/verify.ts` | Slack signature verification |
 | `src/lib/slack/updates-channel.ts` | Updates channel posting |
 | `src/app/runway/page.tsx` | Board page (RSC, data transformation) |
 | `src/app/runway/runway-board.tsx` | Board client component (3 views) |
 | `src/app/runway/queries.ts` | Board-specific DB queries |
-| `src/app/runway/date-utils.ts` | `parseISODate`, `getMondayISODate` |
-| `src/app/runway/components/day-item-card.tsx` | Card component (account-first hierarchy, blocked override) |
+| `src/app/runway/date-utils.ts` | `parseISODate`, `getMonday`, `getMondayISODate` |
+| `src/app/runway/runway-board-utils.ts` | Board utilities (mergeWeekendDays, groupByWeek) |
+| `src/app/runway/components/day-item-card.tsx` | Card component (resources-first, notes parsing, blocked override) |
+| `src/app/runway/components/display-utils.ts` | Shared display helpers (getOwnerResourcesDisplay) |
+| `src/app/runway/components/flags-panel.tsx` | AI flags sidebar panel |
+| `src/app/runway/components/needs-update-section.tsx` | Stale items urgency section |
 | `src/app/runway/components/status-badge.tsx` | Shared badge and label components |
 | `src/app/runway/data.ts` | Seed data (13 clients, typed exports) |
-| `scripts/seed-runway.ts` | Seed script (imports from date-utils) |
+| `scripts/seed-runway.ts` | Seed script (imports from date-utils, links week items to projects via `projectId` FK) |
 
 ## Related Documentation
 

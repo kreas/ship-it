@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Account, TriageItem } from "../types";
+import { getOwnerResourcesDisplay } from "./display-utils";
 import { StatusBadge, StaleBadge, ContractBadge, MetadataLabel } from "./status-badge";
 
 const DATE_PATTERN = /(\d{1,2})\/(\d{1,2})/;
@@ -17,13 +18,6 @@ function targetSortKey(target?: string): number {
   return 99998;
 }
 
-/** Extract a short date like "4/11" from a target string, if one exists. */
-function extractDate(target?: string): string | null {
-  if (!target) return null;
-  const match = target.match(DATE_PATTERN);
-  return match ? `${match[1]}/${match[2]}` : null;
-}
-
 /**
  * Expand common contract abbreviations for readability.
  */
@@ -36,38 +30,34 @@ function formatContractTerm(term?: string): string | undefined {
 }
 
 function ProjectCard({ item }: { item: TriageItem }) {
-  const shortDate = extractDate(item.target);
+  const { showOwnerSeparately, displayResources } = getOwnerResourcesDisplay(item);
 
   return (
     <div className="border-t border-border/30 py-3 first:border-t-0 first:pt-0">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-foreground">{item.title}</p>
-            <StatusBadge status={item.status} />
-            {item.staleDays ? <StaleBadge days={item.staleDays} /> : null}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            {item.owner ? (
-              <MetadataLabel label="Owner" value={item.owner} />
-            ) : null}
-            {item.waitingOn ? (
-              <MetadataLabel label="Waiting on" value={item.waitingOn} className="text-xs text-amber-400/80" />
-            ) : null}
-            {item.target ? (
-              <MetadataLabel label="Target" value={item.target} className="text-xs text-sky-400/80" />
-            ) : null}
-          </div>
-          {item.notes ? (
-            <p className="mt-1 text-xs text-muted-foreground/70">
-              {item.notes}
-            </p>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground">{item.title}</p>
+          <StatusBadge status={item.status} />
+          {item.staleDays ? <StaleBadge days={item.staleDays} /> : null}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {displayResources ? (
+            <MetadataLabel label="Resources" value={displayResources} />
+          ) : null}
+          {showOwnerSeparately ? (
+            <MetadataLabel label="Owner" value={item.owner!} className="text-xs text-muted-foreground/50" />
+          ) : null}
+          {item.waitingOn ? (
+            <MetadataLabel label="Waiting on" value={item.waitingOn} className="text-xs text-amber-400/80" />
+          ) : null}
+          {item.target ? (
+            <MetadataLabel label="Target" value={item.target} className="text-xs text-sky-400/80" />
           ) : null}
         </div>
-        {shortDate ? (
-          <span className="shrink-0 text-xs font-medium text-muted-foreground/60">
-            {shortDate}
-          </span>
+        {item.notes ? (
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            {item.notes}
+          </p>
         ) : null}
       </div>
     </div>
@@ -93,17 +83,17 @@ export function AccountSection({ account }: { account: Account }) {
   const displayTerm = formatContractTerm(account.contractTerm);
 
   return (
-    <div className="rounded-xl border border-border bg-card/30 p-5">
-      <div className="mb-4 flex items-start justify-between">
+    <div className="rounded-xl border border-border bg-card/30 p-3 sm:p-5">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-xl font-bold text-foreground">{account.name}</h3>
+          <h3 className="text-lg font-bold text-foreground sm:text-xl">{account.name}</h3>
           {account.team ? (
             <p className="mt-0.5 text-xs text-muted-foreground">
               {account.team}
             </p>
           ) : null}
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           {account.contractValue ? (
             <p className="text-sm font-medium text-foreground">
               {account.contractValue}

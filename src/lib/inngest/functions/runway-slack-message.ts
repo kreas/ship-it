@@ -17,10 +17,35 @@ export const processRunwaySlackMessage = inngest.createFunction(
   },
   { event: "runway/slack.message" },
   async ({ event, step }) => {
-    const { slackUserId, channelId, messageText, messageTs } = event.data;
+    const { slackUserId, channelId, messageText, messageTs, imageFiles } = event.data;
+
+    // Download images from Slack (requires bot token for private URLs)
+    const images = await step.run("download-images", async () => {
+      if (!imageFiles?.length) return [];
+      const token = process.env.SLACK_BOT_TOKEN;
+      if (!token) return [];
+      const results = await Promise.allSettled(
+        imageFiles.map(async (file: { url: string; mimetype: string }) => {
+          const response = await fetch(file.url, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!response.ok) {
+            throw new Error(`Slack returned ${response.status} for image download`);
+          }
+          const buffer = await response.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString("base64");
+          return { mimetype: file.mimetype, base64 };
+        })
+      );
+      return results
+        .filter((r): r is PromiseFulfilledResult<{ mimetype: string; base64: string }> =>
+          r.status === "fulfilled"
+        )
+        .map((r) => r.value);
+    });
 
     await step.run("process-message", async () => {
-      await handleDirectMessage(slackUserId, channelId, messageText, messageTs);
+      await handleDirectMessage(slackUserId, channelId, messageText, messageTs, images);
     });
 
     return { processed: true };

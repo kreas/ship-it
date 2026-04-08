@@ -1,9 +1,12 @@
 "use client";
 
 import type { DayItemEntry, DayItemType } from "../types";
-import { TYPE_INDICATORS } from "./status-badge";
+import { getOwnerResourcesDisplay } from "./display-utils";
+import { TYPE_INDICATORS, MetadataLabel } from "./status-badge";
 
 const HOLD_PATTERN = /\b(hold[s]?\s+until|on\s+hold|blocked|not\s+starting\s+until)\b/i;
+const RISK_PATTERN = /\(Risk:\s*([^)]+)\)/;
+const NEXT_STEP_PATTERN = /^Next Step:\s*/;
 
 /**
  * Override the display type to "blocked" if notes contain hold/blocked language.
@@ -12,6 +15,18 @@ export function getEffectiveType(item: DayItemEntry): DayItemType {
   if (item.type === "blocked") return "blocked";
   if (item.notes && HOLD_PATTERN.test(item.notes)) return "blocked";
   return item.type;
+}
+
+/**
+ * Parse notes into main text and optional risk warning.
+ */
+export function parseNotes(notes: string): { main: string; risk?: string; isNextStep: boolean } {
+  const riskMatch = notes.match(RISK_PATTERN);
+  const risk = riskMatch ? riskMatch[1].trim() : undefined;
+  const mainText = notes.replace(RISK_PATTERN, "").trim();
+  const isNextStep = NEXT_STEP_PATTERN.test(mainText);
+  const main = mainText.replace(NEXT_STEP_PATTERN, "").trim();
+  return { main, risk, isNextStep };
 }
 
 interface DayItemCardProps {
@@ -43,6 +58,9 @@ const SIZE_CLASSES = {
 export function DayItemCard({ item, size = "sm" }: DayItemCardProps) {
   const s = SIZE_CLASSES[size];
   const displayType = getEffectiveType(item);
+  const { showOwnerSeparately, displayResources } = getOwnerResourcesDisplay(item);
+
+  const parsed = item.notes ? parseNotes(item.notes) : null;
 
   return (
     <div className={s.card}>
@@ -50,12 +68,31 @@ export function DayItemCard({ item, size = "sm" }: DayItemCardProps) {
         <div className="min-w-0 flex-1">
           <p className={ACCOUNT_CLASS}>{item.account}</p>
           <p className={s.title}>{item.title}</p>
-          {item.owner ? (
-            <div className={s.meta}>
-              <span className={s.metaText}>{item.owner}</span>
+          <div className={s.meta}>
+            {displayResources ? (
+              <MetadataLabel label="Resources" value={displayResources} className={s.metaText} />
+            ) : null}
+          </div>
+          {parsed ? (
+            <div className={s.notes}>
+              {parsed.isNextStep ? (
+                <span>
+                  <span className="font-medium text-muted-foreground">Next Step:</span>{" "}
+                  {parsed.main}
+                </span>
+              ) : (
+                <span>{parsed.main}</span>
+              )}
+              {parsed.risk ? (
+                <span className="ml-1 text-amber-400/80">(Risk: {parsed.risk})</span>
+              ) : null}
             </div>
           ) : null}
-          {item.notes ? <p className={s.notes}>{item.notes}</p> : null}
+          {showOwnerSeparately ? (
+            <div className="mt-1">
+              <MetadataLabel label="Owner" value={item.owner!} className="text-xs text-muted-foreground/50" />
+            </div>
+          ) : null}
         </div>
         <span
           className={`mt-0.5 shrink-0 text-xs font-medium uppercase tracking-wider ${
