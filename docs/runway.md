@@ -33,9 +33,9 @@ Runway uses a **separate Turso database** (`RUNWAY_DATABASE_URL`), not the main 
 | Table | Purpose |
 |-------|---------|
 | `clients` | Agency clients (Convergix, LPPC, etc.) with contract info |
-| `projects` | Work items under each client, with status and category |
-| `week_items` | Calendar entries by date, linked to clients |
-| `pipeline_items` | Unsigned SOWs and new business, linked to clients |
+| `projects` | Work items under each client, with status, owner, and resources |
+| `week_items` | Calendar entries by date, with owner/resources separation |
+| `pipeline_items` | Unsigned SOWs and new business, with owner and pipeline status lifecycle |
 | `updates` | Audit log of all changes (idempotency-keyed) |
 | `team_members` | Civilization team with Slack user IDs |
 
@@ -57,7 +57,10 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 | File | Purpose |
 |------|---------|
 | `operations.ts` | Shared queries (client cache, name map, fuzzy match), utilities (`groupBy`, `matchesSubstring`, `getClientOrFail`), re-exports from split modules |
-| `operations-reads.ts` | Read operations: clients with counts, filtered projects (owner/waitingOn), week items, pipeline, person workload |
+| `operations-reads.ts` | Barrel re-export for read operations (split into clients, week, pipeline modules) |
+| `operations-reads-clients.ts` | Client/project queries: clients with counts, filtered projects |
+| `operations-reads-week.ts` | Week items (filterable by owner/resource) and person workload |
+| `operations-reads-pipeline.ts` | Pipeline data and stale items detection |
 | `operations-writes.ts` | Status updates with idempotency and audit logging |
 | `operations-add.ts` | New projects and free-form updates |
 | `operations-context.ts` | Team members (with roleCategory/accountsLed), client contacts, update history |
@@ -86,7 +89,7 @@ Static lookup tables for clients and team members, used by the bot system prompt
 | File | Purpose |
 |------|---------|
 | `src/lib/runway/reference/clients.ts` | 13 clients with slugs, nicknames, and contacts |
-| `src/lib/runway/reference/team.ts` | 8 team members with roles, accountsLed, titles |
+| `src/lib/runway/reference/team.ts` | 11 team members with roles, accountsLed, titles (includes contractors) |
 | `src/lib/runway/date-constants.ts` | Shared `DAY_NAMES`, `MONTH_NAMES`, `MONTH_NAMES_SHORT` |
 
 ### Client References
@@ -95,7 +98,7 @@ Each entry has `slug`, `fullName`, `nicknames[]`, and `contacts[]`. Used by `bui
 
 ### Team References
 
-Each entry has `fullName`, `firstName`, `nicknames[]`, `roleCategory` (creative/dev/am/pm/leadership/community), `accountsLed[]`, and `title`. Used by the system prompt for the team roster and name disambiguation.
+Each entry has `fullName`, `firstName`, `nicknames[]`, `roleCategory` (creative/dev/am/pm/leadership/community/contractor), `accountsLed[]`, and `title`. Used by the system prompt for the team roster and name disambiguation. Contractors (Chris, Josefina) have empty `slackUserId` and `accountsLed`.
 
 Key disambiguation: "Lane" defaults to Lane Jordan (Creative Director), not Ronan Lane (PM).
 
@@ -113,13 +116,16 @@ Server-rendered page at `/runway` with three client-side views:
 
 ```
 page.tsx (RSC)
-  → Promise.all([getClientsWithProjects(), getWeekItems(), getPipeline()])
+  → Promise.all([getClientsWithProjects(), getWeekItems(), getPipeline(), getStaleWeekItems()])
   → Splits week items into thisWeek/upcoming by current Monday
+  → analyzeFlags() generates AI flags from board data
   → Maps DB shapes to UI types (src/app/runway/types.ts)
   → RunwayBoard (client component)
+    → NeedsUpdateSection: stale items from previous days (above Today)
     → Pre-computes todayColumn, restOfWeek from thisWeek
     → mergeWeekendDays() combines Sat+Sun into single Weekend column
     → groupByWeek() groups upcoming days under "w/o M/D" headers
+    → FlagsPanel: AI flags sidebar (resource conflicts, stale items, deadlines, bottlenecks)
     → Tab state selects view
     → Leaf components render data
 ```
@@ -138,7 +144,7 @@ page.tsx (RSC)
 
 ### Card Hierarchy
 
-`DayItemCard` renders fields in this order: account name (uppercase, prominent), project/task title, owner via `MetadataLabel` (if present), notes. The type tag (delivery, review, kickoff, etc.) appears on the right. Both `sm` (day columns) and `lg` (today section) sizes share the same `ACCOUNT_CLASS` constant for the account label.
+`DayItemCard` renders fields in this order: account name (uppercase, prominent), project/task title, resources via `MetadataLabel` (who does the work), notes with parsed "Next Step:" labels and "(Risk: ...)" in amber, then owner (muted, only when different from resources). The type tag (delivery, review, kickoff, etc.) appears on the right. Owner/resources display logic is in `display-utils.ts` (`getOwnerResourcesDisplay`). Both `sm` (day columns) and `lg` (today section) sizes share the same `ACCOUNT_CLASS` constant.
 
 ### Scroll Constraints
 
@@ -155,9 +161,10 @@ Day columns use `max-h-[60vh] overflow-y-auto` so they scroll internally instead
 
 ### Pipeline View
 
-`PipelineRow` displays unsigned SOWs with these behaviors:
+`PipelineRow` displays SOWs and new business with these behaviors:
 
-- **Status labels**: `no-sow` displays as "Drafting" (same label as `drafting`, different color). `sow-sent` displays as "SOW Sent", `verbal` as "Verbal".
+- **Pipeline status lifecycle**: `scoping` -> `drafting` -> `sow-sent` -> `verbal` -> `signed`, with `at-risk` as a branch (work happening without formal agreement). Statuses: `scoping` (gray), `drafting` (violet), `sow-sent` (amber), `verbal` (green), `signed` (sky), `at-risk` (red).
+- **Owner display**: Owner shown as muted metadata alongside waitingOn.
 - **Waiting on fallback**: `getWaitingOnDisplay()` returns the explicit `waitingOn` name if set. For `sow-sent` and `verbal` statuses without a name, falls back to "Client". Other statuses show nothing.
 - **Next Steps prefix**: Notes are shown with a "Next Steps:" label prefix.
 
@@ -194,18 +201,19 @@ Documented in [MCP Integration](./mcp-integration.md#standalone-mcp-servers-runw
 
 ### Dynamic System Prompt
 
-`src/lib/runway/bot-context.ts` builds a context-rich prompt with 10 sections:
+`src/lib/runway/bot-context.ts` composes sections from `bot-context-sections.ts` (data builders) and `bot-context-behaviors.ts` (behavior rules) into a context-rich prompt with 10 sections:
 
-1. Core rules (status values, update workflow)
+1. Core rules (project statuses, pipeline statuses, update workflow)
 2. Date context (today, this week's Monday, yesterday, tomorrow)
-3. Identity context (who's talking — name, role, accounts led)
-4. Team roster (all members with roles and accounts)
-5. Client map (nicknames, slugs, contacts)
-6. Natural language glossary ("out the door" = delivered, "sitting on it" = awaiting client, etc.)
-7. Role-based behavior (AM vs creative vs PM query interpretation)
-8. Proactive behavior (suggest related updates, flag contradictions)
-9. Tone rules (no AI voice, acknowledge frustration)
-10. Unsupported features (graceful handling of availability, reminders)
+3. Identity context (who's talking -- name, role, accounts led)
+4. Query recipes (owner vs resource distinction: "what am I working on" uses resource, "what do I own" uses owner)
+5. Team roster (all members with roles and accounts)
+6. Client map (nicknames, slugs, contacts)
+7. Natural language glossary ("out the door" = delivered, "sitting on it" = awaiting client, etc.)
+8. Role-based behavior (AM vs creative vs PM query interpretation)
+9. Proactive behavior (suggest related updates, flag contradictions)
+10. Tone rules (no AI voice, acknowledge frustration)
+11. Unsupported features (graceful handling of availability, reminders)
 
 The prompt is built per-message using the team member's record from the DB and the current date. Unknown Slack users get a null record and the bot asks who they are.
 
@@ -228,8 +236,8 @@ Defined in `src/lib/slack/bot-tools.ts`. Same operations as MCP but wrapped as A
 | `get_clients` | List clients with project counts |
 | `get_projects` | List projects filtered by client, owner, or waitingOn |
 | `get_pipeline` | List unsigned SOWs |
-| `get_week_items` | Calendar items for a week, optionally filtered by owner |
-| `get_person_workload` | Cross-client view of a person's projects and week items |
+| `get_week_items` | Calendar items for a week, filterable by owner (accountable) or resource (doing the work) |
+| `get_person_workload` | Cross-client view of a person's projects and week items (searches both owner and resource fields) |
 | `get_client_contacts` | Contact names and roles for a client (from reference data) |
 | `update_project_status` | Change status + post to updates channel |
 | `add_update` | Log free-form update + post to updates channel |
@@ -293,8 +301,12 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 |------|---------|
 | `src/lib/db/runway-schema.ts` | Database schema (6 tables) |
 | `src/lib/db/runway.ts` | Database client factory |
-| `src/lib/runway/operations.ts` | Shared operations entry point + utilities |
-| `src/lib/runway/bot-context.ts` | Dynamic system prompt builder (10 sections) |
+| `src/lib/runway/operations.ts` | Barrel re-export + shared utilities (groupBy, matchesSubstring, etc.) |
+| `src/lib/runway/operations-utils.ts` | Shared utility implementations (client cache, fuzzy match, idempotency) |
+| `src/lib/runway/flags.ts` | AI flag analysis (resource conflicts, stale items, deadlines, bottlenecks) |
+| `src/lib/runway/bot-context.ts` | Dynamic system prompt coordinator |
+| `src/lib/runway/bot-context-sections.ts` | Prompt data builders (date, identity, roster, client map, recipes) |
+| `src/lib/runway/bot-context-behaviors.ts` | Prompt behavior rules (glossary, roles, tone, proactive) |
 | `src/lib/runway/date-constants.ts` | Shared date formatting constants |
 | `src/lib/runway/reference/clients.ts` | Client reference data (nicknames, contacts) |
 | `src/lib/runway/reference/team.ts` | Team reference data (roles, accounts led) |
@@ -310,7 +322,11 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/app/runway/runway-board.tsx` | Board client component (3 views) |
 | `src/app/runway/queries.ts` | Board-specific DB queries |
 | `src/app/runway/date-utils.ts` | `parseISODate`, `getMonday`, `getMondayISODate` |
-| `src/app/runway/components/day-item-card.tsx` | Card component (account-first hierarchy, blocked override) |
+| `src/app/runway/runway-board-utils.ts` | Board utilities (mergeWeekendDays, groupByWeek) |
+| `src/app/runway/components/day-item-card.tsx` | Card component (resources-first, notes parsing, blocked override) |
+| `src/app/runway/components/display-utils.ts` | Shared display helpers (getOwnerResourcesDisplay) |
+| `src/app/runway/components/flags-panel.tsx` | AI flags sidebar panel |
+| `src/app/runway/components/needs-update-section.tsx` | Stale items urgency section |
 | `src/app/runway/components/status-badge.tsx` | Shared badge and label components |
 | `src/app/runway/data.ts` | Seed data (13 clients, typed exports) |
 | `scripts/seed-runway.ts` | Seed script (imports from date-utils) |
