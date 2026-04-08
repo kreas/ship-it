@@ -7,7 +7,7 @@
 
 import { TEAM_REFERENCES } from "./reference/team";
 import { CLIENT_REFERENCES } from "./reference/clients";
-import { getMonday } from "@/app/runway/date-utils";
+import { getMonday, toISODateString } from "@/app/runway/date-utils";
 import { DAY_NAMES, MONTH_NAMES } from "./date-constants";
 import type { TeamMemberRecord } from "./operations-context";
 
@@ -16,7 +16,7 @@ export function formatDate(date: Date): string {
   const month = MONTH_NAMES[date.getMonth()];
   const dateNum = date.getDate();
   const year = date.getFullYear();
-  const iso = date.toISOString().slice(0, 10);
+  const iso = toISODateString(date);
   return `${day}, ${month} ${dateNum}, ${year} (${iso})`;
 }
 
@@ -33,7 +33,7 @@ export function buildDateContext(now: Date): string {
 
   return `## Date context
 - Today is ${formatDate(now)}.
-- This week's Monday is ${monday.toISOString().slice(0, 10)}.
+- This week's Monday is ${toISODateString(monday)}.
 - Yesterday was ${DAY_NAMES[yesterday.getDay()]}, ${MONTH_NAMES[yesterday.getMonth()]} ${yesterday.getDate()}.
 - Tomorrow is ${DAY_NAMES[tomorrow.getDay()]}, ${MONTH_NAMES[tomorrow.getMonth()]} ${tomorrow.getDate()}.
 - You know the date. Never ask the user for dates or ISO formats.`;

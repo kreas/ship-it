@@ -1,3 +1,14 @@
+/**
+ * Tests for operations-reads barrel module.
+ *
+ * The read operations are split across three files for maintainability:
+ *   - operations-reads-clients.ts (getClientsWithCounts, getProjectsFiltered, getPersonWorkload)
+ *   - operations-reads-week.ts (getWeekItemsData, getStaleItemsForAccounts)
+ *   - operations-reads-pipeline.ts (getPipelineData)
+ *
+ * This test file covers all split modules via the barrel re-export in operations-reads.ts.
+ * Tests are not duplicated in per-file test files — this is the canonical location.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockSelectFrom = vi.fn();

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Account, TriageItem } from "../types";
+import { getOwnerResourcesDisplay } from "./display-utils";
 import { StatusBadge, StaleBadge, ContractBadge, MetadataLabel } from "./status-badge";
 
 const DATE_PATTERN = /(\d{1,2})\/(\d{1,2})/;
@@ -29,8 +30,7 @@ function formatContractTerm(term?: string): string | undefined {
 }
 
 function ProjectCard({ item }: { item: TriageItem }) {
-  const showOwnerSeparately = item.owner && item.resources && item.resources !== item.owner;
-  const displayResources = item.resources ?? item.owner;
+  const { showOwnerSeparately, displayResources } = getOwnerResourcesDisplay(item);
 
   return (
     <div className="border-t border-border/30 py-3 first:border-t-0 first:pt-0">

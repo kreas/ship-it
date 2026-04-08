@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { DayItemCard, getEffectiveType } from "./day-item-card";
+import { DayItemCard, getEffectiveType, parseNotes } from "./day-item-card";
 import type { DayItemEntry } from "../types";
 
 function createEntry(overrides: Partial<DayItemEntry> = {}): DayItemEntry {
@@ -179,5 +179,73 @@ describe("getEffectiveType", () => {
 
   it("is case insensitive", () => {
     expect(getEffectiveType(createEntry({ type: "kickoff", notes: "HOLDS UNTIL approval" }))).toBe("blocked");
+  });
+});
+
+describe("parseNotes", () => {
+  it("returns plain notes unchanged with no risk and isNextStep false", () => {
+    const result = parseNotes("Regular update on the project");
+    expect(result.main).toBe("Regular update on the project");
+    expect(result.risk).toBeUndefined();
+    expect(result.isNextStep).toBe(false);
+  });
+
+  it("detects Next Step prefix and strips it from main", () => {
+    const result = parseNotes("Next Step: Send the draft to client");
+    expect(result.main).toBe("Send the draft to client");
+    expect(result.isNextStep).toBe(true);
+    expect(result.risk).toBeUndefined();
+  });
+
+  it("extracts risk text and removes it from main", () => {
+    const result = parseNotes("Waiting on assets (Risk: May miss deadline)");
+    expect(result.main).toBe("Waiting on assets");
+    expect(result.risk).toBe("May miss deadline");
+    expect(result.isNextStep).toBe(false);
+  });
+
+  it("handles both Next Step prefix and risk together", () => {
+    const result = parseNotes("Next Step: Send SOW (Risk: Client unresponsive)");
+    expect(result.main).toBe("Send SOW");
+    expect(result.risk).toBe("Client unresponsive");
+    expect(result.isNextStep).toBe(true);
+  });
+
+  it("returns empty main for empty string", () => {
+    const result = parseNotes("");
+    expect(result.main).toBe("");
+    expect(result.risk).toBeUndefined();
+    expect(result.isNextStep).toBe(false);
+  });
+
+  it("extracts risk when it appears in the middle of text", () => {
+    const result = parseNotes("Design phase (Risk: Scope creep) starting Monday");
+    // Risk is removed but internal whitespace is not collapsed (trim only applies to edges)
+    expect(result.main).toBe("Design phase  starting Monday");
+    expect(result.risk).toBe("Scope creep");
+  });
+
+  it("extracts risk at the beginning of text", () => {
+    const result = parseNotes("(Risk: Budget overrun) Need approval");
+    expect(result.main).toBe("Need approval");
+    expect(result.risk).toBe("Budget overrun");
+  });
+
+  it("handles risk text with special characters", () => {
+    const result = parseNotes("Update (Risk: Client's Q2 budget @ 50% — tight)");
+    expect(result.main).toBe("Update");
+    expect(result.risk).toBe("Client's Q2 budget @ 50% — tight");
+  });
+
+  it("handles risk text with commas and numbers", () => {
+    const result = parseNotes("Review (Risk: 3 revisions pending, $2,000 over)");
+    expect(result.main).toBe("Review");
+    expect(result.risk).toBe("3 revisions pending, $2,000 over");
+  });
+
+  it("does not treat Next Step in the middle of text as a prefix", () => {
+    const result = parseNotes("Discussed Next Step: options with team");
+    expect(result.isNextStep).toBe(false);
+    expect(result.main).toBe("Discussed Next Step: options with team");
   });
 });

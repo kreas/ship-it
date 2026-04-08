@@ -22,7 +22,7 @@ export function getMonday(date: Date): Date {
  * Get the ISO date string (YYYY-MM-DD) of the Monday for a given date's week.
  */
 export function getMondayISODate(date: Date): string {
-  return getMonday(date).toISOString().split("T")[0];
+  return toISODateString(getMonday(date));
 }
 
 /**

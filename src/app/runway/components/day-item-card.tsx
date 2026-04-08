@@ -1,6 +1,7 @@
 "use client";
 
 import type { DayItemEntry, DayItemType } from "../types";
+import { getOwnerResourcesDisplay } from "./display-utils";
 import { TYPE_INDICATORS, MetadataLabel } from "./status-badge";
 
 const HOLD_PATTERN = /\b(hold[s]?\s+until|on\s+hold|blocked|not\s+starting\s+until)\b/i;
@@ -57,8 +58,7 @@ const SIZE_CLASSES = {
 export function DayItemCard({ item, size = "sm" }: DayItemCardProps) {
   const s = SIZE_CLASSES[size];
   const displayType = getEffectiveType(item);
-  const showOwnerSeparately = item.owner && item.resources && item.resources !== item.owner;
-  const displayResources = item.resources ?? item.owner;
+  const { showOwnerSeparately, displayResources } = getOwnerResourcesDisplay(item);
 
   const parsed = item.notes ? parseNotes(item.notes) : null;
 

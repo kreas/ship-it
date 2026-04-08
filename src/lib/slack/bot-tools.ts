@@ -13,7 +13,7 @@ import {
   addUpdate,
 } from "@/lib/runway/operations";
 import { getClientContactsRef } from "@/lib/runway/reference/clients";
-import { getMonday } from "@/app/runway/date-utils";
+import { getMonday, toISODateString } from "@/app/runway/date-utils";
 
 async function safePostUpdate(update: Parameters<typeof postUpdate>[0]) {
   try {
@@ -24,7 +24,7 @@ async function safePostUpdate(update: Parameters<typeof postUpdate>[0]) {
 }
 
 export function createBotTools(userName: string, now: Date = new Date()) {
-  const currentMonday = getMonday(now).toISOString().slice(0, 10);
+  const currentMonday = toISODateString(getMonday(now));
   return {
     get_clients: tool({
       description: "List all clients with project counts",
