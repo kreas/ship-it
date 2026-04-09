@@ -16,8 +16,7 @@ import {
   generateIdempotencyKey,
   generateId,
   getClientOrFail,
-  findProjectByFuzzyName,
-  getProjectsForClient,
+  resolveProjectOrFail,
   checkIdempotency,
   getLinkedWeekItems,
 } from "./operations";
@@ -48,15 +47,9 @@ export async function updateProjectStatus(
   if (!lookup.ok) return lookup;
   const { client } = lookup;
 
-  const project = await findProjectByFuzzyName(client.id, projectName);
-  if (!project) {
-    const clientProjects = await getProjectsForClient(client.id);
-    return {
-      ok: false,
-      error: `Project '${projectName}' not found for ${client.name}.`,
-      available: clientProjects.map((p) => p.name),
-    };
-  }
+  const projectLookup = await resolveProjectOrFail(client.id, client.name, projectName);
+  if (!projectLookup.ok) return projectLookup;
+  const project = projectLookup.project;
 
   const previousStatus = project.status;
   const idemKey = generateIdempotencyKey(

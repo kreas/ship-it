@@ -27,11 +27,96 @@ import { buildBotSystemPrompt } from "@/lib/runway/bot-context";
 import { formatProactiveFollowUp } from "./bot-proactive";
 
 const MODEL = "claude-sonnet-4-6";
-const MAX_STEPS = 5;
+const MAX_STEPS = 12;
+
+/** Tool names that mutate project/week-item data — used to exclude just-updated items from proactive nudge. */
+const MUTATION_TOOLS = [
+  "update_project_status",
+  "add_update",
+  "update_project_field",
+  "create_project",
+  "create_week_item",
+  "update_week_item",
+] as const;
+const MAX_THREAD_MESSAGES = 20;
 
 export interface SlackImage {
   mimetype: string;
   base64: string;
+}
+
+/**
+ * Fetch thread history from Slack and convert to AI message format.
+ * Caps at the most recent messages to control token usage.
+ */
+async function fetchThreadHistory(
+  channelId: string,
+  threadTs: string,
+  currentMessageTs: string
+): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
+  const slack = getSlackClient();
+  const result = await slack.conversations.replies({
+    channel: channelId,
+    ts: threadTs,
+    inclusive: true,
+  });
+
+  if (!result.messages) return [];
+
+  // Exclude the current message (added separately with full content blocks)
+  // Take the most recent for token budget
+  const threadMessages = result.messages
+    .filter((m: { ts?: string }) => m.ts !== currentMessageTs)
+    .slice(-MAX_THREAD_MESSAGES);
+
+  return threadMessages
+    .map((m: { bot_id?: string; text?: string }) => ({
+      role: (m.bot_id ? "assistant" : "user") as "user" | "assistant",
+      content: m.text ?? "",
+    }))
+    .filter((m) => m.content.length > 0);
+}
+
+/**
+ * Collect project names the bot just updated, then nudge about stale items
+ * on the user's accounts (excluding the ones just touched).
+ */
+async function handleProactiveFollowUp(
+  result: { steps: Array<{ toolCalls: Array<{ toolName: string; input: unknown }> }> },
+  teamMemberRecord: { accountsLed?: string[] } | null,
+  channelId: string,
+  replyTs: string,
+  displayName: string
+): Promise<void> {
+  if (!teamMemberRecord?.accountsLed?.length) return;
+
+  const updatedProjects: string[] = [];
+  for (const step of result.steps) {
+    for (const call of step.toolCalls) {
+      if (
+        MUTATION_TOOLS.includes(call.toolName as typeof MUTATION_TOOLS[number]) &&
+        call.input &&
+        typeof call.input === "object" &&
+        "projectName" in call.input &&
+        typeof call.input.projectName === "string"
+      ) {
+        updatedProjects.push(call.input.projectName);
+      }
+    }
+  }
+
+  const staleItems = await getStaleItemsForAccounts(teamMemberRecord.accountsLed, displayName);
+  if (staleItems.length > 0) {
+    const followUp = formatProactiveFollowUp(staleItems, updatedProjects);
+    if (followUp) {
+      const slack = getSlackClient();
+      await slack.chat.postMessage({
+        channel: channelId,
+        text: followUp,
+        thread_ts: replyTs,
+      });
+    }
+  }
 }
 
 /**
@@ -43,6 +128,7 @@ export async function handleDirectMessage(
   channelId: string,
   messageText: string,
   messageTs: string,
+  threadTs?: string,
   images?: SlackImage[]
 ): Promise<void> {
   const slack = getSlackClient();
@@ -77,51 +163,36 @@ export async function handleDirectMessage(
   try {
     const systemPrompt = buildBotSystemPrompt(teamMemberRecord, now);
 
+    // Build messages array — include thread history when in a thread
+    const threadHistory = threadTs
+      ? await fetchThreadHistory(channelId, threadTs, messageTs)
+      : [];
+    const messages = [
+      ...threadHistory,
+      { role: "user" as const, content: userContent },
+    ];
+
     const result = await generateText({
       model: anthropic(MODEL),
       system: systemPrompt,
-      messages: [{ role: "user", content: userContent }],
+      messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
       maxRetries: 1,
     });
 
+    const replyTs = threadTs ?? messageTs;
+
     await slack.chat.postMessage({
       channel: channelId,
       text: result.text,
-      thread_ts: messageTs,
+      thread_ts: replyTs,
     });
 
-    // Proactive follow-up: if user leads accounts, nudge about stale items
-    if (teamMemberRecord?.accountsLed?.length) {
+    // Proactive follow-up: only on first message (not thread replies), for account leads
+    if (!threadTs) {
       try {
-        // Collect project names the bot just updated so we don't nag about them
-        const updatedProjects: string[] = [];
-        for (const step of result.steps) {
-          for (const call of step.toolCalls) {
-            if (
-              (call.toolName === "update_project_status" || call.toolName === "add_update") &&
-              call.input &&
-              typeof call.input === "object" &&
-              "projectName" in call.input &&
-              typeof call.input.projectName === "string"
-            ) {
-              updatedProjects.push(call.input.projectName);
-            }
-          }
-        }
-
-        const staleItems = await getStaleItemsForAccounts(teamMemberRecord.accountsLed);
-        if (staleItems.length > 0) {
-          const followUp = formatProactiveFollowUp(staleItems, updatedProjects);
-          if (followUp) {
-            await slack.chat.postMessage({
-              channel: channelId,
-              text: followUp,
-              thread_ts: messageTs,
-            });
-          }
-        }
+        await handleProactiveFollowUp(result, teamMemberRecord, channelId, replyTs, displayName);
       } catch (err) {
         console.error("[Runway Bot] Proactive follow-up failed:", err);
       }
@@ -131,7 +202,7 @@ export async function handleDirectMessage(
     await slack.chat.postMessage({
       channel: channelId,
       text: "Something went wrong processing your message. Try again or check with the team.",
-      thread_ts: messageTs,
+      thread_ts: threadTs ?? messageTs,
     });
   }
 }

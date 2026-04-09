@@ -35,7 +35,7 @@ export function formatProactiveFollowUp(
     return `- ${item.clientName}: ${item.projectName}${staleNote}`;
   });
 
-  let message = "Got a minute for a couple other things?\n\n";
+  let message = "While I have you -- a few items on your accounts haven't been updated recently:\n\n";
   message += lines.join("\n");
 
   if (remaining > 0) {

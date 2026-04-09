@@ -68,9 +68,33 @@ describe("processRunwaySlackMessage", () => {
       "D67890",
       "CDS is done",
       "1234567890.123456",
+      undefined, // no threadTs
       [] // no images
     );
     expect(result).toEqual({ processed: true });
+  });
+
+  it("passes threadTs to handleDirectMessage when present", async () => {
+    const eventData = {
+      data: {
+        slackUserId: "U12345",
+        channelId: "D67890",
+        messageText: "thread reply",
+        messageTs: "1234567890.999999",
+        threadTs: "1234567890.111111",
+      },
+    };
+
+    await handler({ event: eventData, step: { run: mockStepRun } });
+
+    expect(mockHandleDirectMessage).toHaveBeenCalledWith(
+      "U12345",
+      "D67890",
+      "thread reply",
+      "1234567890.999999",
+      "1234567890.111111",
+      []
+    );
   });
 
   it("downloads images and passes them to handleDirectMessage", async () => {
@@ -108,6 +132,7 @@ describe("processRunwaySlackMessage", () => {
       "D67890",
       "check this",
       "1234567890.123456",
+      undefined, // no threadTs
       [{ mimetype: "image/png", base64: expectedBase64 }]
     );
   });
@@ -145,7 +170,7 @@ describe("processRunwaySlackMessage", () => {
     const expectedBase64 = Buffer.from(fakeImageBuffer).toString("base64");
     expect(mockHandleDirectMessage).toHaveBeenCalledWith(
       "U12345", "D67890", "two images", "1234567890.123456",
-      [{ mimetype: "image/png", base64: expectedBase64 }]
+      undefined, [{ mimetype: "image/png", base64: expectedBase64 }]
     );
   });
 
@@ -168,7 +193,7 @@ describe("processRunwaySlackMessage", () => {
 
     // Should still call handleDirectMessage with empty images array
     expect(mockHandleDirectMessage).toHaveBeenCalledWith(
-      "U12345", "D67890", "broken image", "1234567890.123456", []
+      "U12345", "D67890", "broken image", "1234567890.123456", undefined, []
     );
   });
 
@@ -192,7 +217,7 @@ describe("processRunwaySlackMessage", () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockHandleDirectMessage).toHaveBeenCalledWith(
-      "U12345", "D67890", "hello", "1234567890.123456", []
+      "U12345", "D67890", "hello", "1234567890.123456", undefined, []
     );
   });
 });

@@ -88,27 +88,26 @@ export async function getClientContacts(clientSlug: string) {
   return { client: client.name, contacts };
 }
 
-export async function getTeamMemberBySlackId(
-  slackUserId: string
-): Promise<string | null> {
+async function findTeamMemberBySlackId(slackUserId: string) {
   const db = getRunwayDb();
-  const member = await db
+  return db
     .select()
     .from(teamMembers)
     .where(eq(teamMembers.slackUserId, slackUserId))
     .get();
+}
+
+export async function getTeamMemberBySlackId(
+  slackUserId: string
+): Promise<string | null> {
+  const member = await findTeamMemberBySlackId(slackUserId);
   return member?.name ?? null;
 }
 
 export async function getTeamMemberRecordBySlackId(
   slackUserId: string
 ): Promise<TeamMemberRecord | null> {
-  const db = getRunwayDb();
-  const member = await db
-    .select()
-    .from(teamMembers)
-    .where(eq(teamMembers.slackUserId, slackUserId))
-    .get();
+  const member = await findTeamMemberBySlackId(slackUserId);
   if (!member) return null;
   return {
     name: member.name,

@@ -10,7 +10,13 @@ import {
   getWeekItemsData,
   getPersonWorkload,
   updateProjectStatus,
+  addProject,
   addUpdate,
+  updateProjectField,
+  createWeekItem,
+  updateWeekItemField,
+  undoLastChange,
+  getRecentUpdates,
 } from "@/lib/runway/operations";
 import { getClientContactsRef } from "@/lib/runway/reference/clients";
 import { getMonday, toISODateString } from "@/app/runway/date-utils";
@@ -109,7 +115,11 @@ export function createBotTools(userName: string, now: Date = new Date()) {
           ? ` Also updated ${cascaded.length} linked week item(s): ${cascaded.join(", ")}.`
           : "";
 
-        return { result: result.message + cascadeNote };
+        if (!result.data) return { result: result.message + cascadeNote };
+
+        const d = result.data;
+        const statusDetail = `Updated status for ${d.projectName} (${d.clientName}). Was: ${d.previousStatus}, now: ${d.newStatus}.`;
+        return { result: statusDetail + cascadeNote };
       },
     }),
 
@@ -170,6 +180,204 @@ export function createBotTools(userName: string, now: Date = new Date()) {
           return { client: clientSlug, contacts: [], note: "No contacts on file for this client" };
         }
         return { client: clientSlug, contacts };
+      },
+    }),
+
+    create_project: tool({
+      description:
+        "Create a new project under a client. Use when someone says they want to add a project.",
+      inputSchema: z.object({
+        clientSlug: z.string().describe("Client slug"),
+        name: z.string().describe("Project name"),
+        status: z.string().optional().describe("Initial status (default: not-started)"),
+        owner: z.string().optional().describe("Project owner"),
+        resources: z.string().optional().describe("Comma-separated resources"),
+        dueDate: z.string().optional().describe("Due date (ISO format)"),
+        target: z.string().optional().describe("Target date or milestone"),
+        waitingOn: z.string().optional().describe("Who/what we're waiting on"),
+        notes: z.string().optional().describe("Project notes"),
+      }),
+      execute: async ({ clientSlug, name, status, owner, resources, dueDate, target, waitingOn, notes }) => {
+        const result = await addProject({
+          clientSlug,
+          name,
+          status,
+          owner,
+          resources,
+          dueDate,
+          target,
+          waitingOn,
+          notes,
+          updatedBy: userName,
+        });
+
+        if (!result.ok) {
+          return { error: result.error };
+        }
+
+        if (result.data) {
+          await safePostUpdate({
+            clientName: result.data.clientName as string,
+            projectName: result.data.projectName as string,
+            updateText: `New project created`,
+            updatedBy: userName,
+          });
+        }
+
+        // Build detailed summary for the bot
+        const details = [owner && `Owner: ${owner}`, resources && `Resources: ${resources}`, dueDate && `Due: ${dueDate}`].filter(Boolean).join(", ");
+        const summary = `Created project '${name}' under ${result.data?.clientName ?? clientSlug}.${details ? ` ${details}.` : ""}`;
+        return { result: summary };
+      },
+    }),
+
+    update_project_field: tool({
+      description:
+        "Update a specific field on a project. This ACTUALLY changes the database field. Use for deadlines, owner, resources, name changes. Do NOT use add_update for field changes.",
+      inputSchema: z.object({
+        clientSlug: z.string().describe("Client slug"),
+        projectName: z.string().describe("Project name (fuzzy match)"),
+        field: z.enum(["name", "dueDate", "owner", "resources", "waitingOn", "target", "notes"]).describe("Field to update"),
+        newValue: z.string().describe("New value for the field"),
+      }),
+      execute: async ({ clientSlug, projectName, field, newValue }) => {
+        const result = await updateProjectField({
+          clientSlug,
+          projectName,
+          field,
+          newValue,
+          updatedBy: userName,
+        });
+
+        if (!result.ok) {
+          return { error: result.error, available: result.available };
+        }
+
+        if (result.data) {
+          const updateText = `${field}: "${result.data.previousValue}" → "${result.data.newValue}"`;
+          await safePostUpdate({
+            clientName: result.data.clientName as string,
+            projectName: result.data.projectName as string,
+            updateText,
+            updatedBy: userName,
+          });
+        }
+
+        if (!result.data) return { result: result.message };
+
+        const d = result.data;
+        return { result: `Updated ${d.field} for ${d.projectName} (${d.clientName}). Was: "${d.previousValue}", now: "${d.newValue}".` };
+      },
+    }),
+
+    create_week_item: tool({
+      description: "Add a new item to the weekly calendar.",
+      inputSchema: z.object({
+        clientSlug: z.string().optional().describe("Client slug (if related to a client)"),
+        projectName: z.string().optional().describe("Project name (fuzzy match)"),
+        weekOf: z.string().default(currentMonday).describe(`ISO Monday date. Defaults to ${currentMonday}`),
+        dayOfWeek: z.string().optional().describe("Day of the week (e.g. 'tuesday')"),
+        date: z.string().optional().describe("Exact date (ISO format)"),
+        title: z.string().describe("Week item title"),
+        status: z.string().optional().describe("Status"),
+        category: z.string().optional().describe("Category (delivery, review, kickoff, deadline, approval, launch)"),
+        owner: z.string().optional().describe("Owner"),
+        resources: z.string().optional().describe("Resources"),
+        notes: z.string().optional().describe("Notes"),
+      }),
+      execute: async (params) => {
+        const result = await createWeekItem({
+          ...params,
+          updatedBy: userName,
+        });
+
+        if (!result.ok) {
+          return { error: result.error };
+        }
+
+        if (result.data?.clientName) {
+          await safePostUpdate({
+            clientName: result.data.clientName as string,
+            updateText: `New week item: ${result.data.title}`,
+            updatedBy: userName,
+          });
+        }
+
+        return { result: result.message };
+      },
+    }),
+
+    undo_last_change: tool({
+      description:
+        "Undo the most recent change made by this user. Use when someone says 'scratch that', 'undo', 'wait that's wrong', or 'change it back'.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const result = await undoLastChange({ updatedBy: userName });
+
+        if (!result.ok) {
+          return { error: result.error };
+        }
+
+        if (result.data?.revertedFrom) {
+          await safePostUpdate({
+            clientName: "Undo",
+            updateText: `Reverted: "${result.data.revertedFrom}" back to "${result.data.revertedTo}"`,
+            updatedBy: userName,
+          });
+        }
+
+        return { result: result.message };
+      },
+    }),
+
+    get_recent_updates: tool({
+      description:
+        "Look up recent updates and changes. Use when someone asks 'what did I change?', 'what did I tell you about X?', or 'what happened with Bonterra this week?'",
+      inputSchema: z.object({
+        clientSlug: z.string().optional().describe("Filter by client slug"),
+        since: z.string().optional().describe("ISO date to search from (default: 7 days ago)"),
+        limit: z.number().optional().describe("Max results (default: 20)"),
+      }),
+      execute: async ({ clientSlug, since, limit }) => {
+        return getRecentUpdates({
+          updatedBy: userName,
+          clientSlug,
+          since,
+          limit,
+        });
+      },
+    }),
+
+    update_week_item: tool({
+      description: "Update a field on an existing week item.",
+      inputSchema: z.object({
+        weekOf: z.string().default(currentMonday).describe(`ISO Monday date. Defaults to ${currentMonday}`),
+        weekItemTitle: z.string().describe("Week item title (fuzzy match)"),
+        field: z.enum(["title", "status", "date", "dayOfWeek", "owner", "resources", "notes", "category"]).describe("Field to update"),
+        newValue: z.string().describe("New value for the field"),
+      }),
+      execute: async ({ weekOf, weekItemTitle, field, newValue }) => {
+        const result = await updateWeekItemField({
+          weekOf,
+          weekItemTitle,
+          field,
+          newValue,
+          updatedBy: userName,
+        });
+
+        if (!result.ok) {
+          return { error: result.error, available: result.available };
+        }
+
+        if (result.data) {
+          await safePostUpdate({
+            clientName: "Calendar",
+            updateText: `Week item "${weekItemTitle}": ${field} updated`,
+            updatedBy: userName,
+          });
+        }
+
+        return { result: result.message };
       },
     }),
   };

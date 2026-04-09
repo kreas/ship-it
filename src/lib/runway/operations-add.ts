@@ -12,6 +12,7 @@ import {
   generateId,
   getClientOrFail,
   findProjectByFuzzyName,
+  findProjectByFuzzyNameWithDisambiguation,
   checkIdempotency,
 } from "./operations";
 import type { OperationResult } from "./operations-writes";
@@ -22,6 +23,10 @@ export interface AddProjectParams {
   status?: string;
   category?: string;
   owner?: string;
+  resources?: string;
+  dueDate?: string;
+  target?: string;
+  waitingOn?: string;
   notes?: string;
   updatedBy: string;
 }
@@ -42,6 +47,10 @@ export async function addProject(
     status = "not-started",
     category = "active",
     owner,
+    resources,
+    dueDate,
+    target,
+    waitingOn,
     notes,
     updatedBy,
   } = params;
@@ -50,6 +59,15 @@ export async function addProject(
   const lookup = await getClientOrFail(clientSlug);
   if (!lookup.ok) return lookup;
   const { client } = lookup;
+
+  // Check for duplicate project name (exact case-insensitive match)
+  const existing = await findProjectByFuzzyName(client.id, name);
+  if (existing && existing.name.toLowerCase() === name.toLowerCase()) {
+    return {
+      ok: false,
+      error: `A project named '${existing.name}' already exists under ${client.name}. Did you mean to update it?`,
+    };
+  }
 
   const idemKey = generateIdempotencyKey(
     "add-project",
@@ -70,6 +88,10 @@ export async function addProject(
     status,
     category,
     owner: owner ?? null,
+    resources: resources ?? null,
+    dueDate: dueDate ?? null,
+    target: target ?? null,
+    waitingOn: waitingOn ?? null,
     notes: notes ?? null,
     sortOrder: 999,
   });
@@ -105,9 +127,19 @@ export async function addUpdate(
   let projectId: string | null = null;
   let projectMatch: string | undefined;
   if (projectName) {
-    const project = await findProjectByFuzzyName(client.id, projectName);
-    projectId = project?.id ?? null;
-    projectMatch = project?.name;
+    const fuzzyResult = await findProjectByFuzzyNameWithDisambiguation(client.id, projectName);
+    if (fuzzyResult.kind === "ambiguous") {
+      return {
+        ok: false,
+        error: `Multiple projects match '${projectName}': ${fuzzyResult.options.map((p) => p.name).join(", ")}. Which one?`,
+        available: fuzzyResult.options.map((p) => p.name),
+      };
+    }
+    if (fuzzyResult.kind === "match") {
+      projectId = fuzzyResult.value.id;
+      projectMatch = fuzzyResult.value.name;
+    }
+    // kind === "none": leave projectId null, note is client-level
   }
 
   const idemKey = generateIdempotencyKey(

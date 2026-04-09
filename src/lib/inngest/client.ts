@@ -62,6 +62,7 @@ export type Events = {
       channelId: string;
       messageText: string;
       messageTs: string;
+      threadTs?: string;
       imageFiles?: Array<{ url: string; mimetype: string; name?: string }>;
     };
   };

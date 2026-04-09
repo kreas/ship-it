@@ -20,9 +20,20 @@ export {
   getClientBySlug,
   getClientNameMap,
   findProjectByFuzzyName,
+  findProjectByFuzzyNameWithDisambiguation,
+  resolveProjectOrFail,
+  fuzzyMatch,
+  fuzzyMatchProject,
   getProjectsForClient,
   checkIdempotency,
+  validateField,
+  findWeekItemByFuzzyTitle,
+  findWeekItemByFuzzyTitleWithDisambiguation,
+  fuzzyMatchWeekItem,
+  getWeekItemsForWeek,
 } from "./operations-utils";
+
+export type { FuzzyMatchResult } from "./operations-utils";
 
 // ── Read operations ─────────────────────────────────────
 export {
@@ -39,6 +50,15 @@ export type {
   WeekItemRow,
   StaleAccountItem,
 } from "./operations-reads";
+
+export {
+  getRecentUpdates,
+} from "./operations-reads-updates";
+
+export type {
+  RecentUpdate,
+  GetRecentUpdatesParams,
+} from "./operations-reads-updates";
 
 // ── Context operations ──────────────────────────────────
 export {
@@ -62,6 +82,28 @@ export type {
   UpdateProjectStatusParams,
   OperationResult,
 } from "./operations-writes";
+
+export {
+  updateProjectField,
+} from "./operations-writes-project";
+
+export type {
+  UpdateProjectFieldParams,
+} from "./operations-writes-project";
+
+export {
+  createWeekItem,
+  updateWeekItemField,
+} from "./operations-writes-week";
+
+export type {
+  CreateWeekItemParams,
+  UpdateWeekItemFieldParams,
+} from "./operations-writes-week";
+
+export {
+  undoLastChange,
+} from "./operations-writes-undo";
 
 // ── Add operations ──────────────────────────────────────
 export {

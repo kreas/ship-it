@@ -17,7 +17,7 @@ export const processRunwaySlackMessage = inngest.createFunction(
   },
   { event: "runway/slack.message" },
   async ({ event, step }) => {
-    const { slackUserId, channelId, messageText, messageTs, imageFiles } = event.data;
+    const { slackUserId, channelId, messageText, messageTs, threadTs, imageFiles } = event.data;
 
     // Download images from Slack (requires bot token for private URLs)
     const images = await step.run("download-images", async () => {
@@ -45,7 +45,7 @@ export const processRunwaySlackMessage = inngest.createFunction(
     });
 
     await step.run("process-message", async () => {
-      await handleDirectMessage(slackUserId, channelId, messageText, messageTs, images);
+      await handleDirectMessage(slackUserId, channelId, messageText, messageTs, threadTs, images);
     });
 
     return { processed: true };
