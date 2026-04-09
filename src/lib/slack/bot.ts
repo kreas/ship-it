@@ -167,19 +167,35 @@ export async function handleDirectMessage(
     const threadHistory = threadTs
       ? await fetchThreadHistory(channelId, threadTs, messageTs)
       : [];
+
+    // Prompt caching: system prompt is placed as a cached message so repeated
+    // calls with the same prompt (team roster, query recipes, etc.) hit cache.
+    // Cache control must be on the message itself, not at the call level.
+    const cacheControl = { cacheControl: { type: "ephemeral" as const } };
     const messages = [
+      {
+        role: "system" as const,
+        content: systemPrompt,
+        providerOptions: { anthropic: cacheControl },
+      },
       ...threadHistory,
       { role: "user" as const, content: userContent },
     ];
 
     const result = await generateText({
       model: anthropic(MODEL),
-      system: systemPrompt,
       messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
       maxRetries: 1,
     });
+
+    // Log token usage for cost visibility
+    // TODO: integrate with recordTokenUsage once Runway has a workspaceId
+    if (result.usage) {
+      const { inputTokens, outputTokens } = result.usage;
+      console.log(`[Runway Bot] tokens: ${inputTokens} in / ${outputTokens} out`);
+    }
 
     const replyTs = threadTs ?? messageTs;
 

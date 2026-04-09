@@ -166,9 +166,8 @@ describe("handleDirectMessage", () => {
     await handleDirectMessage("U12345", "D67890", "CDS went to Daniel", "ts123");
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages).toEqual([
-      { role: "user", content: "CDS went to Daniel" },
-    ]);
+    // messages[0] is the cached system message; user message is at [1]
+    expect(call.messages[1]).toEqual({ role: "user", content: "CDS went to Daniel" });
   });
 
   it("sends images as content blocks when images are provided", async () => {
@@ -184,7 +183,7 @@ describe("handleDirectMessage", () => {
     ]);
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages[0].content).toEqual([
+    expect(call.messages[1].content).toEqual([
       { type: "text", text: "what is this?" },
       { type: "image", image: "iVBORw0KGgo=", mediaType: "image/png" },
     ]);
@@ -203,7 +202,7 @@ describe("handleDirectMessage", () => {
     ]);
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages[0].content).toEqual([
+    expect(call.messages[1].content).toEqual([
       { type: "image", image: "/9j/4AAQ=", mediaType: "image/jpeg" },
     ]);
   });
@@ -219,7 +218,7 @@ describe("handleDirectMessage", () => {
     await handleDirectMessage("U12345", "D67890", "just text", "ts123", undefined, []);
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages[0].content).toBe("just text");
+    expect(call.messages[1].content).toBe("just text");
   });
 
   it("passes tools to generateText", async () => {
@@ -299,7 +298,16 @@ describe("buildBotSystemPrompt integration", () => {
     await handleDirectMessage("U12345", "D67890", "hello", "ts123");
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.system).toBe("mocked system prompt");
+    // System prompt is now a cached message in the messages array
+    expect(call.messages[0]).toEqual(
+      expect.objectContaining({
+        role: "system",
+        content: "mocked system prompt",
+        providerOptions: {
+          anthropic: { cacheControl: { type: "ephemeral" } },
+        },
+      })
+    );
   });
 });
 
@@ -327,7 +335,8 @@ describe("thread history", () => {
     await handleDirectMessage("U12345", "D67890", "also update deadline", "1111.0002", "1111.0000");
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages).toEqual([
+    // messages[0] is system; thread history + current message follow
+    expect(call.messages.slice(1)).toEqual([
       { role: "user", content: "CDS went to Daniel" },
       { role: "assistant", content: "Got it, updated." },
       { role: "user", content: "also update deadline" },
@@ -345,7 +354,8 @@ describe("thread history", () => {
     await handleDirectMessage("U12345", "D67890", "hello", "ts123");
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages).toEqual([{ role: "user", content: "hello" }]);
+    // messages[0] is system; only user message follows
+    expect(call.messages.slice(1)).toEqual([{ role: "user", content: "hello" }]);
     expect(mockConversationsReplies).not.toHaveBeenCalled();
   });
 
@@ -369,8 +379,8 @@ describe("thread history", () => {
     await handleDirectMessage("U12345", "D67890", "latest", "1111.9999", "1111.0000");
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    // 20 from history + 1 current = 21
-    expect(call.messages).toHaveLength(21);
+    // 1 system + 20 from history + 1 current = 22
+    expect(call.messages).toHaveLength(22);
   });
 
   it("posts response with threadTs when present", async () => {
@@ -409,8 +419,8 @@ describe("thread history", () => {
     await handleDirectMessage("U12345", "D67890", "latest", "1111.9999", "1111.0000");
 
     const call = (generateText as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    // "hello", "world" from history + "latest" current = 3 (empty message excluded)
-    expect(call.messages).toHaveLength(3);
+    // 1 system + "hello", "world" from history + "latest" current = 4 (empty message excluded)
+    expect(call.messages).toHaveLength(4);
   });
 });
 
