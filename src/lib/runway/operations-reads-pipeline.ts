@@ -9,7 +9,7 @@ import {
   updates,
 } from "@/lib/db/runway-schema";
 import { eq, asc, desc } from "drizzle-orm";
-import { getClientBySlug, getClientNameMap } from "./operations";
+import { getClientBySlug, getClientNameMap, matchesSubstring } from "./operations";
 
 export async function getPipelineData() {
   const db = getRunwayDb();
@@ -45,7 +45,8 @@ export interface StaleAccountItem {
  * Results are sorted by staleness (most stale first).
  */
 export async function getStaleItemsForAccounts(
-  clientSlugs: string[]
+  clientSlugs: string[],
+  personName?: string
 ): Promise<StaleAccountItem[]> {
   if (clientSlugs.length === 0) return [];
 
@@ -80,8 +81,16 @@ export async function getStaleItemsForAccounts(
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     for (const project of clientProjects) {
-      // Skip completed projects
-      if (project.status === "completed") continue;
+      // Skip completed and on-hold projects
+      if (project.status === "completed" || project.status === "on-hold") continue;
+
+      // Filter by personName if provided — show items they own, resource, or unassigned
+      if (personName) {
+        const isOwner = matchesSubstring(project.owner, personName);
+        const isResource = matchesSubstring(project.resources, personName);
+        const isUnassigned = !project.owner && !project.resources;
+        if (!isOwner && !isResource && !isUnassigned) continue;
+      }
 
       const isStaleByStaleDays = project.staleDays != null && project.staleDays >= 7;
       const lastUpdate = latestUpdateByProject.get(project.id);

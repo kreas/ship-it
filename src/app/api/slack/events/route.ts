@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       const channelId = event.channel as string;
       const messageText = (event.text as string) ?? "";
       const messageTs = event.ts as string;
+      const threadTs = (event.thread_ts as string) || undefined;
 
       // Extract image attachments from Slack file uploads
       const files = event.files as Array<{ mimetype?: string; url_private?: string; name?: string }> | undefined;
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
           channelId,
           messageText,
           messageTs,
+          threadTs,
           imageFiles: imageFiles.length > 0 ? imageFiles : undefined,
         },
       });

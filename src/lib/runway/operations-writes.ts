@@ -8,17 +8,16 @@
  */
 
 import { getRunwayDb } from "@/lib/db/runway";
-import { projects, updates, weekItems } from "@/lib/db/runway-schema";
+import { projects, weekItems } from "@/lib/db/runway-schema";
 import { eq } from "drizzle-orm";
 import {
   CASCADE_STATUSES,
   TERMINAL_ITEM_STATUSES,
   generateIdempotencyKey,
-  generateId,
   getClientOrFail,
-  findProjectByFuzzyName,
-  getProjectsForClient,
-  checkIdempotency,
+  resolveProjectOrFail,
+  checkDuplicate,
+  insertAuditRecord,
   getLinkedWeekItems,
 } from "./operations";
 
@@ -48,15 +47,9 @@ export async function updateProjectStatus(
   if (!lookup.ok) return lookup;
   const { client } = lookup;
 
-  const project = await findProjectByFuzzyName(client.id, projectName);
-  if (!project) {
-    const clientProjects = await getProjectsForClient(client.id);
-    return {
-      ok: false,
-      error: `Project '${projectName}' not found for ${client.name}.`,
-      available: clientProjects.map((p) => p.name),
-    };
-  }
+  const projectLookup = await resolveProjectOrFail(client.id, client.name, projectName);
+  if (!projectLookup.ok) return projectLookup;
+  const project = projectLookup.project;
 
   const previousStatus = project.status;
   const idemKey = generateIdempotencyKey(
@@ -66,27 +59,19 @@ export async function updateProjectStatus(
     updatedBy
   );
 
-  if (await checkIdempotency(idemKey)) {
-    return {
-      ok: true,
-      message: "Update already applied (duplicate request).",
-      data: {
-        clientName: client.name,
-        projectName: project.name,
-        previousStatus,
-        newStatus,
-      },
-    };
-  }
+  const dup = await checkDuplicate(idemKey, {
+    ok: true,
+    message: "Update already applied (duplicate request).",
+    data: { clientName: client.name, projectName: project.name, previousStatus, newStatus },
+  });
+  if (dup) return dup;
 
   await db
     .update(projects)
     .set({ status: newStatus, updatedAt: new Date() })
     .where(eq(projects.id, project.id));
 
-  const summary = `${client.name} / ${project.name}: ${previousStatus} -> ${newStatus}${notes ? `. ${notes}` : ""}`;
-  await db.insert(updates).values({
-    id: generateId(),
+  await insertAuditRecord({
     idempotencyKey: idemKey,
     projectId: project.id,
     clientId: client.id,
@@ -94,7 +79,7 @@ export async function updateProjectStatus(
     updateType: "status-change",
     previousValue: previousStatus,
     newValue: newStatus,
-    summary,
+    summary: `${client.name} / ${project.name}: ${previousStatus} -> ${newStatus}${notes ? `. ${notes}` : ""}`,
   });
 
   // Cascade to linked week items for terminal/blocking statuses

@@ -6,13 +6,16 @@
  */
 
 import { getRunwayDb } from "@/lib/db/runway";
-import { projects, updates } from "@/lib/db/runway-schema";
+import { projects } from "@/lib/db/runway-schema";
 import {
   generateIdempotencyKey,
   generateId,
   getClientOrFail,
   findProjectByFuzzyName,
-  checkIdempotency,
+  resolveProjectOrFail,
+  normalizeForMatch,
+  checkDuplicate,
+  insertAuditRecord,
 } from "./operations";
 import type { OperationResult } from "./operations-writes";
 
@@ -22,6 +25,10 @@ export interface AddProjectParams {
   status?: string;
   category?: string;
   owner?: string;
+  resources?: string;
+  dueDate?: string;
+  target?: string;
+  waitingOn?: string;
   notes?: string;
   updatedBy: string;
 }
@@ -42,6 +49,10 @@ export async function addProject(
     status = "not-started",
     category = "active",
     owner,
+    resources,
+    dueDate,
+    target,
+    waitingOn,
     notes,
     updatedBy,
   } = params;
@@ -51,6 +62,15 @@ export async function addProject(
   if (!lookup.ok) return lookup;
   const { client } = lookup;
 
+  // Check for duplicate project name (exact case-insensitive match)
+  const existing = await findProjectByFuzzyName(client.id, name);
+  if (existing && normalizeForMatch(existing.name) === normalizeForMatch(name)) {
+    return {
+      ok: false,
+      error: `A project named '${existing.name}' already exists under ${client.name}. Did you mean to update it?`,
+    };
+  }
+
   const idemKey = generateIdempotencyKey(
     "add-project",
     client.id,
@@ -58,9 +78,10 @@ export async function addProject(
     updatedBy
   );
 
-  if (await checkIdempotency(idemKey)) {
-    return { ok: true, message: "Project already added (duplicate request)." };
-  }
+  const dup = await checkDuplicate(idemKey, {
+    ok: true, message: "Project already added (duplicate request).",
+  });
+  if (dup) return dup;
 
   const projectId = generateId();
   await db.insert(projects).values({
@@ -70,12 +91,15 @@ export async function addProject(
     status,
     category,
     owner: owner ?? null,
+    resources: resources ?? null,
+    dueDate: dueDate ?? null,
+    target: target ?? null,
+    waitingOn: waitingOn ?? null,
     notes: notes ?? null,
     sortOrder: 999,
   });
 
-  await db.insert(updates).values({
-    id: generateId(),
+  await insertAuditRecord({
     idempotencyKey: idemKey,
     projectId,
     clientId: client.id,
@@ -96,7 +120,6 @@ export async function addUpdate(
   params: AddUpdateParams
 ): Promise<OperationResult> {
   const { clientSlug, projectName, summary, updatedBy } = params;
-  const db = getRunwayDb();
 
   const lookup = await getClientOrFail(clientSlug);
   if (!lookup.ok) return lookup;
@@ -105,9 +128,15 @@ export async function addUpdate(
   let projectId: string | null = null;
   let projectMatch: string | undefined;
   if (projectName) {
-    const project = await findProjectByFuzzyName(client.id, projectName);
-    projectId = project?.id ?? null;
-    projectMatch = project?.name;
+    const resolved = await resolveProjectOrFail(client.id, client.name, projectName);
+    if (resolved.ok) {
+      projectId = resolved.project.id;
+      projectMatch = resolved.project.name;
+    } else if (resolved.error.startsWith("Multiple")) {
+      // Ambiguous match — return error so user can disambiguate
+      return resolved;
+    }
+    // Not found — leave projectId null, note is client-level
   }
 
   const idemKey = generateIdempotencyKey(
@@ -118,16 +147,14 @@ export async function addUpdate(
     new Date().toISOString().slice(0, 16)
   );
 
-  if (await checkIdempotency(idemKey)) {
-    return {
-      ok: true,
-      message: "Update already logged (duplicate request).",
-      data: { clientName: client.name, projectName: projectMatch },
-    };
-  }
+  const dup = await checkDuplicate(idemKey, {
+    ok: true,
+    message: "Update already logged (duplicate request).",
+    data: { clientName: client.name, projectName: projectMatch },
+  });
+  if (dup) return dup;
 
-  await db.insert(updates).values({
-    id: generateId(),
+  await insertAuditRecord({
     idempotencyKey: idemKey,
     projectId,
     clientId: client.id,

@@ -38,17 +38,28 @@ vi.mock("./operations", () => ({
   CASCADE_STATUSES: ["completed", "blocked", "on-hold"],
   TERMINAL_ITEM_STATUSES: ["completed", "canceled"],
   generateIdempotencyKey: (...parts: string[]) => parts.join("|"),
-  generateId: () => "mock-id-12345678901234",
   getClientOrFail: async (slug: string) => {
     const client = await mockGetClientBySlug(slug);
     if (!client) return { ok: false, error: `Client '${slug}' not found.` };
     return { ok: true, client };
   },
-  findProjectByFuzzyName: (...args: unknown[]) =>
-    mockFindProjectByFuzzyName(...args),
+  resolveProjectOrFail: async (_clientId: string, _clientName: string, projectName: string) => {
+    const result = await mockFindProjectByFuzzyName(_clientId, projectName);
+    if (!result) {
+      const available = await mockGetProjectsForClient(_clientId);
+      return { ok: false, error: `Project '${projectName}' not found.`, available: available?.map((p: { name: string }) => p.name) };
+    }
+    return { ok: true, project: result };
+  },
   getProjectsForClient: (...args: unknown[]) =>
     mockGetProjectsForClient(...args),
-  checkIdempotency: (...args: unknown[]) => mockCheckIdempotency(...args),
+  checkDuplicate: async (idemKey: string, dupResult: unknown) => {
+    if (await mockCheckIdempotency(idemKey)) return dupResult;
+    return null;
+  },
+  insertAuditRecord: async (params: Record<string, unknown>) => {
+    mockInsertValues(params);
+  },
   getLinkedWeekItems: (...args: unknown[]) => mockGetLinkedWeekItems(...args),
 }));
 

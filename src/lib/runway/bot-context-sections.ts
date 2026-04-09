@@ -142,6 +142,8 @@ Call get_person_workload with the person's name. This returns items where they a
   Call get_pipeline.
 - "who's holding things up at [client]":
   Call get_client_contacts with the client slug, then cross-reference with get_projects filtered by waitingOn.
+- "what did I update" / "what changed on [client]" / "what happened this week":
+  Call get_recent_updates. Filter by client slug if mentioned. Filter by since date if mentioned.
 
 ### Status cascade behavior
 When you update a project status to ${CASCADE_STATUSES.join(", ")}, linked week items

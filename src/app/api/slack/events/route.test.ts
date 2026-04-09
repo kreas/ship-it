@@ -186,6 +186,66 @@ describe("POST /api/slack/events — image attachments", () => {
     );
   });
 
+  it("includes threadTs in Inngest event when message is in a thread", async () => {
+    const { POST } = await import("./route");
+    const { inngest } = await import("@/lib/inngest/client");
+
+    const body = JSON.stringify({
+      type: "event_callback",
+      event: {
+        type: "message",
+        channel_type: "im",
+        user: "U12345",
+        channel: "D67890",
+        text: "replying in thread",
+        ts: "1234567890.999999",
+        thread_ts: "1234567890.111111",
+      },
+    });
+    const req = makeRequest(body);
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: "runway/slack.message",
+      data: {
+        slackUserId: "U12345",
+        channelId: "D67890",
+        messageText: "replying in thread",
+        messageTs: "1234567890.999999",
+        threadTs: "1234567890.111111",
+        imageFiles: undefined,
+      },
+    });
+  });
+
+  it("does not include threadTs when message is not in a thread", async () => {
+    const { POST } = await import("./route");
+    const { inngest } = await import("@/lib/inngest/client");
+
+    const body = JSON.stringify({
+      type: "event_callback",
+      event: {
+        type: "message",
+        channel_type: "im",
+        user: "U12345",
+        channel: "D67890",
+        text: "top-level message",
+        ts: "1234567890.123456",
+      },
+    });
+    const req = makeRequest(body);
+    await POST(req as never);
+
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          threadTs: undefined,
+        }),
+      })
+    );
+  });
+
   it("does not include imageFiles when there are no image attachments", async () => {
     const { POST } = await import("./route");
     const { inngest } = await import("@/lib/inngest/client");

@@ -18,7 +18,7 @@ describe("formatProactiveFollowUp", () => {
 
   it("formats a single item", () => {
     const result = formatProactiveFollowUp([item()]);
-    expect(result).toContain("Got a minute");
+    expect(result).toContain("While I have you");
     expect(result).toContain("Convergix: CDS Messaging (10d stale)");
     expect(result).toContain("Any updates on these");
     expect(result).not.toContain("more");

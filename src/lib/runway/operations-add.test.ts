@@ -8,6 +8,7 @@ vi.mock("@/lib/db/runway-schema", () => ({ projects: {}, updates: {} }));
 
 const mockGetClientBySlug = vi.fn();
 const mockFindProjectByFuzzyName = vi.fn();
+const mockResolveProjectOrFail = vi.fn();
 const mockCheckIdempotency = vi.fn();
 vi.mock("./operations", () => ({
   generateIdempotencyKey: (...parts: string[]) => parts.join("|"),
@@ -18,7 +19,16 @@ vi.mock("./operations", () => ({
     return { ok: true, client };
   },
   findProjectByFuzzyName: (...args: unknown[]) => mockFindProjectByFuzzyName(...args),
-  checkIdempotency: (...args: unknown[]) => mockCheckIdempotency(...args),
+  resolveProjectOrFail: (...args: unknown[]) => mockResolveProjectOrFail(...args),
+  normalizeForMatch: (text: string) =>
+    text.replace(/[\u2014\u2013\-]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase(),
+  checkDuplicate: async (idemKey: string, dupResult: unknown) => {
+    if (await mockCheckIdempotency(idemKey)) return dupResult;
+    return null;
+  },
+  insertAuditRecord: async (params: Record<string, unknown>) => {
+    mockInsertValues(params);
+  },
 }));
 
 const client = { id: "c1", name: "Convergix", slug: "convergix" };
@@ -91,6 +101,45 @@ describe("addProject", () => {
     }
   });
 
+  it("returns error when project with same name already exists under client", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue({ id: "p1", name: "Engagement Videos" });
+    const { addProject } = await import("./operations-add");
+    const result = await addProject({
+      clientSlug: "convergix", name: "Engagement Videos", updatedBy: "jason",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("already exists");
+      expect(result.error).toContain("Convergix");
+    }
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it("detects duplicate when existing name uses em dash", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue({ id: "p1", name: "Impact Report \u2014 Dev" });
+    const { addProject } = await import("./operations-add");
+    const result = await addProject({
+      clientSlug: "convergix", name: "Impact Report Dev", updatedBy: "jason",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("already exists");
+    }
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it("allows project creation when fuzzy match finds similar but not exact name", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockFindProjectByFuzzyName.mockResolvedValue({ id: "p1", name: "Chester Claws" });
+    const { addProject } = await import("./operations-add");
+    const result = await addProject({
+      clientSlug: "convergix", name: "Chester Claws - Music Videos", updatedBy: "jason",
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("logs audit record with correct fields", async () => {
     mockGetClientBySlug.mockResolvedValue(client);
     const { addProject } = await import("./operations-add");
@@ -120,7 +169,10 @@ describe("addUpdate — edge cases", () => {
 
   it("sets projectId to null when project not found by fuzzy name", async () => {
     mockGetClientBySlug.mockResolvedValue(client);
-    mockFindProjectByFuzzyName.mockResolvedValue(null);
+    mockResolveProjectOrFail.mockResolvedValue({
+      ok: false, error: "Project 'nonexistent' not found for Convergix.",
+      available: ["CDS Messaging"],
+    });
     const { addUpdate } = await import("./operations-add");
     const result = await addUpdate({
       clientSlug: "convergix", projectName: "nonexistent", summary: "Note", updatedBy: "kathy",
@@ -132,7 +184,9 @@ describe("addUpdate — edge cases", () => {
 
   it("returns undefined projectName in data when project not matched", async () => {
     mockGetClientBySlug.mockResolvedValue(client);
-    mockFindProjectByFuzzyName.mockResolvedValue(null);
+    mockResolveProjectOrFail.mockResolvedValue({
+      ok: false, error: "Project 'nonexistent' not found for Convergix.",
+    });
     const { addUpdate } = await import("./operations-add");
     const result = await addUpdate({
       clientSlug: "convergix", projectName: "nonexistent", summary: "Note", updatedBy: "kathy",
@@ -140,6 +194,26 @@ describe("addUpdate — edge cases", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data?.projectName).toBeUndefined();
+    }
+  });
+
+  it("returns disambiguation error when multiple projects match", async () => {
+    mockGetClientBySlug.mockResolvedValue(client);
+    mockResolveProjectOrFail.mockResolvedValue({
+      ok: false,
+      error: "Multiple projects match 'Impact Report': Impact Report Dev, Impact Report Design. Which one?",
+      available: ["Impact Report Dev", "Impact Report Design"],
+    });
+    const { addUpdate } = await import("./operations-add");
+    const result = await addUpdate({
+      clientSlug: "convergix", projectName: "Impact Report", summary: "Note", updatedBy: "kathy",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("Multiple projects match");
+      expect(result.error).toContain("Impact Report Dev");
+      expect(result.error).toContain("Impact Report Design");
+      expect(result.available).toEqual(["Impact Report Dev", "Impact Report Design"]);
     }
   });
 });
@@ -158,7 +232,7 @@ describe("addUpdate", () => {
 
   it("resolves project name when provided", async () => {
     mockGetClientBySlug.mockResolvedValue(client);
-    mockFindProjectByFuzzyName.mockResolvedValue(project);
+    mockResolveProjectOrFail.mockResolvedValue({ ok: true, project });
     const { addUpdate } = await import("./operations-add");
     const result = await addUpdate({
       clientSlug: "convergix", projectName: "CDS", summary: "Feedback received", updatedBy: "kathy",

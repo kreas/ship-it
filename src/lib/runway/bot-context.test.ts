@@ -184,21 +184,52 @@ describe("buildBotSystemPrompt", () => {
     });
   });
 
-  describe("tone and unsupported features", () => {
+  describe("tone and capability boundaries", () => {
     it("includes emotional awareness", () => {
       const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
       expect(prompt).toContain("acknowledge empathetically");
     });
 
-    it("includes unsupported feature handling", () => {
+    it("includes capability boundaries with add_update distinction", () => {
       const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
-      expect(prompt).toContain("Availability tracking isn't in Runway yet");
-      expect(prompt).toContain("Reminders aren't set up yet");
+      expect(prompt).toContain("add_update logs a text note");
+      expect(prompt).toContain("NEVER tell the user a field was changed unless");
+    });
+
+    it("contains CAN and CANNOT sections", () => {
+      const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
+      expect(prompt).toContain("What you CAN do");
+      expect(prompt).toContain("What you CANNOT do");
+      expect(prompt).toContain("update_project_field");
+      expect(prompt).toContain("create_project");
+      expect(prompt).toContain("create_week_item");
+      expect(prompt).toContain("update_week_item");
     });
 
     it("includes no em dashes rule", () => {
       const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
       expect(prompt).toContain("Never use em dashes");
+    });
+  });
+
+  describe("confirmation rules", () => {
+    it("includes confirmation requirements", () => {
+      const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
+      expect(prompt).toContain("Confirmation rules");
+      expect(prompt).toContain("Sound right?");
+      expect(prompt).toContain("Marking a project completed");
+    });
+
+    it("includes multi-update guidance", () => {
+      const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
+      expect(prompt).toContain("Multi-update messages");
+      expect(prompt).toContain("Process each update separately");
+    });
+
+    it("includes ambiguity rules", () => {
+      const prompt = buildBotSystemPrompt(createMember(), APRIL_6_2026);
+      expect(prompt).toContain("Ambiguity");
+      expect(prompt).toContain("could mean two things");
     });
   });
 

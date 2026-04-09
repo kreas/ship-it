@@ -10,6 +10,11 @@
 export {
   CASCADE_STATUSES,
   TERMINAL_ITEM_STATUSES,
+  PROJECT_FIELDS,
+  PROJECT_FIELD_TO_COLUMN,
+  WEEK_ITEM_FIELDS,
+  WEEK_ITEM_FIELD_TO_COLUMN,
+  UNDO_FIELDS,
   generateIdempotencyKey,
   generateId,
   clientNotFoundError,
@@ -20,9 +25,24 @@ export {
   getClientBySlug,
   getClientNameMap,
   findProjectByFuzzyName,
+  findProjectByFuzzyNameWithDisambiguation,
+  resolveProjectOrFail,
+  normalizeForMatch,
+  fuzzyMatch,
+  fuzzyMatchProject,
   getProjectsForClient,
   checkIdempotency,
+  checkDuplicate,
+  insertAuditRecord,
+  validateField,
+  findWeekItemByFuzzyTitle,
+  findWeekItemByFuzzyTitleWithDisambiguation,
+  resolveWeekItemOrFail,
+  fuzzyMatchWeekItem,
+  getWeekItemsForWeek,
 } from "./operations-utils";
+
+export type { FuzzyMatchResult, ProjectField, WeekItemField } from "./operations-utils";
 
 // ── Read operations ─────────────────────────────────────
 export {
@@ -39,6 +59,15 @@ export type {
   WeekItemRow,
   StaleAccountItem,
 } from "./operations-reads";
+
+export {
+  getRecentUpdates,
+} from "./operations-reads-updates";
+
+export type {
+  RecentUpdate,
+  GetRecentUpdatesParams,
+} from "./operations-reads-updates";
 
 // ── Context operations ──────────────────────────────────
 export {
@@ -62,6 +91,28 @@ export type {
   UpdateProjectStatusParams,
   OperationResult,
 } from "./operations-writes";
+
+export {
+  updateProjectField,
+} from "./operations-writes-project";
+
+export type {
+  UpdateProjectFieldParams,
+} from "./operations-writes-project";
+
+export {
+  createWeekItem,
+  updateWeekItemField,
+} from "./operations-writes-week";
+
+export type {
+  CreateWeekItemParams,
+  UpdateWeekItemFieldParams,
+} from "./operations-writes-week";
+
+export {
+  undoLastChange,
+} from "./operations-writes-undo";
 
 // ── Add operations ──────────────────────────────────────
 export {

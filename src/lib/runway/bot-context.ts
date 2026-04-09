@@ -17,8 +17,9 @@ import {
   buildGlossary,
   buildRoleBehavior,
   buildProactiveBehavior,
+  buildConfirmationRules,
   buildToneRules,
-  buildUnsupported,
+  buildCapabilityBoundaries,
 } from "./bot-context-behaviors";
 
 /**
@@ -59,7 +60,7 @@ Pipeline items (unsigned SOWs / new business) use: scoping, drafting, sow-sent, 
 
 ## When making updates
 1. First use get_clients and/or get_projects to find the right project
-2. Call update_project_status or add_update to make the change
+2. Use the right tool for the job (see capability boundaries below)
 3. Confirm what you did in plain language
 4. The updates channel post happens automatically`,
 
@@ -71,8 +72,9 @@ Pipeline items (unsigned SOWs / new business) use: scoping, drafting, sow-sent, 
     buildGlossary(),
     buildRoleBehavior(),
     buildProactiveBehavior(),
+    buildConfirmationRules(),
     buildToneRules(),
-    buildUnsupported(),
+    buildCapabilityBoundaries(),
   ];
 
   return sections.join("\n\n");
