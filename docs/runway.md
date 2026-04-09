@@ -36,7 +36,7 @@ Runway uses a **separate Turso database** (`RUNWAY_DATABASE_URL`), not the main 
 | `projects` | Work items under each client, with status, owner, and resources |
 | `week_items` | Calendar entries by date, with owner/resources separation |
 | `pipeline_items` | Unsigned SOWs and new business, with owner and pipeline status lifecycle |
-| `updates` | Audit log of all changes (idempotency-keyed) |
+| `updates` | Audit log of all changes (idempotency-keyed, `metadata` JSON for structured undo) |
 | `team_members` | Civilization team with Slack user IDs |
 
 ### Separate Drizzle Config
@@ -62,7 +62,11 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 | `operations-reads-week.ts` | Week items (filterable by owner/resource), person workload, and `getLinkedWeekItems(projectId)` |
 | `operations-reads-pipeline.ts` | Pipeline data and stale items detection |
 | `operations-writes.ts` | Status updates with idempotency, audit logging, and cascade to linked week items |
-| `operations-add.ts` | New projects and free-form updates |
+| `operations-writes-project.ts` | Project field updates (name, dueDate, owner, resources, waitingOn, target, notes) |
+| `operations-writes-week.ts` | Create week items and update week item fields |
+| `operations-writes-undo.ts` | Undo last status or field change by user (reads field from `metadata` JSON, regex fallback for pre-migration records) |
+| `operations-reads-updates.ts` | Recent updates query (powers "what did I change?" recall) |
+| `operations-add.ts` | New projects (with duplicate name guard, expanded fields: resources, dueDate, target, waitingOn) and free-form updates (with disambiguation on ambiguous project matches) |
 | `operations-context.ts` | Team members (with roleCategory/accountsLed), client contacts, update history |
 
 ### Client Cache
@@ -77,6 +81,10 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 - `matchesSubstring(value, search)` — case-insensitive substring match (used by read operations for owner/waitingOn filters)
 - `groupBy(items, keyFn)` — generic array grouping (used by reads and board queries)
 - `clientNotFoundError(slug)` — standard error result for missing clients
+- `resolveProjectOrFail(clientId, clientName, projectName)` — fuzzy-match project with full disambiguation error handling (ambiguous, not-found with available list)
+- `validateField(field, allowedFields)` — validate a field name against an allowed list, return error result or null
+- `fuzzyMatch(items, searchTerm, getText)` — generic ranked fuzzy match (exact > starts-with > substring), returns `match`, `ambiguous`, or `none`
+- `fuzzyMatchProject` / `fuzzyMatchWeekItem` — convenience wrappers for `.name` and `.title` fields
 - `CASCADE_STATUSES` — statuses that cascade from projects to linked week items: `completed`, `blocked`, `on-hold`
 - `TERMINAL_ITEM_STATUSES` — week item statuses that block cascade: `completed`, `canceled`
 
@@ -89,6 +97,24 @@ The cascade is implemented in `operations-writes.ts` using `getLinkedWeekItems(p
 ### Idempotency
 
 All write operations generate a deterministic idempotency key (SHA-256 hash of operation parts). Duplicate requests return success without writing.
+
+### Structured Undo via Metadata
+
+Field-change audit records store `metadata: JSON.stringify({ field })` so `undoLastChange` can read the field name from structured data instead of parsing it from the summary string. For records created before the migration (no `metadata` column), the regex fallback (`/: (\w+) changed from/`) is used.
+
+Undo handles null/empty `previousValue` gracefully: status reverts to `"not-started"`, fields revert to `null`. Sequential undos work correctly — the scan loop skips records that already have an undo audit entry (checked via idempotency key), always reverting the most recent un-undone change first. The query uses `orderBy(desc(createdAt), desc(id))` for stable ordering when timestamps collide. The scan is bounded to `MAX_UNDO_SCAN` (50) most recent records to prevent unbounded DB queries.
+
+### Fuzzy Matching with Disambiguation
+
+Project and week item lookups use ranked fuzzy matching via `fuzzyMatch()`:
+
+1. **Exact match** (case-insensitive) -- single result, highest confidence
+2. **Starts-with match** -- single if only one, else returns `ambiguous` with options
+3. **Substring match** -- single if only one, else returns `ambiguous` with options
+
+All comparisons normalize dashes and whitespace via `normalizeForMatch()`: em dashes (—), en dashes (–), and hyphens (-) are replaced with spaces, then whitespace is collapsed. This means "Impact Report Dev" matches "Impact Report — Dev" in the database. Items are pre-normalized once per `fuzzyMatch` call for performance.
+
+When a match is ambiguous, write operations return an error like `"Multiple projects match 'Impact Report': Impact Report Dev, Impact Report Design. Which one?"` with an `available` list so the bot can ask clearly. The `resolveProjectOrFail()` helper encapsulates this pattern for all project write operations.
 
 ## Reference Data
 
@@ -201,29 +227,35 @@ Documented in [MCP Integration](./mcp-integration.md#standalone-mcp-servers-runw
 
 ### Flow
 
-1. Team member DMs the bot (text and/or images)
-2. `POST /api/slack/events` verifies HMAC signature, extracts image file metadata, dispatches to Inngest
-3. Inngest function (`runway/slack.message`) downloads images via Slack API (with `Promise.allSettled` for graceful failure), then calls `handleDirectMessage`
-4. `handleDirectMessage` builds a dynamic system prompt via `buildBotSystemPrompt`, sends text + images as AI SDK content blocks to Haiku with 8 tools
+1. Team member DMs the bot (text and/or images), possibly in a thread
+2. `POST /api/slack/events` verifies HMAC signature, extracts image file metadata and `thread_ts`, dispatches to Inngest
+3. Inngest function (`runway/slack.message`) downloads images via Slack API (with `Promise.allSettled` for graceful failure), then calls `handleDirectMessage` with `threadTs`
+4. `handleDirectMessage` fetches thread history if in a thread (capped at 20 messages), builds a dynamic system prompt via `buildBotSystemPrompt`, sends full conversation + images as AI SDK content blocks to Sonnet with 14 tools (MAX_STEPS=12)
 5. Bot responds in thread, posts formatted update to updates channel
+6. Proactive follow-up fires only on first message (not thread replies), excludes projects touched by any mutation tool in the current response (`MUTATION_TOOLS` constant), filtered by the user's owned/resourced items
 
 ### Dynamic System Prompt
 
-`src/lib/runway/bot-context.ts` composes sections from `bot-context-sections.ts` (data builders) and `bot-context-behaviors.ts` (behavior rules) into a context-rich prompt with 10 sections:
+`src/lib/runway/bot-context.ts` composes sections from `bot-context-sections.ts` (data builders) and `bot-context-behaviors.ts` (behavior rules) into a context-rich prompt with 12 sections:
 
 1. Core rules (project statuses, pipeline statuses, update workflow)
 2. Date context (today, this week's Monday, yesterday, tomorrow)
 3. Identity context (who's talking -- name, role, accounts led)
-4. Query recipes (owner vs resource distinction: "what am I working on" uses resource, "what do I own" uses owner)
+4. Query recipes (owner vs resource, "what did I update" recall, cascade behavior)
 5. Team roster (all members with roles and accounts)
 6. Client map (nicknames, slugs, contacts)
 7. Natural language glossary ("out the door" = delivered, "sitting on it" = awaiting client, etc.)
 8. Role-based behavior (AM vs creative vs PM query interpretation)
-9. Proactive behavior (suggest related updates, flag contradictions)
-10. Tone rules (no AI voice, acknowledge frustration)
-11. Unsupported features (graceful handling of availability, reminders)
+9. Proactive behavior (suggest related updates, flag contradictions, multi-update handling)
+10. Confirmation rules (confirm before completing/on-hold, changing owner, creating projects; ambiguity handling)
+11. Tone rules (no AI voice, acknowledge frustration)
+12. Capability boundaries (what the bot CAN and CANNOT do, critical add_update vs update_project_field distinction)
 
 The prompt is built per-message using the team member's record from the DB and the current date. Unknown Slack users get a null record and the bot asks who they are.
+
+### Thread History
+
+When a user replies in a Slack thread, the bot fetches the full conversation (up to 20 most recent messages) via `conversations.replies` and includes them as prior `user`/`assistant` messages in the AI call. This gives the bot multi-turn context so users don't repeat themselves. The `threadTs` flows from the Slack event through Inngest to `handleDirectMessage`. Responses and proactive follow-ups are posted to the same thread via `thread_ts`.
 
 ### Image Attachments
 
@@ -247,8 +279,14 @@ Defined in `src/lib/slack/bot-tools.ts`. Same operations as MCP but wrapped as A
 | `get_week_items` | Calendar items for a week, filterable by owner (accountable) or resource (doing the work) |
 | `get_person_workload` | Cross-client view of a person's projects and week items (searches both owner and resource fields) |
 | `get_client_contacts` | Contact names and roles for a client (from reference data) |
-| `update_project_status` | Change status + cascade to linked week items + post to updates channel |
-| `add_update` | Log free-form update + post to updates channel |
+| `update_project_status` | Change status + cascade to linked week items + post to updates channel. Returns before/after in response. |
+| `add_update` | Log free-form update + post to updates channel. Does NOT change any DB field. |
+| `create_project` | Create a new project under a client (with owner, resources, dueDate, target, waitingOn). Rejects duplicate names under same client. |
+| `update_project_field` | Update a specific project field (name, dueDate, owner, resources, waitingOn, target, notes). ACTUALLY changes the DB. |
+| `create_week_item` | Add a new item to the weekly calendar |
+| `undo_last_change` | Revert the user's most recent status or field change |
+| `get_recent_updates` | Look up recent changes (powers "what did I change?" queries) |
+| `update_week_item` | Update a field on an existing week item + post to updates channel |
 
 ### Updates Channel
 
@@ -277,14 +315,14 @@ export const processRunwaySlackMessage = inngest.createFunction(
   { id: "runway-slack-message", retries: 2, concurrency: { limit: 3 } },
   { event: "runway/slack.message" },
   async ({ event, step }) => {
-    const { slackUserId, channelId, messageText, messageTs, imageFiles } = event.data;
+    const { slackUserId, channelId, messageText, messageTs, threadTs, imageFiles } = event.data;
 
     // Download images (graceful failure via Promise.allSettled)
     const images = await step.run("download-images", async () => { /* ... */ });
 
-    // Process message with text + images
+    // Process message with text + images + thread context
     await step.run("process-message", async () => {
-      await handleDirectMessage(slackUserId, channelId, messageText, messageTs, images);
+      await handleDirectMessage(slackUserId, channelId, messageText, messageTs, threadTs, images);
     });
   },
 );
@@ -310,11 +348,15 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/lib/db/runway-schema.ts` | Database schema (6 tables) |
 | `src/lib/db/runway.ts` | Database client factory |
 | `src/lib/runway/operations.ts` | Barrel re-export + shared utilities (groupBy, matchesSubstring, etc.) |
-| `src/lib/runway/operations-utils.ts` | Shared utility implementations (client cache, fuzzy match, idempotency) |
+| `src/lib/runway/operations-utils.ts` | Shared utility implementations (client cache, fuzzy match, idempotency, resolveProjectOrFail, validateField) |
+| `src/lib/runway/operations-writes-project.ts` | Project field update operations |
+| `src/lib/runway/operations-writes-week.ts` | Week item create and field update operations |
+| `src/lib/runway/operations-writes-undo.ts` | Undo last change operation |
+| `src/lib/runway/operations-reads-updates.ts` | Recent updates query |
 | `src/lib/runway/flags.ts` | AI flag analysis (resource conflicts, stale items, deadlines, bottlenecks) |
 | `src/lib/runway/bot-context.ts` | Dynamic system prompt coordinator |
 | `src/lib/runway/bot-context-sections.ts` | Prompt data builders (date, identity, roster, client map, recipes) |
-| `src/lib/runway/bot-context-behaviors.ts` | Prompt behavior rules (glossary, roles, tone, proactive) |
+| `src/lib/runway/bot-context-behaviors.ts` | Prompt behavior rules (glossary, roles, tone, capabilities, confirmation) |
 | `src/lib/runway/date-constants.ts` | Shared date formatting constants |
 | `src/lib/runway/reference/clients.ts` | Client reference data (nicknames, contacts) |
 | `src/lib/runway/reference/team.ts` | Team reference data (roles, accounts led) |
@@ -323,7 +365,7 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/app/api/mcp/runway/route.ts` | MCP HTTP endpoint |
 | `src/app/api/slack/events/route.ts` | Slack webhook handler (text + images) |
 | `src/lib/slack/bot.ts` | AI bot orchestration (text + image content blocks) |
-| `src/lib/slack/bot-tools.ts` | Bot tool definitions (8 tools) |
+| `src/lib/slack/bot-tools.ts` | Bot tool definitions (14 tools) |
 | `src/lib/slack/verify.ts` | Slack signature verification |
 | `src/lib/slack/updates-channel.ts` | Updates channel posting |
 | `src/app/runway/page.tsx` | Board page (RSC, data transformation) |
