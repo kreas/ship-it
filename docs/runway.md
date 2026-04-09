@@ -82,11 +82,24 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 - `groupBy(items, keyFn)` — generic array grouping (used by reads and board queries)
 - `clientNotFoundError(slug)` — standard error result for missing clients
 - `resolveProjectOrFail(clientId, clientName, projectName)` — fuzzy-match project with full disambiguation error handling (ambiguous, not-found with available list)
+- `resolveWeekItemOrFail(weekOf, weekItemTitle)` — fuzzy-match week item with disambiguation, mirrors `resolveProjectOrFail`
 - `validateField(field, allowedFields)` — validate a field name against an allowed list, return error result or null
+- `insertAuditRecord(params)` — insert an audit record into the `updates` table (used by all write operations for change tracking)
+- `checkDuplicate(idemKey, duplicateResult)` — check idempotency key; returns `duplicateResult` if key exists, `null` otherwise (replaces inline `checkIdempotency` + if-block pattern)
 - `fuzzyMatch(items, searchTerm, getText)` — generic ranked fuzzy match (exact > starts-with > substring), returns `match`, `ambiguous`, or `none`
 - `fuzzyMatchProject` / `fuzzyMatchWeekItem` — convenience wrappers for `.name` and `.title` fields
 - `CASCADE_STATUSES` — statuses that cascade from projects to linked week items: `completed`, `blocked`, `on-hold`
 - `TERMINAL_ITEM_STATUSES` — week item statuses that block cascade: `completed`, `canceled`
+
+### Field Constants
+
+Centralized in `operations-utils.ts` so field allowlists are defined once and shared across write, undo, and validation code:
+
+- `PROJECT_FIELDS` — editable project fields: `name`, `dueDate`, `owner`, `resources`, `waitingOn`, `target`, `notes`
+- `PROJECT_FIELD_TO_COLUMN` — maps each `ProjectField` to its Drizzle column key
+- `WEEK_ITEM_FIELDS` — editable week item fields: `title`, `status`, `date`, `dayOfWeek`, `owner`, `resources`, `notes`, `category`
+- `WEEK_ITEM_FIELD_TO_COLUMN` — maps each `WeekItemField` to its Drizzle column key
+- `UNDO_FIELDS` — derived from `[...PROJECT_FIELDS, "status", "category"]` so new project fields automatically become undoable
 
 ### Status Cascade
 
@@ -253,6 +266,25 @@ Documented in [MCP Integration](./mcp-integration.md#standalone-mcp-servers-runw
 
 The prompt is built per-message using the team member's record from the DB and the current date. Unknown Slack users get a null record and the bot asks who they are.
 
+### Prompt Caching
+
+The system prompt is sent as the first message in the `messages` array (not via the `system` parameter) with Anthropic ephemeral cache control:
+
+```typescript
+const cacheControl = { cacheControl: { type: "ephemeral" as const } };
+const messages = [
+  {
+    role: "system" as const,
+    content: systemPrompt,
+    providerOptions: { anthropic: cacheControl },
+  },
+  ...threadHistory,
+  { role: "user" as const, content: userContent },
+];
+```
+
+This matches the `addCacheBreakpoints` pattern in `src/lib/chat/index.ts`. Cache control must be on the message object via `providerOptions`, not at the `generateText` call level (top-level `providerOptions` is silently ignored for caching). The system prompt is large (~3K tokens with roster, client map, and behavior rules), so caching it across multi-turn thread conversations reduces cost significantly.
+
 ### Thread History
 
 When a user replies in a Slack thread, the bot fetches the full conversation (up to 20 most recent messages) via `conversations.replies` and includes them as prior `user`/`assistant` messages in the AI call. This gives the bot multi-turn context so users don't repeat themselves. The `threadTs` flows from the Slack event through Inngest to `handleDirectMessage`. Responses and proactive follow-ups are posted to the same thread via `thread_ts`.
@@ -348,7 +380,7 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/lib/db/runway-schema.ts` | Database schema (6 tables) |
 | `src/lib/db/runway.ts` | Database client factory |
 | `src/lib/runway/operations.ts` | Barrel re-export + shared utilities (groupBy, matchesSubstring, etc.) |
-| `src/lib/runway/operations-utils.ts` | Shared utility implementations (client cache, fuzzy match, idempotency, resolveProjectOrFail, validateField) |
+| `src/lib/runway/operations-utils.ts` | Shared utility implementations (client cache, fuzzy match, idempotency, field constants, insertAuditRecord, checkDuplicate, resolveProjectOrFail, resolveWeekItemOrFail, validateField) |
 | `src/lib/runway/operations-writes-project.ts` | Project field update operations |
 | `src/lib/runway/operations-writes-week.ts` | Week item create and field update operations |
 | `src/lib/runway/operations-writes-undo.ts` | Undo last change operation |
