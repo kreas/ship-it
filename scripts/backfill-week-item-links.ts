@@ -26,6 +26,7 @@ const client = createClient({ url, authToken: process.env.RUNWAY_AUTH_TOKEN });
 const db = drizzle(client);
 
 const applyMode = process.argv.includes("--apply");
+const verboseMode = process.argv.includes("--verbose");
 
 async function backfill() {
   console.log(`Mode: ${applyMode ? "APPLY (will write to DB)" : "DRY-RUN (preview only)"}`);
@@ -68,6 +69,9 @@ async function backfill() {
     if (projectId) {
       const project = allProjects.find((p) => p.id === projectId);
       console.log(`  MATCH: "${item.title}" -> ${project?.name ?? projectId}`);
+      if (verboseMode && project) {
+        console.log(`         Reason: project "${project.name}" matched in client ${item.clientId}`);
+      }
 
       if (applyMode) {
         await db
@@ -84,7 +88,8 @@ async function backfill() {
 
   console.log(`\nResults: ${matched} matched, ${unmatched} unmatched`);
   if (!applyMode && matched > 0) {
-    console.log("Run with --apply to commit these changes.");
+    console.log("\nReview the matches above carefully before running with --apply.");
+    console.log("Incorrect links will cause cascades to update wrong week items.");
   }
 }
 

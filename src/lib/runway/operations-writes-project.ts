@@ -67,22 +67,36 @@ export async function updateProjectField(
   });
   if (dup) return dup;
 
-  await db
-    .update(projects)
-    .set({ [columnKey]: newValue, updatedAt: new Date() })
-    .where(eq(projects.id, project.id));
-
-  // Cascade dueDate changes to linked deadline week items
+  // Wrap project update + cascade in a single transaction for atomicity
   const cascadedItems: string[] = [];
-  if (typedField === "dueDate") {
-    const linkedDeadlines = await getLinkedDeadlineItems(project.id);
-    for (const item of linkedDeadlines) {
-      await db
-        .update(weekItems)
-        .set({ date: newValue, updatedAt: new Date() })
-        .where(eq(weekItems.id, item.id));
-      cascadedItems.push(item.title);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(projects)
+      .set({ [columnKey]: newValue, updatedAt: new Date() })
+      .where(eq(projects.id, project.id));
+
+    // Cascade dueDate changes to linked deadline week items
+    if (typedField === "dueDate") {
+      const linkedDeadlines = await getLinkedDeadlineItems(project.id);
+      for (const item of linkedDeadlines) {
+        await tx
+          .update(weekItems)
+          .set({ date: newValue, updatedAt: new Date() })
+          .where(eq(weekItems.id, item.id));
+        cascadedItems.push(item.title);
+      }
     }
+  });
+
+  if (cascadedItems.length > 0) {
+    console.log(JSON.stringify({
+      event: "runway_cascade_forward",
+      projectId: project.id,
+      field: "dueDate",
+      newValue,
+      cascadedItems,
+    }));
   }
 
   await insertAuditRecord({

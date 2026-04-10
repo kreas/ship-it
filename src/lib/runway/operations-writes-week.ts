@@ -169,17 +169,33 @@ export async function updateWeekItemField(
   });
   if (dup) return dup;
 
-  await db
-    .update(weekItems)
-    .set({ [columnKey]: newValue, updatedAt: new Date() })
-    .where(eq(weekItems.id, item.id));
+  // Wrap week item update + reverse cascade in a single transaction for atomicity
+  let reverseCascaded = false;
 
-  // Reverse cascade: deadline date changes sync back to project.dueDate
-  if (typedField === "date" && item.category === "deadline" && item.projectId) {
-    await db
-      .update(projects)
-      .set({ dueDate: newValue, updatedAt: new Date() })
-      .where(eq(projects.id, item.projectId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(weekItems)
+      .set({ [columnKey]: newValue, updatedAt: new Date() })
+      .where(eq(weekItems.id, item.id));
+
+    // Reverse cascade: deadline date changes sync back to project.dueDate
+    if (typedField === "date" && item.category === "deadline" && item.projectId) {
+      await tx
+        .update(projects)
+        .set({ dueDate: newValue, updatedAt: new Date() })
+        .where(eq(projects.id, item.projectId));
+      reverseCascaded = true;
+    }
+  });
+
+  if (reverseCascaded) {
+    console.log(JSON.stringify({
+      event: "runway_cascade_reverse",
+      weekItemId: item.id,
+      projectId: item.projectId,
+      field: "dueDate",
+      newValue,
+    }));
   }
 
   await insertAuditRecord({
@@ -196,6 +212,6 @@ export async function updateWeekItemField(
   return {
     ok: true,
     message: `Updated ${field} for '${item.title}'.`,
-    data: { weekItemTitle: item.title, field, previousValue, newValue },
+    data: { weekItemTitle: item.title, field, previousValue, newValue, reverseCascaded },
   };
 }

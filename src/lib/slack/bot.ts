@@ -25,8 +25,27 @@ import {
 import { createBotTools } from "./bot-tools";
 import { buildBotSystemPrompt } from "@/lib/runway/bot-context";
 import { formatProactiveFollowUp } from "./bot-proactive";
+import { recordTokenUsage } from "@/lib/token-usage";
+
+const RUNWAY_WORKSPACE_ID = "runway-bot";
 
 const MODEL = "claude-sonnet-4-6";
+
+/** Only log safe structural fields from tool inputs — never free-text content like notes/summary. */
+const SAFE_INPUT_FIELDS = [
+  "clientSlug", "projectName", "field", "newValue", "newStatus",
+  "weekOf", "weekItemTitle", "personName", "dayOfWeek", "date",
+  "category", "since", "limit",
+];
+
+function sanitizeToolInput(input: unknown): Record<string, unknown> {
+  const raw = input as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  for (const key of SAFE_INPUT_FIELDS) {
+    if (key in raw) sanitized[key] = raw[key];
+  }
+  return sanitized;
+}
 const MAX_STEPS = 12;
 
 /** Tool names that mutate project/week-item data — used to exclude just-updated items from proactive nudge. */
@@ -202,22 +221,33 @@ export async function handleDirectMessage(
     }));
 
     for (const step of result.steps) {
-      for (const call of step.toolCalls) {
+      for (const call of step.toolCalls ?? []) {
         console.log(JSON.stringify({
           event: "runway_bot_tool_call",
           tool: call.toolName,
-          input: call.input,
+          input: sanitizeToolInput(call.input),
         }));
       }
-      if (step.toolResults) {
-        for (const res of step.toolResults) {
-          console.log(JSON.stringify({
-            event: "runway_bot_tool_result",
-            tool: res.toolName,
-            output: typeof res.output === "string" ? res.output : JSON.stringify(res.output),
-          }));
-        }
+      for (const res of step.toolResults ?? []) {
+        console.log(JSON.stringify({
+          event: "runway_bot_tool_result",
+          tool: res.toolName,
+          output: typeof res.output === "string" ? res.output : JSON.stringify(res.output),
+        }));
       }
+    }
+
+    // Persist token usage for cost monitoring (non-critical)
+    try {
+      await recordTokenUsage({
+        workspaceId: RUNWAY_WORKSPACE_ID,
+        model: MODEL,
+        inputTokens: result.usage?.inputTokens ?? 0,
+        outputTokens: result.usage?.outputTokens ?? 0,
+        source: "runway-bot",
+      });
+    } catch {
+      // Token tracking is non-critical; don't fail the bot response
     }
 
     const replyTs = threadTs ?? messageTs;

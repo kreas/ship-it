@@ -5,6 +5,15 @@ const mockInsertValues = vi.fn();
 const mockUpdateSet = vi.fn();
 const mockUpdateWhere = vi.fn();
 
+const mockTx = {
+  update: vi.fn(() => ({
+    set: vi.fn((...args: unknown[]) => {
+      mockUpdateSet(...args);
+      return { where: mockUpdateWhere };
+    }),
+  })),
+};
+
 vi.mock("@/lib/db/runway", () => ({
   getRunwayDb: () => ({
     insert: vi.fn(() => ({ values: mockInsertValues })),
@@ -14,6 +23,7 @@ vi.mock("@/lib/db/runway", () => ({
         return { where: mockUpdateWhere };
       }),
     })),
+    transaction: vi.fn(async (cb: (tx: typeof mockTx) => Promise<void>) => cb(mockTx)),
   }),
 }));
 
@@ -191,6 +201,7 @@ describe("updateWeekItemField", () => {
         field: "status",
         previousValue: "",
         newValue: "completed",
+        reverseCascaded: false,
       });
     }
     expect(mockUpdateSet).toHaveBeenCalledWith(
