@@ -59,11 +59,11 @@ All database reads and writes go through `src/lib/runway/operations*.ts`. No con
 | `operations.ts` | Shared queries (client cache, name map, fuzzy match), utilities (`groupBy`, `matchesSubstring`, `getClientOrFail`), re-exports from split modules |
 | `operations-reads.ts` | Barrel re-export for read operations (split into clients, week, pipeline modules) |
 | `operations-reads-clients.ts` | Client/project queries: clients with counts, filtered projects |
-| `operations-reads-week.ts` | Week items (filterable by owner/resource), person workload, and `getLinkedWeekItems(projectId)` |
+| `operations-reads-week.ts` | Week items (filterable by owner/resource), person workload, `getLinkedWeekItems(projectId)`, and `getLinkedDeadlineItems(projectId)` (deadline-category items only) |
 | `operations-reads-pipeline.ts` | Pipeline data and stale items detection |
 | `operations-writes.ts` | Status updates with idempotency, audit logging, and cascade to linked week items |
-| `operations-writes-project.ts` | Project field updates (name, dueDate, owner, resources, waitingOn, target, notes) |
-| `operations-writes-week.ts` | Create week items and update week item fields |
+| `operations-writes-project.ts` | Project field updates with forward deadline cascade (dueDate changes propagate to linked deadline week items) |
+| `operations-writes-week.ts` | Create week items and update week item fields with reverse deadline cascade (deadline date changes sync back to project.dueDate) |
 | `operations-writes-undo.ts` | Undo last status or field change by user (reads field from `metadata` JSON, regex fallback for pre-migration records) |
 | `operations-reads-updates.ts` | Recent updates query (powers "what did I change?" recall) |
 | `operations-add.ts` | New projects (with duplicate name guard, expanded fields: resources, dueDate, target, waitingOn) and free-form updates (with disambiguation on ambiguous project matches) |
@@ -106,6 +106,16 @@ Centralized in `operations-utils.ts` so field allowlists are defined once and sh
 When a project status changes to a cascade status (`completed`, `blocked`, `on-hold`), linked week items automatically update to match. Week items already in a terminal state (`completed`, `canceled`) are left alone. Non-terminal project statuses (`in-production`, `awaiting-client`) do NOT cascade because individual week items may be at different stages.
 
 The cascade is implemented in `operations-writes.ts` using `getLinkedWeekItems(projectId)` from `operations-reads-week.ts`. The result includes a `cascadedItems: string[]` field listing which week item titles were updated. The bot surfaces this in its response and in the updates channel post.
+
+### Deadline Cascade
+
+When a project's `dueDate` is changed via `updateProjectField`, all linked week items with `category === "deadline"` have their `date` updated to match (**forward cascade**). The bot's response lists which calendar items were updated. This prevents the bug where `projects.dueDate` changes but the board (which reads from `week_items`) still shows the old date.
+
+The reverse also applies: when a deadline week item's `date` is changed via `updateWeekItemField`, the linked project's `dueDate` syncs back automatically (**reverse cascade**). This only fires when all three conditions are met: `field === "date"`, `item.category === "deadline"`, and `item.projectId` is not null.
+
+**No circular cascade risk:** Forward cascade writes directly to `weekItems` table via `db.update()`. Reverse cascade writes directly to `projects` table via `db.update()`. Neither function calls the other -- they use raw DB writes, not the operation functions.
+
+Week items must be linked to projects (via `projectId` FK) for cascades to work. Use `scripts/backfill-week-item-links.ts` to link existing unlinked items.
 
 ### Idempotency
 
@@ -314,11 +324,24 @@ Defined in `src/lib/slack/bot-tools.ts`. Same operations as MCP but wrapped as A
 | `update_project_status` | Change status + cascade to linked week items + post to updates channel. Returns before/after in response. |
 | `add_update` | Log free-form update + post to updates channel. Does NOT change any DB field. |
 | `create_project` | Create a new project under a client (with owner, resources, dueDate, target, waitingOn). Rejects duplicate names under same client. |
-| `update_project_field` | Update a specific project field (name, dueDate, owner, resources, waitingOn, target, notes). ACTUALLY changes the DB. |
+| `update_project_field` | Update a specific project field (name, dueDate, owner, resources, waitingOn, target, notes). ACTUALLY changes the DB. dueDate changes cascade to linked deadline week items. |
 | `create_week_item` | Add a new item to the weekly calendar |
 | `undo_last_change` | Revert the user's most recent status or field change |
 | `get_recent_updates` | Look up recent changes (powers "what did I change?" queries) |
 | `update_week_item` | Update a field on an existing week item + post to updates channel |
+
+### No-Op Guard
+
+All write tool handlers (`update_project_status`, `update_project_field`, `update_week_item`) check if the previous value equals the new value before posting to the updates channel. No-op updates (same value written again) skip the channel post to prevent spam.
+
+### Structured Logging
+
+`bot.ts` emits structured JSON logs for every bot interaction, visible in Vercel logs:
+
+- `runway_bot_request` -- user, slackUserId, isThread, inputTokens, outputTokens, stepCount
+- `runway_bot_tool_call` -- tool name and input for each tool call
+- `runway_bot_tool_result` -- tool name and output for each tool result
+- `runway_bot_error` -- user and error message on failure
 
 ### Updates Channel
 
@@ -412,6 +435,7 @@ Requires `pnpm dev:inngest` (or `pnpm dev:all`) running alongside the dev server
 | `src/app/runway/components/status-badge.tsx` | Shared badge and label components |
 | `src/app/runway/data.ts` | Seed data (13 clients, typed exports) |
 | `scripts/seed-runway.ts` | Seed script (imports from date-utils, links week items to projects via `projectId` FK) |
+| `scripts/backfill-week-item-links.ts` | One-time backfill: links unlinked week items to projects via fuzzy title matching. Dry-run by default, `--apply` to commit. |
 
 ## Related Documentation
 
